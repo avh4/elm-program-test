@@ -4,6 +4,7 @@ import Expect
 import Html exposing (Html)
 import Html.Events exposing (onClick)
 import Json.Decode
+import Json.Encode
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
@@ -27,6 +28,7 @@ testView model =
     Html.div []
         [ Html.span [] [ Html.text model ]
         , Html.button [ onClick "CLICK" ] [ Html.text "Click Me" ]
+        , Html.node "strange" [ Html.Events.on "odd" Json.Decode.string ] []
         ]
 
 
@@ -132,5 +134,13 @@ all =
             \() ->
                 testContext
                     |> TestContext.shouldNotHave [ Selector.tag "article" ]
+                    |> TestContext.done
+        , test "can simulate an arbitrary DOM event" <|
+            \() ->
+                testContext
+                    |> TestContext.simulate
+                        (Query.find [ Selector.tag "strange" ])
+                        ( "odd", Json.Encode.string "<ODD-VALUE>" )
+                    |> TestContext.expectModel (Expect.equal "<INIT>;<ODD-VALUE>")
                     |> TestContext.done
         ]

@@ -13,6 +13,7 @@ module TestContext
         , shouldHave
         , shouldHaveView
         , shouldNotHave
+        , simulate
         , update
         )
 
@@ -28,7 +29,7 @@ module TestContext
 
 ## Simulating user input
 
-@docs clickButton
+@docs clickButton, simulate
 @docs routeChange
 
 
@@ -47,6 +48,7 @@ module TestContext
 import Expect exposing (Expectation)
 import Html exposing (Html)
 import Json.Decode
+import Json.Encode
 import Navigation
 import Navigation.Extra
 import Test.Html.Event
@@ -215,8 +217,8 @@ update msg (TestContext result) =
                     )
 
 
-clickButton : String -> TestContext msg model -> TestContext msg model
-clickButton buttonText (TestContext result) =
+simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model -> TestContext msg model
+simulateHelper functionDescription findTarget event (TestContext result) =
     case result of
         Err err ->
             TestContext <| Err err
@@ -225,19 +227,33 @@ clickButton buttonText (TestContext result) =
             case
                 program.view model
                     |> Query.fromHtml
-                    |> Query.find
-                        [ Selector.tag "button"
-                        , Selector.containing [ Selector.text buttonText ]
-                        ]
-                    |> Test.Html.Event.simulate Test.Html.Event.click
+                    |> findTarget
+                    |> Test.Html.Event.simulate event
                     |> Test.Html.Event.toResult
             of
                 Err message ->
                     TestContext <|
-                        Err (SimulateFailed ("clickButton " ++ toString buttonText) message)
+                        Err (SimulateFailed functionDescription message)
 
                 Ok msg ->
                     update msg (TestContext result)
+
+
+simulate : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model -> TestContext msg model
+simulate findTarget ( eventName, eventValue ) testContext =
+    simulateHelper ("simulate " ++ toString eventName) findTarget ( eventName, eventValue ) testContext
+
+
+clickButton : String -> TestContext msg model -> TestContext msg model
+clickButton buttonText testContext =
+    simulateHelper ("clickButton " ++ toString buttonText)
+        (Query.find
+            [ Selector.tag "button"
+            , Selector.containing [ Selector.text buttonText ]
+            ]
+        )
+        Test.Html.Event.click
+        testContext
 
 
 routeChange : String -> TestContext msg model -> TestContext msg model
