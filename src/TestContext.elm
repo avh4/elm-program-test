@@ -5,6 +5,7 @@ module TestContext
         , create
         , createWithFlags
         , createWithNavigation
+        , createWithNavigationAndFlags
         , done
         , expectModel
         , routeChange
@@ -16,7 +17,7 @@ module TestContext
 
 ## Creating
 
-@docs TestContext, create, createWithFlags, createWithNavigation
+@docs TestContext, create, createWithFlags, createWithNavigation, createWithNavigationAndFlags
 
 
 ## Simulating user input
@@ -131,6 +132,30 @@ createWithNavigation onRouteChange program initialUrl =
         Just location ->
             createHelper
                 { init = program.init location
+                , update = program.update
+                , view = program.view
+                , onRouteChange = onRouteChange >> Just
+                }
+
+
+createWithNavigationAndFlags :
+    (Navigation.Location -> msg)
+    ->
+        { init : flags -> Navigation.Location -> model
+        , update : msg -> model -> ( model, Cmd Never )
+        , view : model -> Html msg
+        }
+    -> String
+    -> flags
+    -> TestContext msg model
+createWithNavigationAndFlags onRouteChange program initialUrl flags =
+    case Navigation.Extra.locationFromString initialUrl of
+        Nothing ->
+            TestContext <| Err (InvalidLocationUrl "createWithNavigationAndFlags" initialUrl)
+
+        Just location ->
+            createHelper
+                { init = program.init flags location
                 , update = program.update
                 , view = program.view
                 , onRouteChange = onRouteChange >> Just

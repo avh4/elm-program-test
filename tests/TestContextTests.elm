@@ -59,12 +59,12 @@ all =
         , test "can create with flags" <|
             \() ->
                 TestContext.createWithFlags
-                    { init = \flags -> flags ++ ";<INIT>"
+                    { init = \flags -> "<INIT:" ++ flags ++ ">"
                     , update = testUpdate
                     , view = testView
                     }
-                    "<FLAGS>"
-                    |> TestContext.expectModel (Expect.equal "<FLAGS>;<INIT>")
+                    "flags"
+                    |> TestContext.expectModel (Expect.equal "<INIT:flags>")
                     |> TestContext.done
         , test "can create with navigation" <|
             \() ->
@@ -88,5 +88,17 @@ all =
                     "https://example.com/path"
                     |> TestContext.routeChange "https://example.com/new"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>;/new")
+                    |> TestContext.done
+        , test "can create with navigation and flags" <|
+            \() ->
+                TestContext.createWithNavigationAndFlags
+                    .pathname
+                    { init = \flags location -> "<INIT:" ++ location.pathname ++ ":" ++ flags ++ ">"
+                    , update = testUpdate
+                    , view = testView
+                    }
+                    "https://example.com/path"
+                    "flags"
+                    |> TestContext.expectModel (Expect.equal "<INIT:/path:flags>")
                     |> TestContext.done
         ]
