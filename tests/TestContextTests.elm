@@ -4,6 +4,8 @@ import Expect
 import Html exposing (Html)
 import Html.Events exposing (onClick)
 import Test exposing (..)
+import Test.Html.Query as Query
+import Test.Html.Selector as Selector
 import TestContext exposing (TestContext)
 
 
@@ -100,5 +102,11 @@ all =
                     "https://example.com/path"
                     "flags"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path:flags>")
+                    |> TestContext.done
+        , test "can assert on the view" <|
+            \() ->
+                testContext
+                    |> TestContext.shouldHaveView
+                        (Query.find [ Selector.tag "span" ] >> Query.has [ Selector.text "<INIT>" ])
                     |> TestContext.done
         ]

@@ -9,6 +9,7 @@ module TestContext
         , done
         , expectModel
         , routeChange
+        , shouldHaveView
         , update
         )
 
@@ -33,7 +34,7 @@ module TestContext
 
 ## Assertions
 
-@docs expectModel
+@docs shouldHaveView, expectModel
 
 -}
 
@@ -236,6 +237,28 @@ expectModel assertion (TestContext result) =
 
                     Just reason ->
                         Err (ExpectFailed "expectModel" reason.description reason.reason)
+
+
+shouldHaveView : (Query.Single msg -> Expectation) -> TestContext msg model -> TestContext msg model
+shouldHaveView assertion (TestContext result) =
+    TestContext <|
+        case result of
+            Err err ->
+                Err err
+
+            Ok ( program, model ) ->
+                case
+                    model
+                        |> program.view
+                        |> Query.fromHtml
+                        |> assertion
+                        |> Test.Runner.getFailureReason
+                of
+                    Nothing ->
+                        Ok ( program, model )
+
+                    Just reason ->
+                        Err (ExpectFailed "shouldHaveView" reason.description reason.reason)
 
 
 done : TestContext msg model -> Expectation
