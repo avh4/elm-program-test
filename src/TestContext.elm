@@ -302,13 +302,13 @@ done (TestContext result) =
             Expect.pass
 
         Err (ExpectFailed expectationName description reason) ->
-            Expect.fail (expectationName ++ ": " ++ Test.Runner.Failure.format description reason)
+            Expect.fail (expectationName ++ ":\n" ++ Test.Runner.Failure.format description reason)
 
         Err (SimulateFailed functionName message) ->
-            Expect.fail (functionName ++ ": " ++ message)
+            Expect.fail (functionName ++ ":\n" ++ message)
 
         Err (InvalidLocationUrl functionName invalidUrl) ->
-            Expect.fail (functionName ++ ": " ++ "Not a valid absolute URL: " ++ toString invalidUrl)
+            Expect.fail (functionName ++ ": " ++ "Not a valid absolute URL:\n" ++ toString invalidUrl)
 
         Err (InvalidFlags functionName message) ->
-            Expect.fail (functionName ++ ": " ++ message)
+            Expect.fail (functionName ++ ":\n" ++ message)
