@@ -61,8 +61,7 @@ type alias TestProgram msg model effect =
 
 
 type Failure
-    = TODO_NotImplemented
-    | ExpectFailed String String Test.Runner.Failure.Reason
+    = ExpectFailed String String Test.Runner.Failure.Reason
     | SimulateFailed String String
     | InvalidLocationUrl String String
 
@@ -275,6 +274,3 @@ done (TestContext result) =
 
         Err (InvalidLocationUrl functionName invalidUrl) ->
             Expect.fail (functionName ++ ": " ++ "Not a valid absolute URL: " ++ toString invalidUrl)
-
-        Err TODO_NotImplemented ->
-            Expect.fail (toString TODO_NotImplemented)
