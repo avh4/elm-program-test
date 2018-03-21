@@ -4,7 +4,7 @@ import Expect
 import Html exposing (Html)
 import Html.Events exposing (onClick)
 import Test exposing (..)
-import TestContext
+import TestContext exposing (TestContext)
 
 
 testInit : String
@@ -12,9 +12,11 @@ testInit =
     "<INIT>"
 
 
-testUpdate : String -> String -> String
+testUpdate : String -> String -> ( String, Cmd msg )
 testUpdate msg model =
-    model ++ ";" ++ msg
+    ( model ++ ";" ++ msg
+    , Cmd.none
+    )
 
 
 testView : String -> Html String
@@ -25,14 +27,26 @@ testView model =
         ]
 
 
+testContext : TestContext String String
+testContext =
+    TestContext.create
+        { init = testInit
+        , update = testUpdate
+        }
+
+
 all : Test
 all =
     describe "TestContext"
         [ test "has initial model" <|
             \() ->
-                TestContext.create
-                    { init = testInit
-                    }
+                testContext
                     |> TestContext.expectModel (Expect.equal "<INIT>")
+                    |> TestContext.done
+        , test "can send a msg" <|
+            \() ->
+                testContext
+                    |> TestContext.update "A"
+                    |> TestContext.expectModel (Expect.equal "<INIT>;A")
                     |> TestContext.done
         ]
