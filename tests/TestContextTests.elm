@@ -3,6 +3,7 @@ module TestContextTests exposing (all)
 import Expect
 import Html exposing (Html)
 import Html.Events exposing (onClick)
+import Json.Decode
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
@@ -108,5 +109,18 @@ all =
                 testContext
                     |> TestContext.shouldHaveView
                         (Query.find [ Selector.tag "span" ] >> Query.has [ Selector.text "<INIT>" ])
+                    |> TestContext.done
+        , test "can create with navigation and JSON string flags" <|
+            \() ->
+                TestContext.createWithNavigationAndJsonStringFlags
+                    (Json.Decode.field "x" Json.Decode.string)
+                    .pathname
+                    { init = \flags location -> "<INIT:" ++ location.pathname ++ ":" ++ flags ++ ">"
+                    , update = testUpdate
+                    , view = testView
+                    }
+                    "https://example.com/path"
+                    """{"x": "fromJson"}"""
+                    |> TestContext.expectModel (Expect.equal "<INIT:/path:fromJson>")
                     |> TestContext.done
         ]

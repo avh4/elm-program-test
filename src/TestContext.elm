@@ -6,6 +6,7 @@ module TestContext
         , createWithFlags
         , createWithNavigation
         , createWithNavigationAndFlags
+        , createWithNavigationAndJsonStringFlags
         , done
         , expectModel
         , routeChange
@@ -18,7 +19,9 @@ module TestContext
 
 ## Creating
 
-@docs TestContext, create, createWithFlags, createWithNavigation, createWithNavigationAndFlags
+@docs TestContext
+@docs create, createWithFlags
+@docs createWithNavigation, createWithNavigationAndFlags, createWithNavigationAndJsonStringFlags
 
 
 ## Simulating user input
@@ -40,6 +43,7 @@ module TestContext
 
 import Expect exposing (Expectation)
 import Html exposing (Html)
+import Json.Decode
 import Navigation
 import Navigation.Extra
 import Test.Html.Event
@@ -64,6 +68,7 @@ type Failure
     = ExpectFailed String String Test.Runner.Failure.Reason
     | SimulateFailed String String
     | InvalidLocationUrl String String
+    | InvalidFlags String String
 
 
 createHelper :
@@ -160,6 +165,36 @@ createWithNavigationAndFlags onRouteChange program initialUrl flags =
                 , view = program.view
                 , onRouteChange = onRouteChange >> Just
                 }
+
+
+createWithNavigationAndJsonStringFlags :
+    Json.Decode.Decoder flags
+    -> (Navigation.Location -> msg)
+    ->
+        { init : flags -> Navigation.Location -> model
+        , update : msg -> model -> ( model, Cmd Never )
+        , view : model -> Html msg
+        }
+    -> String
+    -> String
+    -> TestContext msg model
+createWithNavigationAndJsonStringFlags flagsDecoder onRouteChange program initialUrl flagsJson =
+    case Navigation.Extra.locationFromString initialUrl of
+        Nothing ->
+            TestContext <| Err (InvalidLocationUrl "createWithNavigationAndJsonStringFlags" initialUrl)
+
+        Just location ->
+            case Json.Decode.decodeString flagsDecoder flagsJson of
+                Err message ->
+                    TestContext <| Err (InvalidFlags "createWithNavigationAndJsonStringFlags" message)
+
+                Ok flags ->
+                    createHelper
+                        { init = program.init flags location
+                        , update = program.update
+                        , view = program.view
+                        , onRouteChange = onRouteChange >> Just
+                        }
 
 
 update : msg -> TestContext msg model -> TestContext msg model
@@ -274,3 +309,6 @@ done (TestContext result) =
 
         Err (InvalidLocationUrl functionName invalidUrl) ->
             Expect.fail (functionName ++ ": " ++ "Not a valid absolute URL: " ++ toString invalidUrl)
+
+        Err (InvalidFlags functionName message) ->
+            Expect.fail (functionName ++ ": " ++ message)
