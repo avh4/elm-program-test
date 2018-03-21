@@ -4,6 +4,7 @@ module TestContext
         , clickButton
         , create
         , createWithFlags
+        , createWithNavigation
         , done
         , expectModel
         , update
@@ -14,7 +15,7 @@ module TestContext
 
 ## Creating
 
-@docs TestContext, create, createWithFlags
+@docs TestContext, create, createWithFlags, createWithNavigation
 
 
 ## Simulating user input
@@ -35,6 +36,8 @@ module TestContext
 
 import Expect exposing (Expectation)
 import Html exposing (Html)
+import Navigation
+import Navigation.Extra
 import Test.Html.Event
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
@@ -56,6 +59,7 @@ type Failure
     = TODO_NotImplemented
     | ExpectFailed String String Test.Runner.Failure.Reason
     | SimulateFailed String String
+    | InvalidLocationUrl String String
 
 
 create :
@@ -87,6 +91,28 @@ createWithFlags program flags =
         , update = program.update
         , view = program.view
         }
+
+
+createWithNavigation :
+    (Navigation.Location -> msg)
+    ->
+        { init : Navigation.Location -> model
+        , update : msg -> model -> ( model, Cmd Never )
+        , view : model -> Html msg
+        }
+    -> String
+    -> TestContext msg model
+createWithNavigation onRouteChange program initialUrl =
+    case Navigation.Extra.locationFromString initialUrl of
+        Nothing ->
+            TestContext <| Err (InvalidLocationUrl "createWithNavigation" initialUrl)
+
+        Just location ->
+            create
+                { init = program.init location
+                , update = program.update
+                , view = program.view
+                }
 
 
 update : msg -> TestContext msg model -> TestContext msg model
@@ -156,6 +182,9 @@ done (TestContext result) =
 
         Err (SimulateFailed functionName message) ->
             Expect.fail (functionName ++ ": " ++ message)
+
+        Err (InvalidLocationUrl functionName invalidUrl) ->
+            Expect.fail (functionName ++ ": " ++ "Not a valid absolute URL: " ++ toString invalidUrl)
 
         Err TODO_NotImplemented ->
             Expect.fail (toString TODO_NotImplemented)

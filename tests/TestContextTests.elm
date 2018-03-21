@@ -66,4 +66,15 @@ all =
                     "<FLAGS>"
                     |> TestContext.expectModel (Expect.equal "<FLAGS>;<INIT>")
                     |> TestContext.done
+        , test "can create with navigation" <|
+            \() ->
+                TestContext.createWithNavigation
+                    .pathname
+                    { init = \location -> "<INIT:" ++ location.pathname ++ ">"
+                    , update = testUpdate
+                    , view = testView
+                    }
+                    "https://example.com/path"
+                    |> TestContext.expectModel (Expect.equal "<INIT:/path>")
+                    |> TestContext.done
         ]
