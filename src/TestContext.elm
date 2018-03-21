@@ -3,8 +3,14 @@ module TestContext
         ( TestContext
         , clickButton
         , create
+        , createWithFlags
+        , createWithNavigation
+        , createWithNavigationAndFlags
+        , createWithNavigationAndJsonStringFlags
         , done
         , expectModel
+        , routeChange
+        , shouldHaveView
         , update
         )
 
@@ -13,12 +19,15 @@ module TestContext
 
 ## Creating
 
-@docs TestContext, create
+@docs TestContext
+@docs create, createWithFlags
+@docs createWithNavigation, createWithNavigationAndFlags, createWithNavigationAndJsonStringFlags
 
 
 ## Simulating user input
 
 @docs clickButton
+@docs routeChange
 
 
 ## Directly sending Msgs
@@ -28,12 +37,15 @@ module TestContext
 
 ## Assertions
 
-@docs expectModel
+@docs shouldHaveView, expectModel
 
 -}
 
 import Expect exposing (Expectation)
 import Html exposing (Html)
+import Json.Decode
+import Navigation
+import Navigation.Extra
 import Test.Html.Event
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
@@ -48,13 +60,33 @@ type TestContext msg model
 type alias TestProgram msg model effect =
     { update : msg -> model -> ( model, effect )
     , view : model -> Html msg
+    , onRouteChange : Navigation.Location -> Maybe msg
     }
 
 
 type Failure
-    = TODO_NotImplemented
-    | ExpectFailed String String Test.Runner.Failure.Reason
+    = ExpectFailed String String Test.Runner.Failure.Reason
     | SimulateFailed String String
+    | InvalidLocationUrl String String
+    | InvalidFlags String String
+
+
+createHelper :
+    { init : model
+    , update : msg -> model -> ( model, Cmd Never )
+    , view : model -> Html msg
+    , onRouteChange : Navigation.Location -> Maybe msg
+    }
+    -> TestContext msg model
+createHelper program =
+    TestContext <|
+        Ok
+            ( { update = program.update
+              , view = program.view
+              , onRouteChange = program.onRouteChange
+              }
+            , program.init
+            )
 
 
 create :
@@ -64,13 +96,105 @@ create :
     }
     -> TestContext msg model
 create program =
-    TestContext <|
-        Ok
-            ( { update = program.update
-              , view = program.view
-              }
-            , program.init
-            )
+    createHelper
+        { init = program.init
+        , update = program.update
+        , view = program.view
+        , onRouteChange = \_ -> Nothing
+        }
+
+
+createWithFlags :
+    { init : flags -> model
+    , update : msg -> model -> ( model, Cmd Never )
+    , view : model -> Html msg
+    }
+    -> flags
+    -> TestContext msg model
+createWithFlags program flags =
+    createHelper
+        { init = program.init flags
+        , update = program.update
+        , view = program.view
+        , onRouteChange = \_ -> Nothing
+        }
+
+
+createWithNavigation :
+    (Navigation.Location -> msg)
+    ->
+        { init : Navigation.Location -> model
+        , update : msg -> model -> ( model, Cmd Never )
+        , view : model -> Html msg
+        }
+    -> String
+    -> TestContext msg model
+createWithNavigation onRouteChange program initialUrl =
+    case Navigation.Extra.locationFromString initialUrl of
+        Nothing ->
+            TestContext <| Err (InvalidLocationUrl "createWithNavigation" initialUrl)
+
+        Just location ->
+            createHelper
+                { init = program.init location
+                , update = program.update
+                , view = program.view
+                , onRouteChange = onRouteChange >> Just
+                }
+
+
+createWithNavigationAndFlags :
+    (Navigation.Location -> msg)
+    ->
+        { init : flags -> Navigation.Location -> model
+        , update : msg -> model -> ( model, Cmd Never )
+        , view : model -> Html msg
+        }
+    -> String
+    -> flags
+    -> TestContext msg model
+createWithNavigationAndFlags onRouteChange program initialUrl flags =
+    case Navigation.Extra.locationFromString initialUrl of
+        Nothing ->
+            TestContext <| Err (InvalidLocationUrl "createWithNavigationAndFlags" initialUrl)
+
+        Just location ->
+            createHelper
+                { init = program.init flags location
+                , update = program.update
+                , view = program.view
+                , onRouteChange = onRouteChange >> Just
+                }
+
+
+createWithNavigationAndJsonStringFlags :
+    Json.Decode.Decoder flags
+    -> (Navigation.Location -> msg)
+    ->
+        { init : flags -> Navigation.Location -> model
+        , update : msg -> model -> ( model, Cmd Never )
+        , view : model -> Html msg
+        }
+    -> String
+    -> String
+    -> TestContext msg model
+createWithNavigationAndJsonStringFlags flagsDecoder onRouteChange program initialUrl flagsJson =
+    case Navigation.Extra.locationFromString initialUrl of
+        Nothing ->
+            TestContext <| Err (InvalidLocationUrl "createWithNavigationAndJsonStringFlags" initialUrl)
+
+        Just location ->
+            case Json.Decode.decodeString flagsDecoder flagsJson of
+                Err message ->
+                    TestContext <| Err (InvalidFlags "createWithNavigationAndJsonStringFlags" message)
+
+                Ok flags ->
+                    createHelper
+                        { init = program.init flags location
+                        , update = program.update
+                        , view = program.view
+                        , onRouteChange = onRouteChange >> Just
+                        }
 
 
 update : msg -> TestContext msg model -> TestContext msg model
@@ -113,6 +237,26 @@ clickButton buttonText (TestContext result) =
                     update msg (TestContext result)
 
 
+routeChange : String -> TestContext msg model -> TestContext msg model
+routeChange url (TestContext result) =
+    case result of
+        Err err ->
+            TestContext <| Err err
+
+        Ok ( program, model ) ->
+            case Navigation.Extra.locationFromString url of
+                Nothing ->
+                    TestContext <| Err (InvalidLocationUrl "routeChange" url)
+
+                Just location ->
+                    case program.onRouteChange location of
+                        Nothing ->
+                            TestContext result
+
+                        Just msg ->
+                            update msg (TestContext result)
+
+
 expectModel : (model -> Expectation) -> TestContext msg model -> TestContext msg model
 expectModel assertion (TestContext result) =
     TestContext <|
@@ -129,6 +273,28 @@ expectModel assertion (TestContext result) =
                         Err (ExpectFailed "expectModel" reason.description reason.reason)
 
 
+shouldHaveView : (Query.Single msg -> Expectation) -> TestContext msg model -> TestContext msg model
+shouldHaveView assertion (TestContext result) =
+    TestContext <|
+        case result of
+            Err err ->
+                Err err
+
+            Ok ( program, model ) ->
+                case
+                    model
+                        |> program.view
+                        |> Query.fromHtml
+                        |> assertion
+                        |> Test.Runner.getFailureReason
+                of
+                    Nothing ->
+                        Ok ( program, model )
+
+                    Just reason ->
+                        Err (ExpectFailed "shouldHaveView" reason.description reason.reason)
+
+
 done : TestContext msg model -> Expectation
 done (TestContext result) =
     case result of
@@ -136,10 +302,13 @@ done (TestContext result) =
             Expect.pass
 
         Err (ExpectFailed expectationName description reason) ->
-            Expect.fail (expectationName ++ ": " ++ Test.Runner.Failure.format description reason)
+            Expect.fail (expectationName ++ ":\n" ++ Test.Runner.Failure.format description reason)
 
         Err (SimulateFailed functionName message) ->
-            Expect.fail (functionName ++ ": " ++ message)
+            Expect.fail (functionName ++ ":\n" ++ message)
 
-        Err TODO_NotImplemented ->
-            Expect.fail (toString TODO_NotImplemented)
+        Err (InvalidLocationUrl functionName invalidUrl) ->
+            Expect.fail (functionName ++ ": " ++ "Not a valid absolute URL:\n" ++ toString invalidUrl)
+
+        Err (InvalidFlags functionName message) ->
+            Expect.fail (functionName ++ ":\n" ++ message)
