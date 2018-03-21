@@ -105,6 +105,11 @@ all =
                     |> TestContext.shouldHaveView
                         (Query.find [ Selector.tag "span" ] >> Query.has [ Selector.text "<INIT>" ])
                     |> TestContext.done
+        , test "can assert on the view concisely with a terminal assertion" <|
+            \() ->
+                testContext
+                    |> TestContext.expectView
+                        (Query.find [ Selector.tag "span" ] >> Query.has [ Selector.text "<INIT>" ])
         , test "can create with navigation and JSON string flags" <|
             \() ->
                 TestContext.createWithNavigationAndJsonStringFlags
@@ -122,6 +127,10 @@ all =
                 testContext
                     |> TestContext.shouldHave [ Selector.tag "span" ]
                     |> TestContext.done
+        , test "can assert on the view concisely with a terminal assertion given Html.Test.Selectors" <|
+            \() ->
+                testContext
+                    |> TestContext.expectViewHas [ Selector.tag "span" ]
         , test "can assert on the view concisely given Html.Test.Selectors that should not exist" <|
             \() ->
                 testContext

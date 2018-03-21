@@ -9,6 +9,8 @@ module TestContext
         , createWithNavigationAndJsonStringFlags
         , done
         , expectModel
+        , expectView
+        , expectViewHas
         , routeChange
         , shouldHave
         , shouldHaveView
@@ -38,10 +40,16 @@ module TestContext
 @docs update
 
 
-## Assertions
+## Final assertions
+
+@docs expectViewHas, expectView, expectModel
+
+
+## Intermediate assertions
+
+These functions can be used to make assertions on a `TestContext` without ending the test.
 
 @docs shouldHave, shouldNotHave, shouldHaveView
-@docs expectModel
 
 -}
 
@@ -345,6 +353,20 @@ shouldHave selector testContext =
 shouldNotHave : List Selector.Selector -> TestContext msg model -> TestContext msg model
 shouldNotHave selector testContext =
     expectViewHelper "shouldNotHave" (Query.hasNot selector) testContext
+
+
+expectView : (Query.Single msg -> Expectation) -> TestContext msg model -> Expectation
+expectView assertion testContext =
+    testContext
+        |> expectViewHelper "expectView" assertion
+        |> done
+
+
+expectViewHas : List Selector.Selector -> TestContext msg model -> Expectation
+expectViewHas selector testContext =
+    testContext
+        |> expectViewHelper "expectViewHas" (Query.has selector)
+        |> done
 
 
 done : TestContext msg model -> Expectation
