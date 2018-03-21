@@ -56,4 +56,14 @@ all =
                     |> TestContext.clickButton "Click Me"
                     |> TestContext.expectModel (Expect.equal "<INIT>;CLICK")
                     |> TestContext.done
+        , test "can create with flags" <|
+            \() ->
+                TestContext.createWithFlags
+                    { init = \flags -> flags ++ ";<INIT>"
+                    , update = testUpdate
+                    , view = testView
+                    }
+                    "<FLAGS>"
+                    |> TestContext.expectModel (Expect.equal "<FLAGS>;<INIT>")
+                    |> TestContext.done
         ]

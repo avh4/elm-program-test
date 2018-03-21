@@ -3,6 +3,7 @@ module TestContext
         ( TestContext
         , clickButton
         , create
+        , createWithFlags
         , done
         , expectModel
         , update
@@ -13,7 +14,7 @@ module TestContext
 
 ## Creating
 
-@docs TestContext, create
+@docs TestContext, create, createWithFlags
 
 
 ## Simulating user input
@@ -71,6 +72,21 @@ create program =
               }
             , program.init
             )
+
+
+createWithFlags :
+    { init : flags -> model
+    , update : msg -> model -> ( model, Cmd Never )
+    , view : model -> Html msg
+    }
+    -> flags
+    -> TestContext msg model
+createWithFlags program flags =
+    create
+        { init = program.init flags
+        , update = program.update
+        , view = program.view
+        }
 
 
 update : msg -> TestContext msg model -> TestContext msg model
