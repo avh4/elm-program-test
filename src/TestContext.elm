@@ -12,6 +12,7 @@ module TestContext
         , routeChange
         , shouldHave
         , shouldHaveView
+        , shouldNotHave
         , update
         )
 
@@ -38,7 +39,7 @@ module TestContext
 
 ## Assertions
 
-@docs shouldHave, shouldHaveView
+@docs shouldHave, shouldNotHave, shouldHaveView
 @docs expectModel
 
 -}
@@ -305,6 +306,11 @@ shouldHaveView assertion testContext =
 shouldHave : List Selector.Selector -> TestContext msg model -> TestContext msg model
 shouldHave selector testContext =
     expectViewHelper "shouldHave" (Query.has selector) testContext
+
+
+shouldNotHave : List Selector.Selector -> TestContext msg model -> TestContext msg model
+shouldNotHave selector testContext =
+    expectViewHelper "shouldNotHave" (Query.hasNot selector) testContext
 
 
 done : TestContext msg model -> Expectation

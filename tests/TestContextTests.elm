@@ -128,4 +128,9 @@ all =
                 testContext
                     |> TestContext.shouldHave [ Selector.tag "span" ]
                     |> TestContext.done
+        , test "can assert on the view concisely given Html.Test.Selectors that should not exist" <|
+            \() ->
+                testContext
+                    |> TestContext.shouldNotHave [ Selector.tag "article" ]
+                    |> TestContext.done
         ]
