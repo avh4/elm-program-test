@@ -32,6 +32,7 @@ testContext =
     TestContext.create
         { init = testInit
         , update = testUpdate
+        , view = testView
         }
 
 
@@ -48,5 +49,11 @@ all =
                 testContext
                     |> TestContext.update "A"
                     |> TestContext.expectModel (Expect.equal "<INIT>;A")
+                    |> TestContext.done
+        , test "can click a button" <|
+            \() ->
+                testContext
+                    |> TestContext.clickButton "Click Me"
+                    |> TestContext.expectModel (Expect.equal "<INIT>;CLICK")
                     |> TestContext.done
         ]

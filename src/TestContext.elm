@@ -1,6 +1,7 @@
 module TestContext
     exposing
         ( TestContext
+        , clickButton
         , create
         , done
         , expectModel
@@ -15,6 +16,11 @@ module TestContext
 @docs TestContext, create
 
 
+## Simulating user input
+
+@docs clickButton
+
+
 ## Directly sending Msgs
 
 @docs update
@@ -27,6 +33,10 @@ module TestContext
 -}
 
 import Expect exposing (Expectation)
+import Html exposing (Html)
+import Test.Html.Event
+import Test.Html.Query as Query
+import Test.Html.Selector as Selector
 import Test.Runner
 import Test.Runner.Failure
 
@@ -36,19 +46,28 @@ type TestContext msg model
 
 
 type alias TestProgram msg model effect =
-    { update : msg -> model -> ( model, effect ) }
+    { update : msg -> model -> ( model, effect )
+    , view : model -> Html msg
+    }
 
 
 type Failure
     = TODO_NotImplemented
     | ExpectFailed String String Test.Runner.Failure.Reason
+    | SimulateFailed String String
 
 
-create : { init : model, update : msg -> model -> ( model, Cmd Never ) } -> TestContext msg model
+create :
+    { init : model
+    , update : msg -> model -> ( model, Cmd Never )
+    , view : model -> Html msg
+    }
+    -> TestContext msg model
 create program =
     TestContext <|
         Ok
             ( { update = program.update
+              , view = program.view
               }
             , program.init
             )
@@ -67,6 +86,31 @@ update msg (TestContext result) =
                     , program.update msg model
                         |> Tuple.first
                     )
+
+
+clickButton : String -> TestContext msg model -> TestContext msg model
+clickButton buttonText (TestContext result) =
+    case result of
+        Err err ->
+            TestContext <| Err err
+
+        Ok ( program, model ) ->
+            case
+                program.view model
+                    |> Query.fromHtml
+                    |> Query.find
+                        [ Selector.tag "button"
+                        , Selector.containing [ Selector.text buttonText ]
+                        ]
+                    |> Test.Html.Event.simulate Test.Html.Event.click
+                    |> Test.Html.Event.toResult
+            of
+                Err message ->
+                    TestContext <|
+                        Err (SimulateFailed ("clickButton " ++ toString buttonText) message)
+
+                Ok msg ->
+                    update msg (TestContext result)
 
 
 expectModel : (model -> Expectation) -> TestContext msg model -> TestContext msg model
@@ -93,6 +137,9 @@ done (TestContext result) =
 
         Err (ExpectFailed expectationName description reason) ->
             Expect.fail (expectationName ++ ": " ++ Test.Runner.Failure.format description reason)
+
+        Err (SimulateFailed functionName message) ->
+            Expect.fail (functionName ++ ": " ++ message)
 
         Err TODO_NotImplemented ->
             Expect.fail (toString TODO_NotImplemented)
