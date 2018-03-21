@@ -72,6 +72,7 @@ type alias TestProgram msg model effect =
 type Failure
     = ExpectFailed String String Test.Runner.Failure.Reason
     | SimulateFailed String String
+    | SimulateFailedToFindTarget String String
     | InvalidLocationUrl String String
     | InvalidFlags String String
 
@@ -224,19 +225,35 @@ simulateHelper functionDescription findTarget event (TestContext result) =
             TestContext <| Err err
 
         Ok ( program, model ) ->
+            let
+                targetQuery =
+                    program.view model
+                        |> Query.fromHtml
+                        |> findTarget
+            in
+            -- First check the target so we can give a better error message if it doesn't exist
             case
-                program.view model
-                    |> Query.fromHtml
-                    |> findTarget
-                    |> Test.Html.Event.simulate event
-                    |> Test.Html.Event.toResult
+                targetQuery
+                    |> Query.has []
+                    |> Test.Runner.getFailureReason
             of
-                Err message ->
+                Just reason ->
                     TestContext <|
-                        Err (SimulateFailed functionDescription message)
+                        Err (SimulateFailedToFindTarget functionDescription reason.description)
 
-                Ok msg ->
-                    update msg (TestContext result)
+                Nothing ->
+                    -- Try to simulate the event, now that we know the target exists
+                    case
+                        targetQuery
+                            |> Test.Html.Event.simulate event
+                            |> Test.Html.Event.toResult
+                    of
+                        Err message ->
+                            TestContext <|
+                                Err (SimulateFailed functionDescription message)
+
+                        Ok msg ->
+                            update msg (TestContext result)
 
 
 simulate : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model -> TestContext msg model
@@ -339,6 +356,9 @@ done (TestContext result) =
             Expect.fail (expectationName ++ ":\n" ++ Test.Runner.Failure.format description reason)
 
         Err (SimulateFailed functionName message) ->
+            Expect.fail (functionName ++ ":\n" ++ message)
+
+        Err (SimulateFailedToFindTarget functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
 
         Err (InvalidLocationUrl functionName invalidUrl) ->
