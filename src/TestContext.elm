@@ -293,20 +293,21 @@ routeChange url (TestContext result) =
                             update msg (TestContext result)
 
 
-expectModel : (model -> Expectation) -> TestContext msg model -> TestContext msg model
+expectModel : (model -> Expectation) -> TestContext msg model -> Expectation
 expectModel assertion (TestContext result) =
-    TestContext <|
-        case result of
-            Err err ->
-                Err err
+    done <|
+        TestContext <|
+            case result of
+                Err err ->
+                    Err err
 
-            Ok ( program, model ) ->
-                case assertion model |> Test.Runner.getFailureReason of
-                    Nothing ->
-                        Ok ( program, model )
+                Ok ( program, model ) ->
+                    case assertion model |> Test.Runner.getFailureReason of
+                        Nothing ->
+                            Ok ( program, model )
 
-                    Just reason ->
-                        Err (ExpectFailed "expectModel" reason.description reason.reason)
+                        Just reason ->
+                            Err (ExpectFailed "expectModel" reason.description reason.reason)
 
 
 expectViewHelper : String -> (Query.Single msg -> Expectation) -> TestContext msg model -> TestContext msg model

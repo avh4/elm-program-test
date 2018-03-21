@@ -48,19 +48,16 @@ all =
             \() ->
                 testContext
                     |> TestContext.expectModel (Expect.equal "<INIT>")
-                    |> TestContext.done
         , test "can send a msg" <|
             \() ->
                 testContext
                     |> TestContext.update "A"
                     |> TestContext.expectModel (Expect.equal "<INIT>;A")
-                    |> TestContext.done
         , test "can click a button" <|
             \() ->
                 testContext
                     |> TestContext.clickButton "Click Me"
                     |> TestContext.expectModel (Expect.equal "<INIT>;CLICK")
-                    |> TestContext.done
         , test "can create with flags" <|
             \() ->
                 TestContext.createWithFlags
@@ -70,7 +67,6 @@ all =
                     }
                     "flags"
                     |> TestContext.expectModel (Expect.equal "<INIT:flags>")
-                    |> TestContext.done
         , test "can create with navigation" <|
             \() ->
                 TestContext.createWithNavigation
@@ -81,7 +77,6 @@ all =
                     }
                     "https://example.com/path"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>")
-                    |> TestContext.done
         , test "can simulate a route change" <|
             \() ->
                 TestContext.createWithNavigation
@@ -93,7 +88,6 @@ all =
                     "https://example.com/path"
                     |> TestContext.routeChange "https://example.com/new"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>;/new")
-                    |> TestContext.done
         , test "can create with navigation and flags" <|
             \() ->
                 TestContext.createWithNavigationAndFlags
@@ -105,7 +99,6 @@ all =
                     "https://example.com/path"
                     "flags"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path:flags>")
-                    |> TestContext.done
         , test "can assert on the view" <|
             \() ->
                 testContext
@@ -124,7 +117,6 @@ all =
                     "https://example.com/path"
                     """{"x": "fromJson"}"""
                     |> TestContext.expectModel (Expect.equal "<INIT:/path:fromJson>")
-                    |> TestContext.done
         , test "can assert on the view concisely given Html.Test.Selectors" <|
             \() ->
                 testContext
@@ -142,5 +134,4 @@ all =
                         (Query.find [ Selector.tag "strange" ])
                         ( "odd", Json.Encode.string "<ODD-VALUE>" )
                     |> TestContext.expectModel (Expect.equal "<INIT>;<ODD-VALUE>")
-                    |> TestContext.done
         ]
