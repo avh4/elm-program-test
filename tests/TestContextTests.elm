@@ -11,15 +11,22 @@ import Test.Html.Selector as Selector
 import TestContext exposing (TestContext)
 
 
-testInit : String
+type TestEffect
+    = NoOp
+    | LogUpdate String
+
+
+testInit : ( String, TestEffect )
 testInit =
-    "<INIT>"
+    ( "<INIT>"
+    , NoOp
+    )
 
 
-testUpdate : String -> String -> ( String, Cmd msg )
+testUpdate : String -> String -> ( String, TestEffect )
 testUpdate msg model =
     ( model ++ ";" ++ msg
-    , Cmd.none
+    , LogUpdate msg
     )
 
 
@@ -32,7 +39,7 @@ testView model =
         ]
 
 
-testContext : TestContext String String
+testContext : TestContext String String TestEffect
 testContext =
     TestContext.create
         { init = testInit
@@ -61,7 +68,7 @@ all =
         , test "can create with flags" <|
             \() ->
                 TestContext.createWithFlags
-                    { init = \flags -> "<INIT:" ++ flags ++ ">"
+                    { init = \flags -> ( "<INIT:" ++ flags ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
@@ -71,7 +78,7 @@ all =
             \() ->
                 TestContext.createWithNavigation
                     .pathname
-                    { init = \location -> "<INIT:" ++ location.pathname ++ ">"
+                    { init = \location -> ( "<INIT:" ++ location.pathname ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
@@ -81,7 +88,7 @@ all =
             \() ->
                 TestContext.createWithNavigation
                     .pathname
-                    { init = \location -> "<INIT:" ++ location.pathname ++ ">"
+                    { init = \location -> ( "<INIT:" ++ location.pathname ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
@@ -92,7 +99,7 @@ all =
             \() ->
                 TestContext.createWithNavigationAndFlags
                     .pathname
-                    { init = \flags location -> "<INIT:" ++ location.pathname ++ ":" ++ flags ++ ">"
+                    { init = \flags location -> ( "<INIT:" ++ location.pathname ++ ":" ++ flags ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
@@ -115,7 +122,7 @@ all =
                 TestContext.createWithNavigationAndJsonStringFlags
                     (Json.Decode.field "x" Json.Decode.string)
                     .pathname
-                    { init = \flags location -> "<INIT:" ++ location.pathname ++ ":" ++ flags ++ ">"
+                    { init = \flags location -> ( "<INIT:" ++ location.pathname ++ ":" ++ flags ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
@@ -143,4 +150,13 @@ all =
                         (Query.find [ Selector.tag "strange" ])
                         ( "odd", Json.Encode.string "<ODD-VALUE>" )
                     |> TestContext.expectModel (Expect.equal "<INIT>;<ODD-VALUE>")
+        , test "can assert on the last effect after init" <|
+            \() ->
+                testContext
+                    |> TestContext.expectLastEffect (Expect.equal NoOp)
+        , test "can assert on the last effect after update" <|
+            \() ->
+                testContext
+                    |> TestContext.clickButton "Click Me"
+                    |> TestContext.expectLastEffect (Expect.equal (LogUpdate "CLICK"))
         ]
