@@ -10,6 +10,7 @@ module TestContext
         , done
         , expectModel
         , routeChange
+        , shouldHave
         , shouldHaveView
         , update
         )
@@ -37,7 +38,8 @@ module TestContext
 
 ## Assertions
 
-@docs shouldHaveView, expectModel
+@docs shouldHave, shouldHaveView
+@docs expectModel
 
 -}
 
@@ -273,8 +275,8 @@ expectModel assertion (TestContext result) =
                         Err (ExpectFailed "expectModel" reason.description reason.reason)
 
 
-shouldHaveView : (Query.Single msg -> Expectation) -> TestContext msg model -> TestContext msg model
-shouldHaveView assertion (TestContext result) =
+expectViewHelper : String -> (Query.Single msg -> Expectation) -> TestContext msg model -> TestContext msg model
+expectViewHelper functionName assertion (TestContext result) =
     TestContext <|
         case result of
             Err err ->
@@ -292,7 +294,17 @@ shouldHaveView assertion (TestContext result) =
                         Ok ( program, model )
 
                     Just reason ->
-                        Err (ExpectFailed "shouldHaveView" reason.description reason.reason)
+                        Err (ExpectFailed functionName reason.description reason.reason)
+
+
+shouldHaveView : (Query.Single msg -> Expectation) -> TestContext msg model -> TestContext msg model
+shouldHaveView assertion testContext =
+    expectViewHelper "shouldHaveView" assertion testContext
+
+
+shouldHave : List Selector.Selector -> TestContext msg model -> TestContext msg model
+shouldHave selector testContext =
+    expectViewHelper "shouldHave" (Query.has selector) testContext
 
 
 done : TestContext msg model -> Expectation

@@ -123,4 +123,9 @@ all =
                     """{"x": "fromJson"}"""
                     |> TestContext.expectModel (Expect.equal "<INIT:/path:fromJson>")
                     |> TestContext.done
+        , test "can assert on the view concisely given Html.Test.Selectors" <|
+            \() ->
+                testContext
+                    |> TestContext.shouldHave [ Selector.tag "span" ]
+                    |> TestContext.done
         ]
