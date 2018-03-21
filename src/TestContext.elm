@@ -7,6 +7,7 @@ module TestContext
         , createWithNavigation
         , done
         , expectModel
+        , routeChange
         , update
         )
 
@@ -21,6 +22,7 @@ module TestContext
 ## Simulating user input
 
 @docs clickButton
+@docs routeChange
 
 
 ## Directly sending Msgs
@@ -52,6 +54,7 @@ type TestContext msg model
 type alias TestProgram msg model effect =
     { update : msg -> model -> ( model, effect )
     , view : model -> Html msg
+    , onRouteChange : Navigation.Location -> Maybe msg
     }
 
 
@@ -62,6 +65,24 @@ type Failure
     | InvalidLocationUrl String String
 
 
+createHelper :
+    { init : model
+    , update : msg -> model -> ( model, Cmd Never )
+    , view : model -> Html msg
+    , onRouteChange : Navigation.Location -> Maybe msg
+    }
+    -> TestContext msg model
+createHelper program =
+    TestContext <|
+        Ok
+            ( { update = program.update
+              , view = program.view
+              , onRouteChange = program.onRouteChange
+              }
+            , program.init
+            )
+
+
 create :
     { init : model
     , update : msg -> model -> ( model, Cmd Never )
@@ -69,13 +90,12 @@ create :
     }
     -> TestContext msg model
 create program =
-    TestContext <|
-        Ok
-            ( { update = program.update
-              , view = program.view
-              }
-            , program.init
-            )
+    createHelper
+        { init = program.init
+        , update = program.update
+        , view = program.view
+        , onRouteChange = \_ -> Nothing
+        }
 
 
 createWithFlags :
@@ -86,10 +106,11 @@ createWithFlags :
     -> flags
     -> TestContext msg model
 createWithFlags program flags =
-    create
+    createHelper
         { init = program.init flags
         , update = program.update
         , view = program.view
+        , onRouteChange = \_ -> Nothing
         }
 
 
@@ -108,10 +129,11 @@ createWithNavigation onRouteChange program initialUrl =
             TestContext <| Err (InvalidLocationUrl "createWithNavigation" initialUrl)
 
         Just location ->
-            create
+            createHelper
                 { init = program.init location
                 , update = program.update
                 , view = program.view
+                , onRouteChange = onRouteChange >> Just
                 }
 
 
@@ -153,6 +175,26 @@ clickButton buttonText (TestContext result) =
 
                 Ok msg ->
                     update msg (TestContext result)
+
+
+routeChange : String -> TestContext msg model -> TestContext msg model
+routeChange url (TestContext result) =
+    case result of
+        Err err ->
+            TestContext <| Err err
+
+        Ok ( program, model ) ->
+            case Navigation.Extra.locationFromString url of
+                Nothing ->
+                    TestContext <| Err (InvalidLocationUrl "routeChange" url)
+
+                Just location ->
+                    case program.onRouteChange location of
+                        Nothing ->
+                            TestContext result
+
+                        Just msg ->
+                            update msg (TestContext result)
 
 
 expectModel : (model -> Expectation) -> TestContext msg model -> TestContext msg model

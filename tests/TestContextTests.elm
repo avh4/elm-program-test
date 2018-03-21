@@ -77,4 +77,16 @@ all =
                     "https://example.com/path"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>")
                     |> TestContext.done
+        , test "can simulate a route change" <|
+            \() ->
+                TestContext.createWithNavigation
+                    .pathname
+                    { init = \location -> "<INIT:" ++ location.pathname ++ ">"
+                    , update = testUpdate
+                    , view = testView
+                    }
+                    "https://example.com/path"
+                    |> TestContext.routeChange "https://example.com/new"
+                    |> TestContext.expectModel (Expect.equal "<INIT:/path>;/new")
+                    |> TestContext.done
         ]
