@@ -4,21 +4,29 @@ import Expect
 import Html exposing (Html)
 import Html.Events exposing (onClick)
 import Json.Decode
+import Json.Encode
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
 import TestContext exposing (TestContext)
 
 
-testInit : String
+type TestEffect
+    = NoOp
+    | LogUpdate String
+
+
+testInit : ( String, TestEffect )
 testInit =
-    "<INIT>"
+    ( "<INIT>"
+    , NoOp
+    )
 
 
-testUpdate : String -> String -> ( String, Cmd msg )
+testUpdate : String -> String -> ( String, TestEffect )
 testUpdate msg model =
     ( model ++ ";" ++ msg
-    , Cmd.none
+    , LogUpdate msg
     )
 
 
@@ -27,10 +35,11 @@ testView model =
     Html.div []
         [ Html.span [] [ Html.text model ]
         , Html.button [ onClick "CLICK" ] [ Html.text "Click Me" ]
+        , Html.node "strange" [ Html.Events.on "odd" Json.Decode.string ] []
         ]
 
 
-testContext : TestContext String String
+testContext : TestContext String String TestEffect
 testContext =
     TestContext.create
         { init = testInit
@@ -46,81 +55,108 @@ all =
             \() ->
                 testContext
                     |> TestContext.expectModel (Expect.equal "<INIT>")
-                    |> TestContext.done
         , test "can send a msg" <|
             \() ->
                 testContext
                     |> TestContext.update "A"
                     |> TestContext.expectModel (Expect.equal "<INIT>;A")
-                    |> TestContext.done
         , test "can click a button" <|
             \() ->
                 testContext
                     |> TestContext.clickButton "Click Me"
                     |> TestContext.expectModel (Expect.equal "<INIT>;CLICK")
-                    |> TestContext.done
         , test "can create with flags" <|
             \() ->
                 TestContext.createWithFlags
-                    { init = \flags -> "<INIT:" ++ flags ++ ">"
+                    { init = \flags -> ( "<INIT:" ++ flags ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
                     "flags"
                     |> TestContext.expectModel (Expect.equal "<INIT:flags>")
-                    |> TestContext.done
         , test "can create with navigation" <|
             \() ->
                 TestContext.createWithNavigation
                     .pathname
-                    { init = \location -> "<INIT:" ++ location.pathname ++ ">"
+                    { init = \location -> ( "<INIT:" ++ location.pathname ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
                     "https://example.com/path"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>")
-                    |> TestContext.done
         , test "can simulate a route change" <|
             \() ->
                 TestContext.createWithNavigation
                     .pathname
-                    { init = \location -> "<INIT:" ++ location.pathname ++ ">"
+                    { init = \location -> ( "<INIT:" ++ location.pathname ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
                     "https://example.com/path"
                     |> TestContext.routeChange "https://example.com/new"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>;/new")
-                    |> TestContext.done
         , test "can create with navigation and flags" <|
             \() ->
                 TestContext.createWithNavigationAndFlags
                     .pathname
-                    { init = \flags location -> "<INIT:" ++ location.pathname ++ ":" ++ flags ++ ">"
+                    { init = \flags location -> ( "<INIT:" ++ location.pathname ++ ":" ++ flags ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
                     "https://example.com/path"
                     "flags"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path:flags>")
-                    |> TestContext.done
         , test "can assert on the view" <|
             \() ->
                 testContext
                     |> TestContext.shouldHaveView
                         (Query.find [ Selector.tag "span" ] >> Query.has [ Selector.text "<INIT>" ])
                     |> TestContext.done
+        , test "can assert on the view concisely with a terminal assertion" <|
+            \() ->
+                testContext
+                    |> TestContext.expectView
+                        (Query.find [ Selector.tag "span" ] >> Query.has [ Selector.text "<INIT>" ])
         , test "can create with navigation and JSON string flags" <|
             \() ->
                 TestContext.createWithNavigationAndJsonStringFlags
                     (Json.Decode.field "x" Json.Decode.string)
                     .pathname
-                    { init = \flags location -> "<INIT:" ++ location.pathname ++ ":" ++ flags ++ ">"
+                    { init = \flags location -> ( "<INIT:" ++ location.pathname ++ ":" ++ flags ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
                     "https://example.com/path"
                     """{"x": "fromJson"}"""
                     |> TestContext.expectModel (Expect.equal "<INIT:/path:fromJson>")
+        , test "can assert on the view concisely given Html.Test.Selectors" <|
+            \() ->
+                testContext
+                    |> TestContext.shouldHave [ Selector.tag "span" ]
                     |> TestContext.done
+        , test "can assert on the view concisely with a terminal assertion given Html.Test.Selectors" <|
+            \() ->
+                testContext
+                    |> TestContext.expectViewHas [ Selector.tag "span" ]
+        , test "can assert on the view concisely given Html.Test.Selectors that should not exist" <|
+            \() ->
+                testContext
+                    |> TestContext.shouldNotHave [ Selector.tag "article" ]
+                    |> TestContext.done
+        , test "can simulate an arbitrary DOM event" <|
+            \() ->
+                testContext
+                    |> TestContext.simulate
+                        (Query.find [ Selector.tag "strange" ])
+                        ( "odd", Json.Encode.string "<ODD-VALUE>" )
+                    |> TestContext.expectModel (Expect.equal "<INIT>;<ODD-VALUE>")
+        , test "can assert on the last effect after init" <|
+            \() ->
+                testContext
+                    |> TestContext.expectLastEffect (Expect.equal NoOp)
+        , test "can assert on the last effect after update" <|
+            \() ->
+                testContext
+                    |> TestContext.clickButton "Click Me"
+                    |> TestContext.expectLastEffect (Expect.equal (LogUpdate "CLICK"))
         ]

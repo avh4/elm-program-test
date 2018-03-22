@@ -8,9 +8,15 @@ module TestContext
         , createWithNavigationAndFlags
         , createWithNavigationAndJsonStringFlags
         , done
+        , expectLastEffect
         , expectModel
+        , expectView
+        , expectViewHas
         , routeChange
+        , shouldHave
         , shouldHaveView
+        , shouldNotHave
+        , simulate
         , update
         )
 
@@ -26,7 +32,7 @@ module TestContext
 
 ## Simulating user input
 
-@docs clickButton
+@docs clickButton, simulate
 @docs routeChange
 
 
@@ -35,15 +41,23 @@ module TestContext
 @docs update
 
 
-## Assertions
+## Final assertions
 
-@docs shouldHaveView, expectModel
+@docs expectViewHas, expectView, expectLastEffect, expectModel
+
+
+## Intermediate assertions
+
+These functions can be used to make assertions on a `TestContext` without ending the test.
+
+@docs shouldHave, shouldNotHave, shouldHaveView
 
 -}
 
 import Expect exposing (Expectation)
 import Html exposing (Html)
 import Json.Decode
+import Json.Encode
 import Navigation
 import Navigation.Extra
 import Test.Html.Event
@@ -53,8 +67,8 @@ import Test.Runner
 import Test.Runner.Failure
 
 
-type TestContext msg model
-    = TestContext (Result Failure ( TestProgram msg model (Cmd Never), model ))
+type TestContext msg model effect
+    = TestContext (Result Failure ( TestProgram msg model effect, ( model, effect ) ))
 
 
 type alias TestProgram msg model effect =
@@ -67,17 +81,18 @@ type alias TestProgram msg model effect =
 type Failure
     = ExpectFailed String String Test.Runner.Failure.Reason
     | SimulateFailed String String
+    | SimulateFailedToFindTarget String String
     | InvalidLocationUrl String String
     | InvalidFlags String String
 
 
 createHelper :
-    { init : model
-    , update : msg -> model -> ( model, Cmd Never )
+    { init : ( model, effect )
+    , update : msg -> model -> ( model, effect )
     , view : model -> Html msg
     , onRouteChange : Navigation.Location -> Maybe msg
     }
-    -> TestContext msg model
+    -> TestContext msg model effect
 createHelper program =
     TestContext <|
         Ok
@@ -90,11 +105,11 @@ createHelper program =
 
 
 create :
-    { init : model
-    , update : msg -> model -> ( model, Cmd Never )
+    { init : ( model, effect )
+    , update : msg -> model -> ( model, effect )
     , view : model -> Html msg
     }
-    -> TestContext msg model
+    -> TestContext msg model effect
 create program =
     createHelper
         { init = program.init
@@ -105,12 +120,12 @@ create program =
 
 
 createWithFlags :
-    { init : flags -> model
-    , update : msg -> model -> ( model, Cmd Never )
+    { init : flags -> ( model, effect )
+    , update : msg -> model -> ( model, effect )
     , view : model -> Html msg
     }
     -> flags
-    -> TestContext msg model
+    -> TestContext msg model effect
 createWithFlags program flags =
     createHelper
         { init = program.init flags
@@ -123,12 +138,12 @@ createWithFlags program flags =
 createWithNavigation :
     (Navigation.Location -> msg)
     ->
-        { init : Navigation.Location -> model
-        , update : msg -> model -> ( model, Cmd Never )
+        { init : Navigation.Location -> ( model, effect )
+        , update : msg -> model -> ( model, effect )
         , view : model -> Html msg
         }
     -> String
-    -> TestContext msg model
+    -> TestContext msg model effect
 createWithNavigation onRouteChange program initialUrl =
     case Navigation.Extra.locationFromString initialUrl of
         Nothing ->
@@ -146,13 +161,13 @@ createWithNavigation onRouteChange program initialUrl =
 createWithNavigationAndFlags :
     (Navigation.Location -> msg)
     ->
-        { init : flags -> Navigation.Location -> model
-        , update : msg -> model -> ( model, Cmd Never )
+        { init : flags -> Navigation.Location -> ( model, effect )
+        , update : msg -> model -> ( model, effect )
         , view : model -> Html msg
         }
     -> String
     -> flags
-    -> TestContext msg model
+    -> TestContext msg model effect
 createWithNavigationAndFlags onRouteChange program initialUrl flags =
     case Navigation.Extra.locationFromString initialUrl of
         Nothing ->
@@ -171,13 +186,13 @@ createWithNavigationAndJsonStringFlags :
     Json.Decode.Decoder flags
     -> (Navigation.Location -> msg)
     ->
-        { init : flags -> Navigation.Location -> model
-        , update : msg -> model -> ( model, Cmd Never )
+        { init : flags -> Navigation.Location -> ( model, effect )
+        , update : msg -> model -> ( model, effect )
         , view : model -> Html msg
         }
     -> String
     -> String
-    -> TestContext msg model
+    -> TestContext msg model effect
 createWithNavigationAndJsonStringFlags flagsDecoder onRouteChange program initialUrl flagsJson =
     case Navigation.Extra.locationFromString initialUrl of
         Nothing ->
@@ -197,47 +212,76 @@ createWithNavigationAndJsonStringFlags flagsDecoder onRouteChange program initia
                         }
 
 
-update : msg -> TestContext msg model -> TestContext msg model
+update : msg -> TestContext msg model effect -> TestContext msg model effect
 update msg (TestContext result) =
     TestContext <|
         case result of
             Err err ->
                 Err err
 
-            Ok ( program, model ) ->
+            Ok ( program, ( model, _ ) ) ->
                 Ok
                     ( program
                     , program.update msg model
-                        |> Tuple.first
                     )
 
 
-clickButton : String -> TestContext msg model -> TestContext msg model
-clickButton buttonText (TestContext result) =
+simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
+simulateHelper functionDescription findTarget event (TestContext result) =
     case result of
         Err err ->
             TestContext <| Err err
 
-        Ok ( program, model ) ->
+        Ok ( program, ( model, _ ) ) ->
+            let
+                targetQuery =
+                    program.view model
+                        |> Query.fromHtml
+                        |> findTarget
+            in
+            -- First check the target so we can give a better error message if it doesn't exist
             case
-                program.view model
-                    |> Query.fromHtml
-                    |> Query.find
-                        [ Selector.tag "button"
-                        , Selector.containing [ Selector.text buttonText ]
-                        ]
-                    |> Test.Html.Event.simulate Test.Html.Event.click
-                    |> Test.Html.Event.toResult
+                targetQuery
+                    |> Query.has []
+                    |> Test.Runner.getFailureReason
             of
-                Err message ->
+                Just reason ->
                     TestContext <|
-                        Err (SimulateFailed ("clickButton " ++ toString buttonText) message)
+                        Err (SimulateFailedToFindTarget functionDescription reason.description)
 
-                Ok msg ->
-                    update msg (TestContext result)
+                Nothing ->
+                    -- Try to simulate the event, now that we know the target exists
+                    case
+                        targetQuery
+                            |> Test.Html.Event.simulate event
+                            |> Test.Html.Event.toResult
+                    of
+                        Err message ->
+                            TestContext <|
+                                Err (SimulateFailed functionDescription message)
+
+                        Ok msg ->
+                            update msg (TestContext result)
 
 
-routeChange : String -> TestContext msg model -> TestContext msg model
+simulate : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
+simulate findTarget ( eventName, eventValue ) testContext =
+    simulateHelper ("simulate " ++ toString eventName) findTarget ( eventName, eventValue ) testContext
+
+
+clickButton : String -> TestContext msg model effect -> TestContext msg model effect
+clickButton buttonText testContext =
+    simulateHelper ("clickButton " ++ toString buttonText)
+        (Query.find
+            [ Selector.tag "button"
+            , Selector.containing [ Selector.text buttonText ]
+            ]
+        )
+        Test.Html.Event.click
+        testContext
+
+
+routeChange : String -> TestContext msg model effect -> TestContext msg model effect
 routeChange url (TestContext result) =
     case result of
         Err err ->
@@ -257,30 +301,48 @@ routeChange url (TestContext result) =
                             update msg (TestContext result)
 
 
-expectModel : (model -> Expectation) -> TestContext msg model -> TestContext msg model
+expectModel : (model -> Expectation) -> TestContext msg model effect -> Expectation
 expectModel assertion (TestContext result) =
+    done <|
+        TestContext <|
+            case result of
+                Err err ->
+                    Err err
+
+                Ok ( program, ( model, lastEffect ) ) ->
+                    case assertion model |> Test.Runner.getFailureReason of
+                        Nothing ->
+                            Ok ( program, ( model, lastEffect ) )
+
+                        Just reason ->
+                            Err (ExpectFailed "expectModel" reason.description reason.reason)
+
+
+expectLastEffect : (effect -> Expectation) -> TestContext msg model effect -> Expectation
+expectLastEffect assertion (TestContext result) =
+    done <|
+        TestContext <|
+            case result of
+                Err err ->
+                    Err err
+
+                Ok ( program, ( model, lastEffect ) ) ->
+                    case assertion lastEffect |> Test.Runner.getFailureReason of
+                        Nothing ->
+                            Ok ( program, ( model, lastEffect ) )
+
+                        Just reason ->
+                            Err (ExpectFailed "expectLastEffect" reason.description reason.reason)
+
+
+expectViewHelper : String -> (Query.Single msg -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
+expectViewHelper functionName assertion (TestContext result) =
     TestContext <|
         case result of
             Err err ->
                 Err err
 
-            Ok ( program, model ) ->
-                case assertion model |> Test.Runner.getFailureReason of
-                    Nothing ->
-                        Ok ( program, model )
-
-                    Just reason ->
-                        Err (ExpectFailed "expectModel" reason.description reason.reason)
-
-
-shouldHaveView : (Query.Single msg -> Expectation) -> TestContext msg model -> TestContext msg model
-shouldHaveView assertion (TestContext result) =
-    TestContext <|
-        case result of
-            Err err ->
-                Err err
-
-            Ok ( program, model ) ->
+            Ok ( program, ( model, lastEffect ) ) ->
                 case
                     model
                         |> program.view
@@ -289,13 +351,42 @@ shouldHaveView assertion (TestContext result) =
                         |> Test.Runner.getFailureReason
                 of
                     Nothing ->
-                        Ok ( program, model )
+                        Ok ( program, ( model, lastEffect ) )
 
                     Just reason ->
-                        Err (ExpectFailed "shouldHaveView" reason.description reason.reason)
+                        Err (ExpectFailed functionName reason.description reason.reason)
 
 
-done : TestContext msg model -> Expectation
+shouldHaveView : (Query.Single msg -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
+shouldHaveView assertion testContext =
+    expectViewHelper "shouldHaveView" assertion testContext
+
+
+shouldHave : List Selector.Selector -> TestContext msg model effect -> TestContext msg model effect
+shouldHave selector testContext =
+    expectViewHelper "shouldHave" (Query.has selector) testContext
+
+
+shouldNotHave : List Selector.Selector -> TestContext msg model effect -> TestContext msg model effect
+shouldNotHave selector testContext =
+    expectViewHelper "shouldNotHave" (Query.hasNot selector) testContext
+
+
+expectView : (Query.Single msg -> Expectation) -> TestContext msg model effect -> Expectation
+expectView assertion testContext =
+    testContext
+        |> expectViewHelper "expectView" assertion
+        |> done
+
+
+expectViewHas : List Selector.Selector -> TestContext msg model effect -> Expectation
+expectViewHas selector testContext =
+    testContext
+        |> expectViewHelper "expectViewHas" (Query.has selector)
+        |> done
+
+
+done : TestContext msg model effect -> Expectation
 done (TestContext result) =
     case result of
         Ok _ ->
@@ -305,6 +396,9 @@ done (TestContext result) =
             Expect.fail (expectationName ++ ":\n" ++ Test.Runner.Failure.format description reason)
 
         Err (SimulateFailed functionName message) ->
+            Expect.fail (functionName ++ ":\n" ++ message)
+
+        Err (SimulateFailedToFindTarget functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
 
         Err (InvalidLocationUrl functionName invalidUrl) ->
