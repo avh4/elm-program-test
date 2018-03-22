@@ -68,7 +68,7 @@ import Test.Runner.Failure
 
 
 type TestContext msg model effect
-    = TestContext (Result Failure ( TestProgram msg model effect, ( model, effect ) ))
+    = TestContext (Result Failure ( TestProgram msg model effect, ( model, effect ), Maybe Navigation.Location ))
 
 
 type alias TestProgram msg model effect =
@@ -84,6 +84,7 @@ type Failure
     | SimulateFailedToFindTarget String String
     | InvalidLocationUrl String String
     | InvalidFlags String String
+    | ProgramDoesNotSupportNavigation String
 
 
 createHelper :
@@ -91,6 +92,7 @@ createHelper :
     , update : msg -> model -> ( model, effect )
     , view : model -> Html msg
     , onRouteChange : Navigation.Location -> Maybe msg
+    , initialLocation : Maybe Navigation.Location
     }
     -> TestContext msg model effect
 createHelper program =
@@ -101,6 +103,7 @@ createHelper program =
               , onRouteChange = program.onRouteChange
               }
             , program.init
+            , program.initialLocation
             )
 
 
@@ -116,6 +119,7 @@ create program =
         , update = program.update
         , view = program.view
         , onRouteChange = \_ -> Nothing
+        , initialLocation = Nothing
         }
 
 
@@ -132,6 +136,7 @@ createWithFlags program flags =
         , update = program.update
         , view = program.view
         , onRouteChange = \_ -> Nothing
+        , initialLocation = Nothing
         }
 
 
@@ -155,6 +160,7 @@ createWithNavigation onRouteChange program initialUrl =
                 , update = program.update
                 , view = program.view
                 , onRouteChange = onRouteChange >> Just
+                , initialLocation = Just location
                 }
 
 
@@ -179,6 +185,7 @@ createWithNavigationAndFlags onRouteChange program initialUrl flags =
                 , update = program.update
                 , view = program.view
                 , onRouteChange = onRouteChange >> Just
+                , initialLocation = Just location
                 }
 
 
@@ -209,6 +216,7 @@ createWithNavigationAndJsonStringFlags flagsDecoder onRouteChange program initia
                         , update = program.update
                         , view = program.view
                         , onRouteChange = onRouteChange >> Just
+                        , initialLocation = Just location
                         }
 
 
@@ -219,10 +227,11 @@ update msg (TestContext result) =
             Err err ->
                 Err err
 
-            Ok ( program, ( model, _ ) ) ->
+            Ok ( program, ( model, _ ), currentLocation ) ->
                 Ok
                     ( program
                     , program.update msg model
+                    , currentLocation
                     )
 
 
@@ -232,7 +241,7 @@ simulateHelper functionDescription findTarget event (TestContext result) =
         Err err ->
             TestContext <| Err err
 
-        Ok ( program, ( model, _ ) ) ->
+        Ok ( program, ( model, _ ), _ ) ->
             let
                 targetQuery =
                     program.view model
@@ -281,24 +290,27 @@ clickButton buttonText testContext =
         testContext
 
 
+{-| `url` may be an absolute URL or relative URL
+-}
 routeChange : String -> TestContext msg model effect -> TestContext msg model effect
 routeChange url (TestContext result) =
     case result of
         Err err ->
             TestContext <| Err err
 
-        Ok ( program, model ) ->
-            case Navigation.Extra.locationFromString url of
+        Ok ( program, _, Nothing ) ->
+            TestContext <| Err (ProgramDoesNotSupportNavigation "routeChange")
+
+        Ok ( program, _, Just currentLocation ) ->
+            case
+                Navigation.Extra.resolve currentLocation url
+                    |> program.onRouteChange
+            of
                 Nothing ->
-                    TestContext <| Err (InvalidLocationUrl "routeChange" url)
+                    TestContext result
 
-                Just location ->
-                    case program.onRouteChange location of
-                        Nothing ->
-                            TestContext result
-
-                        Just msg ->
-                            update msg (TestContext result)
+                Just msg ->
+                    update msg (TestContext result)
 
 
 expectModel : (model -> Expectation) -> TestContext msg model effect -> Expectation
@@ -309,10 +321,10 @@ expectModel assertion (TestContext result) =
                 Err err ->
                     Err err
 
-                Ok ( program, ( model, lastEffect ) ) ->
+                Ok ( _, ( model, _ ), _ ) ->
                     case assertion model |> Test.Runner.getFailureReason of
                         Nothing ->
-                            Ok ( program, ( model, lastEffect ) )
+                            result
 
                         Just reason ->
                             Err (ExpectFailed "expectModel" reason.description reason.reason)
@@ -326,10 +338,10 @@ expectLastEffect assertion (TestContext result) =
                 Err err ->
                     Err err
 
-                Ok ( program, ( model, lastEffect ) ) ->
+                Ok ( _, ( _, lastEffect ), _ ) ->
                     case assertion lastEffect |> Test.Runner.getFailureReason of
                         Nothing ->
-                            Ok ( program, ( model, lastEffect ) )
+                            result
 
                         Just reason ->
                             Err (ExpectFailed "expectLastEffect" reason.description reason.reason)
@@ -342,7 +354,7 @@ expectViewHelper functionName assertion (TestContext result) =
             Err err ->
                 Err err
 
-            Ok ( program, ( model, lastEffect ) ) ->
+            Ok ( program, ( model, _ ), _ ) ->
                 case
                     model
                         |> program.view
@@ -351,7 +363,7 @@ expectViewHelper functionName assertion (TestContext result) =
                         |> Test.Runner.getFailureReason
                 of
                     Nothing ->
-                        Ok ( program, ( model, lastEffect ) )
+                        result
 
                     Just reason ->
                         Err (ExpectFailed functionName reason.description reason.reason)
@@ -406,3 +418,6 @@ done (TestContext result) =
 
         Err (InvalidFlags functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
+
+        Err (ProgramDoesNotSupportNavigation functionName) ->
+            Expect.fail (functionName ++ ": Program does not support navigation.  Use TestContext.createWithNavigation or related function to create a TestContext that supports navigation.")

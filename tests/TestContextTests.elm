@@ -95,6 +95,17 @@ all =
                     "https://example.com/path"
                     |> TestContext.routeChange "https://example.com/new"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>;/new")
+        , test "can simulate a route change with a relative URL" <|
+            \() ->
+                TestContext.createWithNavigation
+                    .pathname
+                    { init = \location -> ( "<INIT:" ++ location.pathname ++ ">", NoOp )
+                    , update = testUpdate
+                    , view = testView
+                    }
+                    "https://example.com/path"
+                    |> TestContext.routeChange "/new"
+                    |> TestContext.expectModel (Expect.equal "<INIT:/path>;/new")
         , test "can create with navigation and flags" <|
             \() ->
                 TestContext.createWithNavigationAndFlags
