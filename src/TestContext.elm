@@ -16,6 +16,7 @@ module TestContext
         , fail
         , routeChange
         , shouldHave
+        , shouldHaveLastEffect
         , shouldHaveView
         , shouldNotHave
         , simulate
@@ -45,7 +46,8 @@ module TestContext
 
 ## Final assertions
 
-@docs expectViewHas, expectView, expectLastEffect, expectModel
+@docs expectViewHas, expectView
+@docs expectLastEffect, expectModel
 
 
 ## Intermediate assertions
@@ -53,6 +55,7 @@ module TestContext
 These functions can be used to make assertions on a `TestContext` without ending the test.
 
 @docs shouldHave, shouldNotHave, shouldHaveView
+@docs shouldHaveLastEffect
 
 
 ## Custom assertions
@@ -364,21 +367,32 @@ expectModel assertion (TestContext result) =
                             Err (ExpectFailed "expectModel" reason.description reason.reason)
 
 
+expectLastEffectHelper : String -> (effect -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
+expectLastEffectHelper functionName assertion (TestContext result) =
+    TestContext <|
+        case result of
+            Err err ->
+                Err err
+
+            Ok ( _, ( _, lastEffect ), _ ) ->
+                case assertion lastEffect |> Test.Runner.getFailureReason of
+                    Nothing ->
+                        result
+
+                    Just reason ->
+                        Err (ExpectFailed functionName reason.description reason.reason)
+
+
+shouldHaveLastEffect : (effect -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
+shouldHaveLastEffect assertion testContext =
+    expectLastEffectHelper "shouldHaveLastEffect" assertion testContext
+
+
 expectLastEffect : (effect -> Expectation) -> TestContext msg model effect -> Expectation
-expectLastEffect assertion (TestContext result) =
-    done <|
-        TestContext <|
-            case result of
-                Err err ->
-                    Err err
-
-                Ok ( _, ( _, lastEffect ), _ ) ->
-                    case assertion lastEffect |> Test.Runner.getFailureReason of
-                        Nothing ->
-                            result
-
-                        Just reason ->
-                            Err (ExpectFailed "expectLastEffect" reason.description reason.reason)
+expectLastEffect assertion testContext =
+    testContext
+        |> expectLastEffectHelper "expectLastEffect" assertion
+        |> done
 
 
 expectViewHelper : String -> (Query.Single msg -> Expectation) -> TestContext msg model effect -> TestContext msg model effect

@@ -181,6 +181,13 @@ all =
                 testContext
                     |> TestContext.clickButton "Click Me"
                     |> TestContext.expectLastEffect (Expect.equal (LogUpdate "CLICK"))
+        , test "can assert on the last effect as an intermediate assertion" <|
+            \() ->
+                testContext
+                    |> TestContext.shouldHaveLastEffect (Expect.equal NoOp)
+                    |> TestContext.clickButton "Click Me"
+                    |> TestContext.shouldHaveLastEffect (Expect.equal (LogUpdate "CLICK"))
+                    |> TestContext.done
         , test "can be forced into failure" <|
             \() ->
                 testContext
