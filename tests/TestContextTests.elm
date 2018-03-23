@@ -8,6 +8,7 @@ import Json.Encode
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
+import Test.Runner
 import TestContext exposing (TestContext)
 
 
@@ -180,4 +181,12 @@ all =
                 testContext
                     |> TestContext.clickButton "Click Me"
                     |> TestContext.expectLastEffect (Expect.equal (LogUpdate "CLICK"))
+        , test "can be forced into failure" <|
+            \() ->
+                testContext
+                    |> TestContext.fail "custom" "Because I said so"
+                    |> TestContext.done
+                    |> Test.Runner.getFailureReason
+                    |> Maybe.map .description
+                    |> Expect.equal (Just "custom: Because I said so")
         ]

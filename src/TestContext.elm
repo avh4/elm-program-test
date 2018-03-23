@@ -13,6 +13,7 @@ module TestContext
         , expectModel
         , expectView
         , expectViewHas
+        , fail
         , routeChange
         , shouldHave
         , shouldHaveView
@@ -53,6 +54,13 @@ These functions can be used to make assertions on a `TestContext` without ending
 
 @docs shouldHave, shouldNotHave, shouldHaveView
 
+
+## Custom assertions
+
+These functions may be useful if you are writing your own custom assertion functions.
+
+@docs fail
+
 -}
 
 import Expect exposing (Expectation)
@@ -86,6 +94,7 @@ type Failure
     | InvalidLocationUrl String String
     | InvalidFlags String String
     | ProgramDoesNotSupportNavigation String
+    | CustomFailure String String
 
 
 createHelper :
@@ -446,3 +455,36 @@ done (TestContext result) =
 
         Err (ProgramDoesNotSupportNavigation functionName) ->
             Expect.fail (functionName ++ ": Program does not support navigation.  Use TestContext.createWithNavigation or related function to create a TestContext that supports navigation.")
+
+        Err (CustomFailure assertionName message) ->
+            Expect.fail (assertionName ++ ": " ++ message)
+
+
+{-| `fail` can be used to report custom errors if you are writing your own convenience functions to deal with test contexts.
+
+Example (this is a function that checks for a particular structure in the program's view,
+but will also fail the TestContext if the `expectedCount` parameter is invalid):
+
+    expectNotificationCount : Int -> TestContext Msg Model effect -> TestContext Msg Model effect
+    expectNotificationCount expectedCount testContext =
+        if expectedCount <= 0 then
+            testContext
+                |> TestContext.fail "expectNotificationCount"
+                    ("expectedCount must be positive, but was: " ++ toString expectedCount)
+        else
+            testContext
+                |> shouldHave
+                    [ Test.Html.Selector.class "notifications"
+                    , Test.Html.Selector.text (toString expectedCount)
+                    ]
+
+-}
+fail : String -> String -> TestContext msg model effect -> TestContext msg model effect
+fail assertionName failureMessage (TestContext result) =
+    TestContext <|
+        case result of
+            Err err ->
+                Err err
+
+            Ok _ ->
+                Err (CustomFailure assertionName failureMessage)
