@@ -74,6 +74,16 @@ all =
                     }
                     "flags"
                     |> TestContext.expectModel (Expect.equal "<INIT:flags>")
+        , test "can create with JSON string flags" <|
+            \() ->
+                TestContext.createWithJsonStringFlags
+                    (Json.Decode.field "y" Json.Decode.string)
+                    { init = \flags -> ( "<INIT:" ++ flags ++ ">", NoOp )
+                    , update = testUpdate
+                    , view = testView
+                    }
+                    """{"y": "fromJson"}"""
+                    |> TestContext.expectModel (Expect.equal "<INIT:fromJson>")
         , test "can create with navigation" <|
             \() ->
                 TestContext.createWithNavigation

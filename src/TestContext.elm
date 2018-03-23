@@ -4,6 +4,7 @@ module TestContext
         , clickButton
         , create
         , createWithFlags
+        , createWithJsonStringFlags
         , createWithNavigation
         , createWithNavigationAndFlags
         , createWithNavigationAndJsonStringFlags
@@ -26,7 +27,7 @@ module TestContext
 ## Creating
 
 @docs TestContext
-@docs create, createWithFlags
+@docs create, createWithFlags, createWithJsonStringFlags
 @docs createWithNavigation, createWithNavigationAndFlags, createWithNavigationAndJsonStringFlags
 
 
@@ -138,6 +139,30 @@ createWithFlags program flags =
         , onRouteChange = \_ -> Nothing
         , initialLocation = Nothing
         }
+
+
+createWithJsonStringFlags :
+    Json.Decode.Decoder flags
+    ->
+        { init : flags -> ( model, effect )
+        , update : msg -> model -> ( model, effect )
+        , view : model -> Html msg
+        }
+    -> String
+    -> TestContext msg model effect
+createWithJsonStringFlags flagsDecoder program flagsJson =
+    case Json.Decode.decodeString flagsDecoder flagsJson of
+        Err message ->
+            TestContext <| Err (InvalidFlags "createWithJsonStringFlags" message)
+
+        Ok flags ->
+            createHelper
+                { init = program.init flags
+                , update = program.update
+                , view = program.view
+                , onRouteChange = \_ -> Nothing
+                , initialLocation = Nothing
+                }
 
 
 createWithNavigation :
