@@ -8,6 +8,7 @@ import Json.Encode
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
+import Test.Runner
 import TestContext exposing (TestContext)
 
 
@@ -74,6 +75,16 @@ all =
                     }
                     "flags"
                     |> TestContext.expectModel (Expect.equal "<INIT:flags>")
+        , test "can create with JSON string flags" <|
+            \() ->
+                TestContext.createWithJsonStringFlags
+                    (Json.Decode.field "y" Json.Decode.string)
+                    { init = \flags -> ( "<INIT:" ++ flags ++ ">", NoOp )
+                    , update = testUpdate
+                    , view = testView
+                    }
+                    """{"y": "fromJson"}"""
+                    |> TestContext.expectModel (Expect.equal "<INIT:fromJson>")
         , test "can create with navigation" <|
             \() ->
                 TestContext.createWithNavigation
@@ -94,6 +105,17 @@ all =
                     }
                     "https://example.com/path"
                     |> TestContext.routeChange "https://example.com/new"
+                    |> TestContext.expectModel (Expect.equal "<INIT:/path>;/new")
+        , test "can simulate a route change with a relative URL" <|
+            \() ->
+                TestContext.createWithNavigation
+                    .pathname
+                    { init = \location -> ( "<INIT:" ++ location.pathname ++ ">", NoOp )
+                    , update = testUpdate
+                    , view = testView
+                    }
+                    "https://example.com/path"
+                    |> TestContext.routeChange "/new"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>;/new")
         , test "can create with navigation and flags" <|
             \() ->
@@ -159,4 +181,19 @@ all =
                 testContext
                     |> TestContext.clickButton "Click Me"
                     |> TestContext.expectLastEffect (Expect.equal (LogUpdate "CLICK"))
+        , test "can assert on the last effect as an intermediate assertion" <|
+            \() ->
+                testContext
+                    |> TestContext.shouldHaveLastEffect (Expect.equal NoOp)
+                    |> TestContext.clickButton "Click Me"
+                    |> TestContext.shouldHaveLastEffect (Expect.equal (LogUpdate "CLICK"))
+                    |> TestContext.done
+        , test "can be forced into failure" <|
+            \() ->
+                testContext
+                    |> TestContext.fail "custom" "Because I said so"
+                    |> TestContext.done
+                    |> Test.Runner.getFailureReason
+                    |> Maybe.map .description
+                    |> Expect.equal (Just "custom: Because I said so")
         ]

@@ -1,4 +1,4 @@
-module Navigation.Extra exposing (locationFromString)
+module Navigation.Extra exposing (locationFromString, resolve)
 
 {-| TODO: this module should implement the algorithm described at
 <https://url.spec.whatwg.org/>
@@ -14,16 +14,28 @@ NOTE: the behavior of when `Nothing` is returned may change when the correct imp
 -}
 locationFromString : String -> Maybe Navigation.Location
 locationFromString url =
-    Just
-        { hash = "TODO"
-        , host = "TODO"
-        , hostname = "TODO"
-        , href = url
-        , origin = "TODO"
-        , password = "TODO"
-        , pathname = "/" ++ (url |> String.split "/" |> List.drop 3 |> String.join "/")
-        , port_ = "TODO"
-        , protocol = "TODO"
-        , search = "TODO"
-        , username = "TODO"
-        }
+    if String.contains "://" url then
+        Just
+            { hash = "TODO"
+            , host = "TODO"
+            , hostname = "TODO"
+            , href = url
+            , origin = "TODO"
+            , password = "TODO"
+            , pathname = "/" ++ (url |> String.split "/" |> List.drop 3 |> String.join "/")
+            , port_ = "TODO"
+            , protocol = "TODO"
+            , search = "TODO"
+            , username = "TODO"
+            }
+    else
+        Nothing
+
+
+{-| This resolves a URL string (either an absolute or relative URL) against a base URL (given as a `Location`).
+-}
+resolve : Navigation.Location -> String -> Navigation.Location
+resolve base url =
+    locationFromString url
+        -- TODO: implment correct logic (current logic is only correct for "authority-relative" URLs without query or fragment strings)
+        |> Maybe.withDefault { base | pathname = url }

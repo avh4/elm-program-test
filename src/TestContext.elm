@@ -4,6 +4,7 @@ module TestContext
         , clickButton
         , create
         , createWithFlags
+        , createWithJsonStringFlags
         , createWithNavigation
         , createWithNavigationAndFlags
         , createWithNavigationAndJsonStringFlags
@@ -12,8 +13,10 @@ module TestContext
         , expectModel
         , expectView
         , expectViewHas
+        , fail
         , routeChange
         , shouldHave
+        , shouldHaveLastEffect
         , shouldHaveView
         , shouldNotHave
         , simulate
@@ -26,7 +29,7 @@ module TestContext
 ## Creating
 
 @docs TestContext
-@docs create, createWithFlags
+@docs create, createWithFlags, createWithJsonStringFlags
 @docs createWithNavigation, createWithNavigationAndFlags, createWithNavigationAndJsonStringFlags
 
 
@@ -43,7 +46,8 @@ module TestContext
 
 ## Final assertions
 
-@docs expectViewHas, expectView, expectLastEffect, expectModel
+@docs expectViewHas, expectView
+@docs expectLastEffect, expectModel
 
 
 ## Intermediate assertions
@@ -51,6 +55,14 @@ module TestContext
 These functions can be used to make assertions on a `TestContext` without ending the test.
 
 @docs shouldHave, shouldNotHave, shouldHaveView
+@docs shouldHaveLastEffect
+
+
+## Custom assertions
+
+These functions may be useful if you are writing your own custom assertion functions.
+
+@docs fail
 
 -}
 
@@ -68,7 +80,7 @@ import Test.Runner.Failure
 
 
 type TestContext msg model effect
-    = TestContext (Result Failure ( TestProgram msg model effect, ( model, effect ) ))
+    = TestContext (Result Failure ( TestProgram msg model effect, ( model, effect ), Maybe Navigation.Location ))
 
 
 type alias TestProgram msg model effect =
@@ -84,6 +96,8 @@ type Failure
     | SimulateFailedToFindTarget String String
     | InvalidLocationUrl String String
     | InvalidFlags String String
+    | ProgramDoesNotSupportNavigation String
+    | CustomFailure String String
 
 
 createHelper :
@@ -91,6 +105,7 @@ createHelper :
     , update : msg -> model -> ( model, effect )
     , view : model -> Html msg
     , onRouteChange : Navigation.Location -> Maybe msg
+    , initialLocation : Maybe Navigation.Location
     }
     -> TestContext msg model effect
 createHelper program =
@@ -101,6 +116,7 @@ createHelper program =
               , onRouteChange = program.onRouteChange
               }
             , program.init
+            , program.initialLocation
             )
 
 
@@ -116,6 +132,7 @@ create program =
         , update = program.update
         , view = program.view
         , onRouteChange = \_ -> Nothing
+        , initialLocation = Nothing
         }
 
 
@@ -132,7 +149,32 @@ createWithFlags program flags =
         , update = program.update
         , view = program.view
         , onRouteChange = \_ -> Nothing
+        , initialLocation = Nothing
         }
+
+
+createWithJsonStringFlags :
+    Json.Decode.Decoder flags
+    ->
+        { init : flags -> ( model, effect )
+        , update : msg -> model -> ( model, effect )
+        , view : model -> Html msg
+        }
+    -> String
+    -> TestContext msg model effect
+createWithJsonStringFlags flagsDecoder program flagsJson =
+    case Json.Decode.decodeString flagsDecoder flagsJson of
+        Err message ->
+            TestContext <| Err (InvalidFlags "createWithJsonStringFlags" message)
+
+        Ok flags ->
+            createHelper
+                { init = program.init flags
+                , update = program.update
+                , view = program.view
+                , onRouteChange = \_ -> Nothing
+                , initialLocation = Nothing
+                }
 
 
 createWithNavigation :
@@ -155,6 +197,7 @@ createWithNavigation onRouteChange program initialUrl =
                 , update = program.update
                 , view = program.view
                 , onRouteChange = onRouteChange >> Just
+                , initialLocation = Just location
                 }
 
 
@@ -179,6 +222,7 @@ createWithNavigationAndFlags onRouteChange program initialUrl flags =
                 , update = program.update
                 , view = program.view
                 , onRouteChange = onRouteChange >> Just
+                , initialLocation = Just location
                 }
 
 
@@ -209,6 +253,7 @@ createWithNavigationAndJsonStringFlags flagsDecoder onRouteChange program initia
                         , update = program.update
                         , view = program.view
                         , onRouteChange = onRouteChange >> Just
+                        , initialLocation = Just location
                         }
 
 
@@ -219,10 +264,11 @@ update msg (TestContext result) =
             Err err ->
                 Err err
 
-            Ok ( program, ( model, _ ) ) ->
+            Ok ( program, ( model, _ ), currentLocation ) ->
                 Ok
                     ( program
                     , program.update msg model
+                    , currentLocation
                     )
 
 
@@ -232,7 +278,7 @@ simulateHelper functionDescription findTarget event (TestContext result) =
         Err err ->
             TestContext <| Err err
 
-        Ok ( program, ( model, _ ) ) ->
+        Ok ( program, ( model, _ ), _ ) ->
             let
                 targetQuery =
                     program.view model
@@ -281,24 +327,27 @@ clickButton buttonText testContext =
         testContext
 
 
+{-| `url` may be an absolute URL or relative URL
+-}
 routeChange : String -> TestContext msg model effect -> TestContext msg model effect
 routeChange url (TestContext result) =
     case result of
         Err err ->
             TestContext <| Err err
 
-        Ok ( program, model ) ->
-            case Navigation.Extra.locationFromString url of
+        Ok ( program, _, Nothing ) ->
+            TestContext <| Err (ProgramDoesNotSupportNavigation "routeChange")
+
+        Ok ( program, _, Just currentLocation ) ->
+            case
+                Navigation.Extra.resolve currentLocation url
+                    |> program.onRouteChange
+            of
                 Nothing ->
-                    TestContext <| Err (InvalidLocationUrl "routeChange" url)
+                    TestContext result
 
-                Just location ->
-                    case program.onRouteChange location of
-                        Nothing ->
-                            TestContext result
-
-                        Just msg ->
-                            update msg (TestContext result)
+                Just msg ->
+                    update msg (TestContext result)
 
 
 expectModel : (model -> Expectation) -> TestContext msg model effect -> Expectation
@@ -309,30 +358,41 @@ expectModel assertion (TestContext result) =
                 Err err ->
                     Err err
 
-                Ok ( program, ( model, lastEffect ) ) ->
+                Ok ( _, ( model, _ ), _ ) ->
                     case assertion model |> Test.Runner.getFailureReason of
                         Nothing ->
-                            Ok ( program, ( model, lastEffect ) )
+                            result
 
                         Just reason ->
                             Err (ExpectFailed "expectModel" reason.description reason.reason)
 
 
+expectLastEffectHelper : String -> (effect -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
+expectLastEffectHelper functionName assertion (TestContext result) =
+    TestContext <|
+        case result of
+            Err err ->
+                Err err
+
+            Ok ( _, ( _, lastEffect ), _ ) ->
+                case assertion lastEffect |> Test.Runner.getFailureReason of
+                    Nothing ->
+                        result
+
+                    Just reason ->
+                        Err (ExpectFailed functionName reason.description reason.reason)
+
+
+shouldHaveLastEffect : (effect -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
+shouldHaveLastEffect assertion testContext =
+    expectLastEffectHelper "shouldHaveLastEffect" assertion testContext
+
+
 expectLastEffect : (effect -> Expectation) -> TestContext msg model effect -> Expectation
-expectLastEffect assertion (TestContext result) =
-    done <|
-        TestContext <|
-            case result of
-                Err err ->
-                    Err err
-
-                Ok ( program, ( model, lastEffect ) ) ->
-                    case assertion lastEffect |> Test.Runner.getFailureReason of
-                        Nothing ->
-                            Ok ( program, ( model, lastEffect ) )
-
-                        Just reason ->
-                            Err (ExpectFailed "expectLastEffect" reason.description reason.reason)
+expectLastEffect assertion testContext =
+    testContext
+        |> expectLastEffectHelper "expectLastEffect" assertion
+        |> done
 
 
 expectViewHelper : String -> (Query.Single msg -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
@@ -342,7 +402,7 @@ expectViewHelper functionName assertion (TestContext result) =
             Err err ->
                 Err err
 
-            Ok ( program, ( model, lastEffect ) ) ->
+            Ok ( program, ( model, _ ), _ ) ->
                 case
                     model
                         |> program.view
@@ -351,7 +411,7 @@ expectViewHelper functionName assertion (TestContext result) =
                         |> Test.Runner.getFailureReason
                 of
                     Nothing ->
-                        Ok ( program, ( model, lastEffect ) )
+                        result
 
                     Just reason ->
                         Err (ExpectFailed functionName reason.description reason.reason)
@@ -406,3 +466,39 @@ done (TestContext result) =
 
         Err (InvalidFlags functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
+
+        Err (ProgramDoesNotSupportNavigation functionName) ->
+            Expect.fail (functionName ++ ": Program does not support navigation.  Use TestContext.createWithNavigation or related function to create a TestContext that supports navigation.")
+
+        Err (CustomFailure assertionName message) ->
+            Expect.fail (assertionName ++ ": " ++ message)
+
+
+{-| `fail` can be used to report custom errors if you are writing your own convenience functions to deal with test contexts.
+
+Example (this is a function that checks for a particular structure in the program's view,
+but will also fail the TestContext if the `expectedCount` parameter is invalid):
+
+    expectNotificationCount : Int -> TestContext Msg Model effect -> TestContext Msg Model effect
+    expectNotificationCount expectedCount testContext =
+        if expectedCount <= 0 then
+            testContext
+                |> TestContext.fail "expectNotificationCount"
+                    ("expectedCount must be positive, but was: " ++ toString expectedCount)
+        else
+            testContext
+                |> shouldHave
+                    [ Test.Html.Selector.class "notifications"
+                    , Test.Html.Selector.text (toString expectedCount)
+                    ]
+
+-}
+fail : String -> String -> TestContext msg model effect -> TestContext msg model effect
+fail assertionName failureMessage (TestContext result) =
+    TestContext <|
+        case result of
+            Err err ->
+                Err err
+
+            Ok _ ->
+                Err (CustomFailure assertionName failureMessage)
