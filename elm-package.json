@@ -6,7 +6,9 @@
     "source-directories": [
         "src"
     ],
-    "exposed-modules": [],
+    "exposed-modules": [
+        "TestContext"
+    ],
     "dependencies": {
         "eeue56/elm-html-test": "5.2.0 <= v < 6.0.0",
         "elm-community/elm-test": "4.2.0 <= v < 5.0.0",

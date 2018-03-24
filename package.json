@@ -4,6 +4,6 @@
     "elm-test": "^0.18.12"
   },
   "scripts": {
-    "test": "elm-make --yes && elm-test"
+    "test": "elm-make --yes --docs documentation.json && elm-test"
   }
 }

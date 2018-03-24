@@ -57,6 +57,10 @@ These functions can be used to make assertions on a `TestContext` without ending
 @docs shouldHave, shouldNotHave, shouldHaveView
 @docs shouldHaveLastEffect
 
+To end a `TestContext` without using a [final assertion](#final-assertions), use the following function:
+
+@docs done
+
 
 ## Custom assertions
 
@@ -79,6 +83,14 @@ import Test.Runner
 import Test.Runner.Failure
 
 
+{-| A `TestContext` represents an Elm program, a current state for that program,
+and a log of any errors that have occurred while simulating interaction with the program.
+
+  - To create a `TestContext, see the`create*` functions below.
+  - To advance the state of a `TestContext`, see [Simulating user input](#simulating-user-input), and [Directly sending Msgs](#directly-sending-msgs)
+  - To assert on the resulting state of a `TestContext`, see [Final assertions](#final-assertions)
+
+-}
 type TestContext msg model effect
     = TestContext (Result Failure ( TestProgram msg model effect, ( model, effect ), Maybe Navigation.Location ))
 
@@ -120,6 +132,12 @@ createHelper program =
             )
 
 
+{-| Creates a `TestContext` from the parts of a standard `Html.program`.
+
+See other `create*` functions below if the program you want to test
+uses flags or nagivation.
+
+-}
 create :
     { init : ( model, effect )
     , update : msg -> model -> ( model, effect )
@@ -136,6 +154,17 @@ create program =
         }
 
 
+{-| Creates a `TestContext` from the parts of a standard with flags (`Html.programWithFlags`).
+
+If your program uses `Json.Encode.Value` as its flags type,
+you may find [`createWithJsonStringFlags`](#createWithJsonStringFlags) useful.
+
+If your program does not use flags, see [`create`](#create).
+
+See other `create*` functions below if the program you want to test
+uses nagivation.
+
+-}
 createWithFlags :
     { init : flags -> ( model, effect )
     , update : msg -> model -> ( model, effect )
@@ -153,6 +182,18 @@ createWithFlags program flags =
         }
 
 
+{-| A simplified way to create a `TestContext` for a program that decodes its flags with a JSON decoder.
+
+If your program does not use `Json.Encode.Value` as its flags type,
+or you want more control over how the flags are provided in your tests,
+see [`createWithFlags`](#createWithFlags).
+
+If your program does not use flags, see [`create`](#create).
+
+See other `create*` functions below if the program you want to test
+uses nagivation.
+
+-}
 createWithJsonStringFlags :
     Json.Decode.Decoder flags
     ->
@@ -177,6 +218,12 @@ createWithJsonStringFlags flagsDecoder program flagsJson =
                 }
 
 
+{-| Creates a `TestContext` from the parts of a `Navigation.program`.
+
+See other `create*` functions above and below if the program you want to test
+uses flags or does not use nagivation.
+
+-}
 createWithNavigation :
     (Navigation.Location -> msg)
     ->
@@ -201,6 +248,16 @@ createWithNavigation onRouteChange program initialUrl =
                 }
 
 
+{-| Creates a `TestContext` from the parts of a program with navigation and flags (`Navigation.programWithFlags`).
+
+If your program uses `Json.Encode.Value` as its flags type,
+you may find [`createWithNavigationAndJsonStringFlags`](#createWithNavigationAndJsonStringFlags) useful.
+
+If your program does not use flags, see [`createWithNavigation`](#createWithNavigation).
+
+If your program does not use navigation, see [`createWithFlags`](#createWithFlags).
+
+-}
 createWithNavigationAndFlags :
     (Navigation.Location -> msg)
     ->
@@ -226,6 +283,17 @@ createWithNavigationAndFlags onRouteChange program initialUrl flags =
                 }
 
 
+{-| A simplified way to create a `TestContext` for a program with navigation that decodes its flags with a JSON decoder.
+
+If your program does not use `Json.Encode.Value` as its flags type,
+or you want more control over how the flags are provided in your tests,
+see [`createWithNavigationAndFlags`](#createWithNavigationAndFlags).
+
+If your program does not use flags, see [`createWithNavigation`](#createWithNavigation).
+
+If your program does not use navigation, see [`createWithJsonStringFlags`](#createWithJsonStringFlags).
+
+-}
 createWithNavigationAndJsonStringFlags :
     Json.Decode.Decoder flags
     -> (Navigation.Location -> msg)
@@ -257,6 +325,16 @@ createWithNavigationAndJsonStringFlags flagsDecoder onRouteChange program initia
                         }
 
 
+{-| Advances the state of the `TestContext`'s program by using the `TestContext`'s program's update function
+with the given `msg`.
+
+This can be used to simulate events that can only be triggered by [commands (`Cmd`) and subscriptions (`Sub`)](https://guide.elm-lang.org/architecture/effects/)
+(i.e., that cannot be triggered by user interaction with the view).
+
+NOTE: When possible, you should prefer [Simulating user input](#simulating-user-input),
+as doing so will make your tests more robust to changes in your program's implementation details.
+
+-}
 update : msg -> TestContext msg model effect -> TestContext msg model effect
 update msg (TestContext result) =
     TestContext <|
@@ -310,11 +388,31 @@ simulateHelper functionDescription findTarget event (TestContext result) =
                             update msg (TestContext result)
 
 
+{-| Simulates a custom DOM event.
+
+NOTE: If there is another, more specific function (see [Simulating user input](#simulating-user-input)
+that does what you want, prefer that instead, as you will get the benefit of better error messages.
+
+Parameters:
+
+  - `findTarget`: A function to find the HTML element that responds to the event
+    (typically this will be a call to `Test.Html.Query.find [ ...some selector... ]`)
+  - `( eventName, eventValue )`: The event to simulate (see [Test.Html.Event "Event Builders"](http://package.elm-lang.org/packages/eeue56/elm-html-test/5.2.0/Test-Html-Event#event-builders))
+
+-}
 simulate : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
 simulate findTarget ( eventName, eventValue ) testContext =
     simulateHelper ("simulate " ++ toString eventName) findTarget ( eventName, eventValue ) testContext
 
 
+{-| Simulates clicking a button.
+
+Currently, this function will find and click a `<button>` HTML node containing the given `buttonText`.
+
+NOTE: In the future, this function will be generalized to find buttons with accessibility attributes
+matching the given `buttonText`.
+
+-}
 clickButton : String -> TestContext msg model effect -> TestContext msg model effect
 clickButton buttonText testContext =
     simulateHelper ("clickButton " ++ toString buttonText)
@@ -350,6 +448,8 @@ routeChange url (TestContext result) =
                     update msg (TestContext result)
 
 
+{-| Make an assertion about the current state of a `TestContext`'s model.
+-}
 expectModel : (model -> Expectation) -> TestContext msg model effect -> Expectation
 expectModel assertion (TestContext result) =
     done <|
@@ -383,11 +483,15 @@ expectLastEffectHelper functionName assertion (TestContext result) =
                         Err (ExpectFailed functionName reason.description reason.reason)
 
 
+{-| Validates the last effect produced by a `TestContext`'s program without ending the `TestContext`.
+-}
 shouldHaveLastEffect : (effect -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
 shouldHaveLastEffect assertion testContext =
     expectLastEffectHelper "shouldHaveLastEffect" assertion testContext
 
 
+{-| Makes an assertion about the last effect produced by a `TestContext`'s program.
+-}
 expectLastEffect : (effect -> Expectation) -> TestContext msg model effect -> Expectation
 expectLastEffect assertion testContext =
     testContext
@@ -417,21 +521,29 @@ expectViewHelper functionName assertion (TestContext result) =
                         Err (ExpectFailed functionName reason.description reason.reason)
 
 
+{-| Validates the the current state of a `TestContext`'s view without ending the `TestContext`.
+-}
 shouldHaveView : (Query.Single msg -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
 shouldHaveView assertion testContext =
     expectViewHelper "shouldHaveView" assertion testContext
 
 
+{-| `shouldHave [...selector...]` is equivalent to `shouldHaveView (Test.Html.Query.has [...selector...])`
+-}
 shouldHave : List Selector.Selector -> TestContext msg model effect -> TestContext msg model effect
 shouldHave selector testContext =
     expectViewHelper "shouldHave" (Query.has selector) testContext
 
 
+{-| `shouldNotHave [...selector...]` is equivalent to `shouldHaveView (Test.Html.Query.hasNot [...selector...])`
+-}
 shouldNotHave : List Selector.Selector -> TestContext msg model effect -> TestContext msg model effect
 shouldNotHave selector testContext =
     expectViewHelper "shouldNotHave" (Query.hasNot selector) testContext
 
 
+{-| Makes an assertion about the current state of a `TestContext`'s view.
+-}
 expectView : (Query.Single msg -> Expectation) -> TestContext msg model effect -> Expectation
 expectView assertion testContext =
     testContext
@@ -439,6 +551,11 @@ expectView assertion testContext =
         |> done
 
 
+{-| A simpler way to assert that a `TestContext`'s view matches a given selector.
+
+`expectViewHas [...selector...]` is the same as `expectView (Test.Html.Query.has [...selector...])`.
+
+-}
 expectViewHas : List Selector.Selector -> TestContext msg model effect -> Expectation
 expectViewHas selector testContext =
     testContext
@@ -446,6 +563,12 @@ expectViewHas selector testContext =
         |> done
 
 
+{-| Ends a `TestContext`, reporting any errors that occurred.
+
+NOTE: You should prefer using a [final assertion](#final-assertions) to end your test over using `done`,
+as doing so will [make the intent of your test more clear](https://www.artima.com/weblogs/viewpost.jsp?thread=35578).
+
+-}
 done : TestContext msg model effect -> Expectation
 done (TestContext result) =
     case result of
