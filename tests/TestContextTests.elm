@@ -2,6 +2,7 @@ module TestContextTests exposing (all)
 
 import Expect
 import Html exposing (Html)
+import Html.Attributes
 import Html.Events exposing (onClick)
 import Json.Decode
 import Json.Encode
@@ -38,6 +39,10 @@ testView model =
         , Html.button [ onClick "CLICK" ] [ Html.text "Click Me" ]
         , Html.node "strange" [ Html.Events.on "odd" Json.Decode.string ] []
         , Html.textarea [ Html.Events.onInput (\text -> "Input:textarea:" ++ text) ] []
+        , Html.div []
+            [ Html.div [ Html.Attributes.id "button-a" ] [ Html.button [ onClick "CLICK-A" ] [ Html.text "Ambiguous click" ] ]
+            , Html.div [ Html.Attributes.id "button-b" ] [ Html.button [ onClick "CLICK-B" ] [ Html.text "Ambiguous click" ] ]
+            ]
         ]
 
 
@@ -200,6 +205,22 @@ all =
         , test "can simulate text input" <|
             \() ->
                 testContext
+                    -- |> TestContext.within (Query.find [ id "sidebar"] )
                     |> TestContext.fillInTextarea "ABC"
                     |> TestContext.expectModel (Expect.equal "<INIT>;Input:textarea:ABC")
+        , test "can narrow down the area to specified element" <|
+            \() ->
+                testContext
+                    |> TestContext.within (Query.find [ Selector.id "button-b" ]) (TestContext.clickButton "Ambiguous click")
+                    |> TestContext.clickButton "Click Me"
+                    |> TestContext.expectModel (Expect.equal "<INIT>;CLICK-B;CLICK")
+
+        -- , Html.div []
+        --     [ Html.div [ Html.Attributes.id "button-a" ] [ Html.button [ onClick "CLICK-A" ] [ Html.text "Ambiguous click" ] ]
+        --     , Html.div [ Html.Attributes.id "button-b" ] [ Html.button [ onClick "CLICK-B" ] [ Html.text "Ambiguous click" ] ]
+        --     ]
+        -- \() ->
+        -- |> TestContext.inSection "Comments"
+        --    (TestContext.fillTextArea "text")
+        -- |>
         ]

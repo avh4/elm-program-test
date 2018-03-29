@@ -22,6 +22,7 @@ module TestContext
         , shouldNotHave
         , simulate
         , update
+        , within
         )
 
 {-| A `TestContext` simulates the execution of an Elm program.
@@ -39,6 +40,11 @@ module TestContext
 @docs clickButton, simulate
 @docs fillInTextarea
 @docs routeChange
+
+
+## Simulating user input (advanced)
+
+@docs within
 
 
 ## Directly sending Msgs
@@ -439,6 +445,38 @@ fillInTextarea newContent testContext =
         (Query.find [ Selector.tag "textarea" ])
         (Test.Html.Event.input newContent)
         testContext
+
+
+{-| Focus on a part of the view for a particular operation.
+
+For example, if we had two buttons with the same text and wanted to click one of
+them, we could narrow the view to the desired button's container and then query
+as if the other one didn't exist.
+
+    testContext
+        |> TestContext.within (Query.find [ Selector.id "button-container" ]) (TestContext.clickButton "Click Me")
+
+-}
+within : (Query.Single msg -> Query.Single msg) -> (TestContext msg model effect -> TestContext msg model effect) -> (TestContext msg model effect -> TestContext msg model effect)
+within findTarget onScopedTest (TestContext result) =
+    case result of
+        Err err ->
+            TestContext (Err err)
+
+        Ok ( program, state, currentLocation ) ->
+            let
+                scopedProgram =
+                    { program | view = program.view >> findTarget }
+
+                scopedContext =
+                    TestContext (Ok ( scopedProgram, state, currentLocation ))
+            in
+            case onScopedTest scopedContext of
+                TestContext (Err err) ->
+                    TestContext (Err err)
+
+                TestContext (Ok ( _, finalState, finalLocation )) ->
+                    TestContext (Ok ( program, finalState, finalLocation ))
 
 
 {-| `url` may be an absolute URL or relative URL
