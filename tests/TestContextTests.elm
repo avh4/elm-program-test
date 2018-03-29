@@ -2,7 +2,7 @@ module TestContextTests exposing (all)
 
 import Expect
 import Html exposing (Html)
-import Html.Attributes exposing (for, id)
+import Html.Attributes exposing (for, id, type_)
 import Html.Events exposing (onClick)
 import Json.Decode
 import Json.Encode
@@ -37,6 +37,9 @@ testView model =
     let
         handleInput fieldId =
             Html.Events.onInput (\text -> "Input:" ++ fieldId ++ ":" ++ text)
+
+        handleCheck fieldId =
+            Html.Events.onCheck (\bool -> "Check:" ++ fieldId ++ ":" ++ toString bool)
     in
     Html.div []
         [ Html.span [] [ Html.text model ]
@@ -48,6 +51,8 @@ testView model =
             , Html.input [ id "field-1", handleInput "field-1" ] []
             , Html.label [ for "field-2" ] [ Html.text "Field 2" ]
             , Html.input [ id "field-2", handleInput "field-2" ] []
+            , Html.label [ for "checkbox-1" ] [ Html.text "Checkbox 1" ]
+            , Html.input [ type_ "checkbox", id "checkbox-1", handleCheck "checkbox-1" ] []
             ]
         , Html.div []
             [ Html.div [ id "button-a" ]
@@ -234,4 +239,9 @@ all =
                 testContext
                     |> TestContext.fillIn "field-1" "Field 1" "value99"
                     |> TestContext.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
+        , test "can simulate setting a labeled checkbox field" <|
+            \() ->
+                testContext
+                    |> TestContext.check "checkbox-1" "Checkbox 1" True
+                    |> TestContext.expectModel (Expect.equal "<INIT>;Check:checkbox-1:True")
         ]

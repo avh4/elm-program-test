@@ -1,6 +1,7 @@
 module TestContext
     exposing
         ( TestContext
+        , check
         , clickButton
         , create
         , createWithFlags
@@ -40,6 +41,7 @@ module TestContext
 
 @docs clickButton, simulate
 @docs fillIn, fillInTextarea
+@docs check
 @docs routeChange
 
 
@@ -435,7 +437,7 @@ clickButton buttonText testContext =
         testContext
 
 
-{-| Simulates replace the text in an input field labeled with the given label.
+{-| Simulates replacing the text in an input field labeled with the given label.
 
 NOTE: Currently, this function requires that you also provide the field id
 (which must match both the `id` attribute of the target `input` element,
@@ -475,6 +477,8 @@ fillIn fieldId label newContent testContext =
             (Query.find
                 [ Selector.tag "input"
                 , Selector.id fieldId
+
+                -- TODO: should ensure that known special input types are not set, like `type="checkbox"`, etc?
                 ]
             )
             (Test.Html.Event.input newContent)
@@ -497,6 +501,45 @@ fillInTextarea newContent testContext =
         (Query.find [ Selector.tag "textarea" ])
         (Test.Html.Event.input newContent)
         testContext
+
+
+{-| Simulates setting the value of a checkbox labeled with the given label.
+
+NOTE: Currently, this function requires that you also provide the field id
+(which must match both the `id` attribute of the target `input` element,
+and the `for` attribute of the `label` element).
+After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+a future release of this package will remove the `fieldId` parameter.
+
+NOTE: In the future, this will be generalized to work with
+aria accessiblity attributes in addition to working with standard HTML label elements.
+
+If you need more control over the finding the target element or creating the simulated event,
+see [`simulate`](#simulate).
+
+-}
+check : String -> String -> Bool -> TestContext msg model effect -> TestContext msg model effect
+check fieldId label willBecomeChecked testContext =
+    let
+        functionDescription =
+            "check " ++ toString label
+    in
+    testContext
+        |> expectViewHelper functionDescription
+            (Query.has
+                [ Selector.tag "label"
+                , Selector.attribute (Html.Attributes.for fieldId)
+                , Selector.text label
+                ]
+            )
+        |> simulateHelper functionDescription
+            (Query.find
+                [ Selector.tag "input"
+                , Selector.id fieldId
+                , Selector.attribute (Html.Attributes.type_ "checkbox")
+                ]
+            )
+            (Test.Html.Event.check willBecomeChecked)
 
 
 {-| Focus on a part of the view for a particular operation.
