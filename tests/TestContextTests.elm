@@ -37,6 +37,7 @@ testView model =
         [ Html.span [] [ Html.text model ]
         , Html.button [ onClick "CLICK" ] [ Html.text "Click Me" ]
         , Html.node "strange" [ Html.Events.on "odd" Json.Decode.string ] []
+        , Html.textarea [ Html.Events.onInput (\text -> "Input:textarea:" ++ text) ] []
         ]
 
 
@@ -196,4 +197,9 @@ all =
                     |> Test.Runner.getFailureReason
                     |> Maybe.map .description
                     |> Expect.equal (Just "custom: Because I said so")
+        , test "can simulate text input" <|
+            \() ->
+                testContext
+                    |> TestContext.fillInTextarea "ABC"
+                    |> TestContext.expectModel (Expect.equal "<INIT>;Input:textarea:ABC")
         ]

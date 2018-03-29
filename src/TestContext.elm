@@ -14,6 +14,7 @@ module TestContext
         , expectView
         , expectViewHas
         , fail
+        , fillInTextarea
         , routeChange
         , shouldHave
         , shouldHaveLastEffect
@@ -36,6 +37,7 @@ module TestContext
 ## Simulating user input
 
 @docs clickButton, simulate
+@docs fillInTextarea
 @docs routeChange
 
 
@@ -422,6 +424,21 @@ clickButton buttonText testContext =
             ]
         )
         Test.Html.Event.click
+        testContext
+
+
+{-| Simulates replace the test in a `<textarea>`.
+This function requires that there is only a single `<textarea>` in the view.
+
+If your view has more than one `<textarea>`, use [`simulate`](#simulate).
+NOTE: TODO: in the future there will also be `fillIn "<label>"`, and `within (...)`
+
+-}
+fillInTextarea : String -> TestContext msg model effect -> TestContext msg model effect
+fillInTextarea newContent testContext =
+    simulateHelper "fillInTextarea"
+        (Query.find [ Selector.tag "textarea" ])
+        (Test.Html.Event.input newContent)
         testContext
 
 
