@@ -406,7 +406,8 @@ Parameters:
 
   - `findTarget`: A function to find the HTML element that responds to the event
     (typically this will be a call to `Test.Html.Query.find [ ...some selector... ]`)
-  - `( eventName, eventValue )`: The event to simulate (see [Test.Html.Event "Event Builders"](http://package.elm-lang.org/packages/eeue56/elm-html-test/5.2.0/Test-Html-Event#event-builders))
+  - `( eventName, eventValue )`: The event to simulate
+    (see [Test.Html.Event "Event Builders"](http://package.elm-lang.org/packages/eeue56/elm-html-test/latest/Test-Html-Event#event-builders))
 
 -}
 simulate : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
@@ -482,8 +483,9 @@ fillIn fieldId label newContent testContext =
 {-| Simulates replacing the text in a `<textarea>`.
 
 This function expects that there is only one `<textarea>` in the view.
-If your view has more than one `<textarea>`, see [`within`](#within).
-NOTE: TODO: in the future there will also be `fillIn "<label>"`.
+If your view has more than one `<textarea>`,
+see [`fillIn`](#fillIn) if your `<textarea>` has an associated `<label>` (preferred),
+otherwise see [`within`](#within).
 
 If you need more control over the finding the target element or creating the simulated event,
 see [`simulate`](#simulate).
