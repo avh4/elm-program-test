@@ -90,7 +90,7 @@ import Navigation
 import Navigation.Extra
 import Test.Html.Event
 import Test.Html.Query as Query
-import Test.Html.Selector as Selector
+import Test.Html.Selector as Selector exposing (Selector)
 import Test.Runner
 import Test.Runner.Failure
 
@@ -399,6 +399,37 @@ simulateHelper functionDescription findTarget event (TestContext result) =
                             update msg (TestContext result)
 
 
+{-| **PRIVATE** helper for simulating events on input elements with associated labels.
+
+NOTE: Currently, this function requires that you also provide the field id
+(which must match both the `id` attribute of the target `input` element,
+and the `for` attribute of the `label` element).
+After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+a future release of this package will remove the `fieldId` parameter.
+
+-}
+simulateLabeledInputHelper : String -> String -> String -> List Selector -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
+simulateLabeledInputHelper functionDescription fieldId label additionalInputSelectors event testContext =
+    testContext
+        |> expectViewHelper functionDescription
+            (Query.has
+                [ Selector.tag "label"
+                , Selector.attribute (Html.Attributes.for fieldId)
+                , Selector.text label
+                ]
+            )
+        |> simulateHelper functionDescription
+            (Query.find <|
+                List.concat
+                    [ [ Selector.tag "input"
+                      , Selector.id fieldId
+                      ]
+                    , additionalInputSelectors
+                    ]
+            )
+            event
+
+
 {-| Simulates a custom DOM event.
 
 NOTE: If there is another, more specific function (see [Simulating user input](#simulating-user-input)
@@ -461,27 +492,13 @@ see [`simulate`](#simulate).
 -}
 fillIn : String -> String -> String -> TestContext msg model effect -> TestContext msg model effect
 fillIn fieldId label newContent testContext =
-    let
-        functionDescription =
-            "fillIn " ++ toString label
-    in
-    testContext
-        |> expectViewHelper functionDescription
-            (Query.has
-                [ Selector.tag "label"
-                , Selector.attribute (Html.Attributes.for fieldId)
-                , Selector.text label
-                ]
-            )
-        |> simulateHelper functionDescription
-            (Query.find
-                [ Selector.tag "input"
-                , Selector.id fieldId
-
-                -- TODO: should ensure that known special input types are not set, like `type="checkbox"`, etc?
-                ]
-            )
-            (Test.Html.Event.input newContent)
+    simulateLabeledInputHelper ("fillIn " ++ toString label)
+        fieldId
+        label
+        [-- TODO: should ensure that known special input types are not set, like `type="checkbox"`, etc?
+        ]
+        (Test.Html.Event.input newContent)
+        testContext
 
 
 {-| Simulates replacing the text in a `<textarea>`.
@@ -520,26 +537,12 @@ see [`simulate`](#simulate).
 -}
 check : String -> String -> Bool -> TestContext msg model effect -> TestContext msg model effect
 check fieldId label willBecomeChecked testContext =
-    let
-        functionDescription =
-            "check " ++ toString label
-    in
-    testContext
-        |> expectViewHelper functionDescription
-            (Query.has
-                [ Selector.tag "label"
-                , Selector.attribute (Html.Attributes.for fieldId)
-                , Selector.text label
-                ]
-            )
-        |> simulateHelper functionDescription
-            (Query.find
-                [ Selector.tag "input"
-                , Selector.id fieldId
-                , Selector.attribute (Html.Attributes.type_ "checkbox")
-                ]
-            )
-            (Test.Html.Event.check willBecomeChecked)
+    simulateLabeledInputHelper ("check " ++ toString label)
+        fieldId
+        label
+        [ Selector.attribute (Html.Attributes.type_ "checkbox") ]
+        (Test.Html.Event.check willBecomeChecked)
+        testContext
 
 
 {-| Focus on a part of the view for a particular operation.
