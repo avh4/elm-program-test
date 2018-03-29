@@ -432,11 +432,14 @@ clickButton buttonText testContext =
         testContext
 
 
-{-| Simulates replace the test in a `<textarea>`.
-This function requires that there is only a single `<textarea>` in the view.
+{-| Simulates replacing the text in a `<textarea>`.
 
-If your view has more than one `<textarea>`, use [`simulate`](#simulate).
-NOTE: TODO: in the future there will also be `fillIn "<label>"`, and `within (...)`
+This function expects that there is only one `<textarea>` in the view.
+If your view has more than one `<textarea>`, see [`within`](#within).
+NOTE: TODO: in the future there will also be `fillIn "<label>"`.
+
+If you need more control over the finding the target element or creating the simulated event,
+see [`simulate`](#simulate).
 
 -}
 fillInTextarea : String -> TestContext msg model effect -> TestContext msg model effect
@@ -449,12 +452,30 @@ fillInTextarea newContent testContext =
 
 {-| Focus on a part of the view for a particular operation.
 
-For example, if we had two buttons with the same text and wanted to click one of
-them, we could narrow the view to the desired button's container and then query
-as if the other one didn't exist.
+For example, if your view produces the following HTML:
+
+```html
+<div>
+  <div id="sidebar">
+    <button>Submit</button>
+  </div>
+  <div id="content">
+    <button>Submit</button>
+  </div>
+</div>
+```
+
+then the following will allow you to simulate clicking the "Submit" button in the sidebar
+(simply using `clickButton "Submit"` would fail because there are two buttons matching that text):
+
+    import Test.Html.Query as Query
+    import Test.Html.Selector exposing (id)
 
     testContext
-        |> TestContext.within (Query.find [ Selector.id "button-container" ]) (TestContext.clickButton "Click Me")
+        |> TestContext.within
+            (Query.find [ id "sidebar" ])
+            (TestContext.clickButton "Submit")
+        |> ...
 
 -}
 within : (Query.Single msg -> Query.Single msg) -> (TestContext msg model effect -> TestContext msg model effect) -> (TestContext msg model effect -> TestContext msg model effect)
