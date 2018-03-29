@@ -458,25 +458,25 @@ as if the other one didn't exist.
 
 -}
 within : (Query.Single msg -> Query.Single msg) -> (TestContext msg model effect -> TestContext msg model effect) -> (TestContext msg model effect -> TestContext msg model effect)
-within findTarget onScopedTest (TestContext result) =
+within findTarget onScopedTest ((TestContext result) as testContext) =
+    let
+        replaceView newView testContext =
+            case testContext of
+                TestContext (Err err) ->
+                    TestContext (Err err)
+
+                TestContext (Ok ( program, state, location )) ->
+                    TestContext (Ok ( { program | view = newView }, state, location ))
+    in
     case result of
         Err err ->
             TestContext (Err err)
 
-        Ok ( program, state, currentLocation ) ->
-            let
-                scopedProgram =
-                    { program | view = program.view >> findTarget }
-
-                scopedContext =
-                    TestContext (Ok ( scopedProgram, state, currentLocation ))
-            in
-            case onScopedTest scopedContext of
-                TestContext (Err err) ->
-                    TestContext (Err err)
-
-                TestContext (Ok ( _, finalState, finalLocation )) ->
-                    TestContext (Ok ( program, finalState, finalLocation ))
+        Ok ( program, _, _ ) ->
+            testContext
+                |> replaceView (program.view >> findTarget)
+                |> onScopedTest
+                |> replaceView program.view
 
 
 {-| `url` may be an absolute URL or relative URL
