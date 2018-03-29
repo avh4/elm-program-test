@@ -99,7 +99,7 @@ type TestContext msg model effect
 
 type alias TestProgram msg model effect =
     { update : msg -> model -> ( model, effect )
-    , view : model -> Html msg
+    , view : model -> Query.Single msg
     , onRouteChange : Navigation.Location -> Maybe msg
     }
 
@@ -126,7 +126,7 @@ createHelper program =
     TestContext <|
         Ok
             ( { update = program.update
-              , view = program.view
+              , view = program.view >> Query.fromHtml
               , onRouteChange = program.onRouteChange
               }
             , program.init
@@ -362,7 +362,6 @@ simulateHelper functionDescription findTarget event (TestContext result) =
             let
                 targetQuery =
                     program.view model
-                        |> Query.fromHtml
                         |> findTarget
             in
             -- First check the target so we can give a better error message if it doesn't exist
@@ -527,7 +526,6 @@ expectViewHelper functionName assertion (TestContext result) =
                 case
                     model
                         |> program.view
-                        |> Query.fromHtml
                         |> assertion
                         |> Test.Runner.getFailureReason
                 of
