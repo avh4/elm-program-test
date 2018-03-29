@@ -2,7 +2,7 @@ module TestContextTests exposing (all)
 
 import Expect
 import Html exposing (Html)
-import Html.Attributes exposing (id)
+import Html.Attributes exposing (for, id)
 import Html.Events exposing (onClick)
 import Json.Decode
 import Json.Encode
@@ -34,11 +34,21 @@ testUpdate msg model =
 
 testView : String -> Html String
 testView model =
+    let
+        handleInput fieldId =
+            Html.Events.onInput (\text -> "Input:" ++ fieldId ++ ":" ++ text)
+    in
     Html.div []
         [ Html.span [] [ Html.text model ]
         , Html.button [ onClick "CLICK" ] [ Html.text "Click Me" ]
         , Html.node "strange" [ Html.Events.on "odd" Json.Decode.string ] []
-        , Html.textarea [ Html.Events.onInput (\text -> "Input:textarea:" ++ text) ] []
+        , Html.textarea [ handleInput "textarea" ] []
+        , Html.div []
+            [ Html.label [ for "field-1" ] [ Html.text "Field 1" ]
+            , Html.input [ id "field-1", handleInput "field-1" ] []
+            , Html.label [ for "field-2" ] [ Html.text "Field 2" ]
+            , Html.input [ id "field-2", handleInput "field-2" ] []
+            ]
         , Html.div []
             [ Html.div [ id "button-a" ]
                 [ Html.button [ onClick "CLICK-A" ] [ Html.text "Ambiguous click" ]
@@ -206,7 +216,7 @@ all =
                     |> Test.Runner.getFailureReason
                     |> Maybe.map .description
                     |> Expect.equal (Just "custom: Because I said so")
-        , test "can simulate text input" <|
+        , test "can simulate textarea input" <|
             \() ->
                 testContext
                     |> TestContext.fillInTextarea "ABC"
@@ -219,4 +229,9 @@ all =
                         (TestContext.clickButton "Ambiguous click")
                     |> TestContext.clickButton "Click Me"
                     |> TestContext.expectModel (Expect.equal "<INIT>;CLICK-B;CLICK")
+        , test "can simulate text input on a labeled field" <|
+            \() ->
+                testContext
+                    |> TestContext.fillIn "field-1" "Field 1" "value99"
+                    |> TestContext.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
         ]

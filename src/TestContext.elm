@@ -14,6 +14,7 @@ module TestContext
         , expectView
         , expectViewHas
         , fail
+        , fillIn
         , fillInTextarea
         , routeChange
         , shouldHave
@@ -38,7 +39,7 @@ module TestContext
 ## Simulating user input
 
 @docs clickButton, simulate
-@docs fillInTextarea
+@docs fillIn, fillInTextarea
 @docs routeChange
 
 
@@ -80,6 +81,7 @@ These functions may be useful if you are writing your own custom assertion funct
 
 import Expect exposing (Expectation)
 import Html exposing (Html)
+import Html.Attributes
 import Json.Decode
 import Json.Encode
 import Navigation
@@ -430,6 +432,51 @@ clickButton buttonText testContext =
         )
         Test.Html.Event.click
         testContext
+
+
+{-| Simulates replace the text in an input field labeled with the given label.
+
+NOTE: Currently, this function requires that you also provide the field id
+(which must match both the `id` attribute of the target `input` element,
+and the `for` attribute of the `label` element).
+After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+a future release of this package will remove the `fieldId` parameter.
+
+NOTE: TODO: In the future, this will be generalized to work with
+labeled textareas as well as labeled input fields.
+(related to [eeue56/elm-html-test#49](https://github.com/eeue56/elm-html-test/issues/49>))
+
+NOTE: In the future, this will be generalized to work with
+aria accessiblity attributes in addition to working with standard HTML label elements.
+
+If you need to target a `<textarea>` that does not have a label,
+see [`fillInTextarea`](#fillInTextArea).
+
+If you need more control over the finding the target element or creating the simulated event,
+see [`simulate`](#simulate).
+
+-}
+fillIn : String -> String -> String -> TestContext msg model effect -> TestContext msg model effect
+fillIn fieldId label newContent testContext =
+    let
+        functionDescription =
+            "fillIn " ++ toString label
+    in
+    testContext
+        |> expectViewHelper functionDescription
+            (Query.has
+                [ Selector.tag "label"
+                , Selector.attribute (Html.Attributes.for fieldId)
+                , Selector.text label
+                ]
+            )
+        |> simulateHelper functionDescription
+            (Query.find
+                [ Selector.tag "input"
+                , Selector.id fieldId
+                ]
+            )
+            (Test.Html.Event.input newContent)
 
 
 {-| Simulates replacing the text in a `<textarea>`.
