@@ -506,39 +506,83 @@ NOTE: Currently, this function requires that you also provide the expected href.
 After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
 a future release of this package will remove the `href` parameter.
 
+Note for testing single-page apps,
+if the target `<a>` tag has an `onClick` handler,
+then the message produced by the handler will be processed
+and the `href` will not be followed.
+NOTE: Currently this function cannot verify that the onClick handler
+sets `preventDefault`, but this will be done in the future after
+<https://github.com/eeue56/elm-html-test/issues/63> is resolved.
+
 -}
 clickLink : String -> String -> TestContext msg model effect -> TestContext msg model effect
 clickLink linkText href testContext =
     let
         functionDescription =
             "clickLink " ++ toString linkText
-    in
-    case
-        expectViewHelper functionDescription
-            (Query.find
+
+        findLinkTag =
+            Query.find
                 [ Selector.tag "a"
                 , Selector.attribute (Html.Attributes.href href)
-                , Selector.text linkText
+                , Selector.containing [ Selector.text linkText ]
                 ]
+
+        normalClick =
+            ( "click"
+            , Json.Encode.object
+                [ ( "ctrlKey", Json.Encode.bool False )
+                , ( "metaKey", Json.Encode.bool False )
+                ]
+            )
+
+        tryClicking { otherwise } testContext =
+            case testContext of
+                Finished err ->
+                    Finished err
+
+                Active ( program, ( model, _ ), _ ) ->
+                    case
+                        program.view model
+                            |> findLinkTag
+                            |> Test.Html.Event.simulate normalClick
+                            |> Test.Html.Event.toResult
+                    of
+                        Err message ->
+                            -- the link doesn't have a click handler
+                            testContext |> otherwise
+
+                        Ok msg ->
+                            -- there is a click handler, so simulate that event and ignore the `href`
+                            testContext
+                                |> simulateHelper ("clickLink " ++ toString linkText)
+                                    findLinkTag
+                                    normalClick
+
+        followLink href testContext =
+            case testContext of
+                Finished err ->
+                    Finished err
+
+                Active ( _, _, finalLocation ) ->
+                    case finalLocation of
+                        Just location ->
+                            Finished (ChangedPage functionDescription (Navigation.Extra.resolve location href))
+
+                        Nothing ->
+                            case Navigation.Extra.locationFromString href of
+                                Nothing ->
+                                    Finished (NoBaseUrl "clickLink" href)
+
+                                Just location ->
+                                    Finished (ChangedPage functionDescription location)
+    in
+    testContext
+        |> expectViewHelper functionDescription
+            (findLinkTag
                 >> Query.has []
             )
-            testContext
-    of
-        Finished err ->
-            Finished err
-
-        Active ( _, _, finalLocation ) ->
-            case finalLocation of
-                Just location ->
-                    Finished (ChangedPage functionDescription (Navigation.Extra.resolve location href))
-
-                Nothing ->
-                    case Navigation.Extra.locationFromString href of
-                        Nothing ->
-                            Finished (NoBaseUrl "clickLink" href)
-
-                        Just location ->
-                            Finished (ChangedPage functionDescription location)
+        |> tryClicking { otherwise = followLink href }
 
 
 {-| Simulates replacing the text in an input field labeled with the given label.
@@ -815,7 +859,7 @@ done testContext =
             Expect.pass
 
         Finished (ChangedPage cause finalLocation) ->
-            Expect.fail (cause ++ " caused the program to end by navigating to " ++ toString finalLocation ++ ".  NOTE: If this is what you intended, use `expectPageChange` instead of `done`.")
+            Expect.fail (cause ++ " caused the program to end by navigating to " ++ toString finalLocation.href ++ ".  NOTE: If this is what you intended, use `expectPageChange` instead of `done`.")
 
         Finished (ExpectFailed expectationName description reason) ->
             Expect.fail (expectationName ++ ":\n" ++ Test.Runner.Failure.format description reason)

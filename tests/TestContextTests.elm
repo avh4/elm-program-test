@@ -269,5 +269,52 @@ all =
                     linkProgram
                         |> TestContext.clickLink "Relative" "/settings"
                         |> TestContext.expectPageChange "http://localhost:3000/settings"
+            , test "can verify an internal (single-page app) link" <|
+                \() ->
+                    TestContext.createWithNavigation
+                        .pathname
+                        { init = \location -> ( "<INIT:" ++ location.pathname ++ ">", NoOp )
+                        , update = testUpdate
+                        , view =
+                            \_ ->
+                                Html.div []
+                                    [ Html.a
+                                        [ href "#search"
+                                        , onClickPreventDefaultForLinkWithHref "GoToSearch"
+                                        ]
+                                        [ Html.text "SPA" ]
+                                    ]
+                        }
+                        "http://localhost:3000/"
+                        |> TestContext.clickLink "SPA" "#search"
+                        |> TestContext.expectModel (Expect.equal "<INIT:/>;GoToSearch")
             ]
         ]
+
+
+onClickPreventDefaultForLinkWithHref : msg -> Html.Attribute msg
+onClickPreventDefaultForLinkWithHref msg =
+    let
+        isSpecialClick : Json.Decode.Decoder Bool
+        isSpecialClick =
+            Json.Decode.map2
+                (\isCtrl isMeta -> isCtrl || isMeta)
+                (Json.Decode.field "ctrlKey" Json.Decode.bool)
+                (Json.Decode.field "metaKey" Json.Decode.bool)
+
+        succeedIfFalse : a -> Bool -> Json.Decode.Decoder a
+        succeedIfFalse msg preventDefault =
+            case preventDefault of
+                False ->
+                    Json.Decode.succeed msg
+
+                True ->
+                    Json.Decode.fail "succeedIfFalse: condition was True"
+    in
+    Html.Events.onWithOptions "click"
+        { stopPropagation = False
+        , preventDefault = True
+        }
+        (isSpecialClick
+            |> Json.Decode.andThen (succeedIfFalse msg)
+        )
