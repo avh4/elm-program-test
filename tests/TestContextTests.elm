@@ -2,6 +2,7 @@ module TestContextTests exposing (all)
 
 import Expect
 import Html exposing (Html)
+import Html.Attributes exposing (for, id, type_)
 import Html.Events exposing (onClick)
 import Json.Decode
 import Json.Encode
@@ -31,12 +32,39 @@ testUpdate msg model =
     )
 
 
+handleInput : String -> Html.Attribute String
+handleInput fieldId =
+    Html.Events.onInput (\text -> "Input:" ++ fieldId ++ ":" ++ text)
+
+
+handleCheck : String -> Html.Attribute String
+handleCheck fieldId =
+    Html.Events.onCheck (\bool -> "Check:" ++ fieldId ++ ":" ++ toString bool)
+
+
 testView : String -> Html String
 testView model =
     Html.div []
         [ Html.span [] [ Html.text model ]
         , Html.button [ onClick "CLICK" ] [ Html.text "Click Me" ]
         , Html.node "strange" [ Html.Events.on "odd" Json.Decode.string ] []
+        , Html.textarea [ handleInput "textarea" ] []
+        , Html.div []
+            [ Html.label [ for "field-1" ] [ Html.text "Field 1" ]
+            , Html.input [ id "field-1", handleInput "field-1" ] []
+            , Html.label [ for "field-2" ] [ Html.text "Field 2" ]
+            , Html.input [ id "field-2", handleInput "field-2" ] []
+            , Html.label [ for "checkbox-1" ] [ Html.text "Checkbox 1" ]
+            , Html.input [ type_ "checkbox", id "checkbox-1", handleCheck "checkbox-1" ] []
+            ]
+        , Html.div []
+            [ Html.div [ id "button-a" ]
+                [ Html.button [ onClick "CLICK-A" ] [ Html.text "Ambiguous click" ]
+                ]
+            , Html.div [ id "button-b" ]
+                [ Html.button [ onClick "CLICK-B" ] [ Html.text "Ambiguous click" ]
+                ]
+            ]
         ]
 
 
@@ -196,4 +224,43 @@ all =
                     |> Test.Runner.getFailureReason
                     |> Maybe.map .description
                     |> Expect.equal (Just "custom: Because I said so")
+        , test "can simulate textarea input" <|
+            \() ->
+                testContext
+                    |> TestContext.fillInTextarea "ABC"
+                    |> TestContext.expectModel (Expect.equal "<INIT>;Input:textarea:ABC")
+        , test "can narrow down the area to specified element" <|
+            \() ->
+                testContext
+                    |> TestContext.within
+                        (Query.find [ Selector.id "button-b" ])
+                        (TestContext.clickButton "Ambiguous click")
+                    |> TestContext.clickButton "Click Me"
+                    |> TestContext.expectModel (Expect.equal "<INIT>;CLICK-B;CLICK")
+        , test "can simulate text input on a labeled field" <|
+            \() ->
+                testContext
+                    |> TestContext.fillIn "field-1" "Field 1" "value99"
+                    |> TestContext.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
+        , test "can simulate text input on a labeled textarea" <|
+            \() ->
+                TestContext.create
+                    { init = testInit
+                    , update = testUpdate
+                    , view =
+                        \_ ->
+                            Html.div []
+                                [ Html.label [ for "field-1" ] [ Html.text "Field 1" ]
+                                , Html.textarea [ id "field-1", handleInput "field-1" ] []
+                                , Html.label [ for "field-2" ] [ Html.text "Field 2" ]
+                                , Html.textarea [ id "field-2", handleInput "field-2" ] []
+                                ]
+                    }
+                    |> TestContext.fillIn "field-1" "Field 1" "value99"
+                    |> TestContext.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
+        , test "can simulate setting a labeled checkbox field" <|
+            \() ->
+                testContext
+                    |> TestContext.check "checkbox-1" "Checkbox 1" True
+                    |> TestContext.expectModel (Expect.equal "<INIT>;Check:checkbox-1:True")
         ]

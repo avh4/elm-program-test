@@ -1,6 +1,7 @@
 module TestContext
     exposing
         ( TestContext
+        , check
         , clickButton
         , create
         , createWithFlags
@@ -14,6 +15,8 @@ module TestContext
         , expectView
         , expectViewHas
         , fail
+        , fillIn
+        , fillInTextarea
         , routeChange
         , shouldHave
         , shouldHaveLastEffect
@@ -21,6 +24,7 @@ module TestContext
         , shouldNotHave
         , simulate
         , update
+        , within
         )
 
 {-| A `TestContext` simulates the execution of an Elm program.
@@ -36,7 +40,14 @@ module TestContext
 ## Simulating user input
 
 @docs clickButton, simulate
+@docs fillIn, fillInTextarea
+@docs check
 @docs routeChange
+
+
+## Simulating user input (advanced)
+
+@docs within
 
 
 ## Directly sending Msgs
@@ -72,13 +83,15 @@ These functions may be useful if you are writing your own custom assertion funct
 
 import Expect exposing (Expectation)
 import Html exposing (Html)
+import Html.Attributes
 import Json.Decode
 import Json.Encode
 import Navigation
 import Navigation.Extra
+import Query.Extra
 import Test.Html.Event
 import Test.Html.Query as Query
-import Test.Html.Selector as Selector
+import Test.Html.Selector as Selector exposing (Selector)
 import Test.Runner
 import Test.Runner.Failure
 
@@ -97,7 +110,7 @@ type TestContext msg model effect
 
 type alias TestProgram msg model effect =
     { update : msg -> model -> ( model, effect )
-    , view : model -> Html msg
+    , view : model -> Query.Single msg
     , onRouteChange : Navigation.Location -> Maybe msg
     }
 
@@ -124,7 +137,7 @@ createHelper program =
     TestContext <|
         Ok
             ( { update = program.update
-              , view = program.view
+              , view = program.view >> Query.fromHtml
               , onRouteChange = program.onRouteChange
               }
             , program.init
@@ -360,7 +373,6 @@ simulateHelper functionDescription findTarget event (TestContext result) =
             let
                 targetQuery =
                     program.view model
-                        |> Query.fromHtml
                         |> findTarget
             in
             -- First check the target so we can give a better error message if it doesn't exist
@@ -388,6 +400,49 @@ simulateHelper functionDescription findTarget event (TestContext result) =
                             update msg (TestContext result)
 
 
+{-| **PRIVATE** helper for simulating events on input elements with associated labels.
+
+NOTE: Currently, this function requires that you also provide the field id
+(which must match both the `id` attribute of the target `input` element,
+and the `for` attribute of the `label` element).
+After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+a future release of this package will remove the `fieldId` parameter.
+
+-}
+simulateLabeledInputHelper : String -> String -> String -> Bool -> List Selector -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
+simulateLabeledInputHelper functionDescription fieldId label allowTextArea additionalInputSelectors event testContext =
+    testContext
+        |> expectViewHelper functionDescription
+            (Query.has
+                [ Selector.tag "label"
+                , Selector.attribute (Html.Attributes.for fieldId)
+                , Selector.text label
+                ]
+            )
+        |> simulateHelper functionDescription
+            (Query.Extra.oneOf <|
+                List.concat
+                    [ [ Query.find <|
+                            List.concat
+                                [ [ Selector.tag "input"
+                                  , Selector.id fieldId
+                                  ]
+                                , additionalInputSelectors
+                                ]
+                      ]
+                    , if allowTextArea then
+                        [ Query.find
+                            [ Selector.tag "textarea"
+                            , Selector.id fieldId
+                            ]
+                        ]
+                      else
+                        []
+                    ]
+            )
+            event
+
+
 {-| Simulates a custom DOM event.
 
 NOTE: If there is another, more specific function (see [Simulating user input](#simulating-user-input)
@@ -397,7 +452,8 @@ Parameters:
 
   - `findTarget`: A function to find the HTML element that responds to the event
     (typically this will be a call to `Test.Html.Query.find [ ...some selector... ]`)
-  - `( eventName, eventValue )`: The event to simulate (see [Test.Html.Event "Event Builders"](http://package.elm-lang.org/packages/eeue56/elm-html-test/5.2.0/Test-Html-Event#event-builders))
+  - `( eventName, eventValue )`: The event to simulate
+    (see [Test.Html.Event "Event Builders"](http://package.elm-lang.org/packages/eeue56/elm-html-test/latest/Test-Html-Event#event-builders))
 
 -}
 simulate : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
@@ -423,6 +479,135 @@ clickButton buttonText testContext =
         )
         Test.Html.Event.click
         testContext
+
+
+{-| Simulates replacing the text in an input field labeled with the given label.
+
+NOTE: Currently, this function requires that you also provide the field id
+(which must match both the `id` attribute of the target `input` element,
+and the `for` attribute of the `label` element).
+After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+a future release of this package will remove the `fieldId` parameter.
+
+NOTE: TODO: In the future, this will be generalized to work with
+labeled textareas as well as labeled input fields.
+(related to [eeue56/elm-html-test#49](https://github.com/eeue56/elm-html-test/issues/49>))
+
+NOTE: In the future, this will be generalized to work with
+aria accessiblity attributes in addition to working with standard HTML label elements.
+
+If you need to target a `<textarea>` that does not have a label,
+see [`fillInTextarea`](#fillInTextArea).
+
+If you need more control over the finding the target element or creating the simulated event,
+see [`simulate`](#simulate).
+
+-}
+fillIn : String -> String -> String -> TestContext msg model effect -> TestContext msg model effect
+fillIn fieldId label newContent testContext =
+    simulateLabeledInputHelper ("fillIn " ++ toString label)
+        fieldId
+        label
+        True
+        [-- TODO: should ensure that known special input types are not set, like `type="checkbox"`, etc?
+        ]
+        (Test.Html.Event.input newContent)
+        testContext
+
+
+{-| Simulates replacing the text in a `<textarea>`.
+
+This function expects that there is only one `<textarea>` in the view.
+If your view has more than one `<textarea>`,
+prefer adding associated `<label>` elements and use [`fillIn`](#fillIn).
+If you cannot add `<label>` elements see [`within`](#within).
+
+If you need more control over the finding the target element or creating the simulated event,
+see [`simulate`](#simulate).
+
+-}
+fillInTextarea : String -> TestContext msg model effect -> TestContext msg model effect
+fillInTextarea newContent testContext =
+    simulateHelper "fillInTextarea"
+        (Query.find [ Selector.tag "textarea" ])
+        (Test.Html.Event.input newContent)
+        testContext
+
+
+{-| Simulates setting the value of a checkbox labeled with the given label.
+
+NOTE: Currently, this function requires that you also provide the field id
+(which must match both the `id` attribute of the target `input` element,
+and the `for` attribute of the `label` element).
+After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+a future release of this package will remove the `fieldId` parameter.
+
+NOTE: In the future, this will be generalized to work with
+aria accessiblity attributes in addition to working with standard HTML label elements.
+
+If you need more control over the finding the target element or creating the simulated event,
+see [`simulate`](#simulate).
+
+-}
+check : String -> String -> Bool -> TestContext msg model effect -> TestContext msg model effect
+check fieldId label willBecomeChecked testContext =
+    simulateLabeledInputHelper ("check " ++ toString label)
+        fieldId
+        label
+        False
+        [ Selector.attribute (Html.Attributes.type_ "checkbox") ]
+        (Test.Html.Event.check willBecomeChecked)
+        testContext
+
+
+{-| Focus on a part of the view for a particular operation.
+
+For example, if your view produces the following HTML:
+
+```html
+<div>
+  <div id="sidebar">
+    <button>Submit</button>
+  </div>
+  <div id="content">
+    <button>Submit</button>
+  </div>
+</div>
+```
+
+then the following will allow you to simulate clicking the "Submit" button in the sidebar
+(simply using `clickButton "Submit"` would fail because there are two buttons matching that text):
+
+    import Test.Html.Query as Query
+    import Test.Html.Selector exposing (id)
+
+    testContext
+        |> TestContext.within
+            (Query.find [ id "sidebar" ])
+            (TestContext.clickButton "Submit")
+        |> ...
+
+-}
+within : (Query.Single msg -> Query.Single msg) -> (TestContext msg model effect -> TestContext msg model effect) -> (TestContext msg model effect -> TestContext msg model effect)
+within findTarget onScopedTest ((TestContext result) as testContext) =
+    let
+        replaceView newView testContext =
+            case testContext of
+                TestContext (Err err) ->
+                    TestContext (Err err)
+
+                TestContext (Ok ( program, state, location )) ->
+                    TestContext (Ok ( { program | view = newView }, state, location ))
+    in
+    case result of
+        Err err ->
+            TestContext (Err err)
+
+        Ok ( program, _, _ ) ->
+            testContext
+                |> replaceView (program.view >> findTarget)
+                |> onScopedTest
+                |> replaceView program.view
 
 
 {-| `url` may be an absolute URL or relative URL
@@ -510,7 +695,6 @@ expectViewHelper functionName assertion (TestContext result) =
                 case
                     model
                         |> program.view
-                        |> Query.fromHtml
                         |> assertion
                         |> Test.Runner.getFailureReason
                 of
