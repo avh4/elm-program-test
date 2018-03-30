@@ -505,8 +505,8 @@ fillIn fieldId label newContent testContext =
 
 This function expects that there is only one `<textarea>` in the view.
 If your view has more than one `<textarea>`,
-see [`fillIn`](#fillIn) if your `<textarea>` has an associated `<label>` (preferred),
-otherwise see [`within`](#within).
+prefer adding associated `<label>` elements and use [`fillIn`](#fillIn).
+If you cannot add `<label>` elements see [`within`](#within).
 
 If you need more control over the finding the target element or creating the simulated event,
 see [`simulate`](#simulate).
