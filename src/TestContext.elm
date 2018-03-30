@@ -104,7 +104,8 @@ and a log of any errors that have occurred while simulating interaction with the
 
 -}
 type TestContext msg model effect
-    = TestContext (Result Failure ( TestProgram msg model effect, ( model, effect ), Maybe Navigation.Location ))
+    = Active ( TestProgram msg model effect, ( model, effect ), Maybe Navigation.Location )
+    | Finished Failure
 
 
 type alias TestProgram msg model effect =
@@ -133,15 +134,14 @@ createHelper :
     }
     -> TestContext msg model effect
 createHelper program =
-    TestContext <|
-        Ok
-            ( { update = program.update
-              , view = program.view >> Query.fromHtml
-              , onRouteChange = program.onRouteChange
-              }
-            , program.init
-            , program.initialLocation
-            )
+    Active
+        ( { update = program.update
+          , view = program.view >> Query.fromHtml
+          , onRouteChange = program.onRouteChange
+          }
+        , program.init
+        , program.initialLocation
+        )
 
 
 {-| Creates a `TestContext` from the parts of a standard `Html.program`.
@@ -218,7 +218,7 @@ createWithJsonStringFlags :
 createWithJsonStringFlags flagsDecoder program flagsJson =
     case Json.Decode.decodeString flagsDecoder flagsJson of
         Err message ->
-            TestContext <| Err (InvalidFlags "createWithJsonStringFlags" message)
+            Finished (InvalidFlags "createWithJsonStringFlags" message)
 
         Ok flags ->
             createHelper
@@ -248,7 +248,7 @@ createWithNavigation :
 createWithNavigation onRouteChange program initialUrl =
     case Navigation.Extra.locationFromString initialUrl of
         Nothing ->
-            TestContext <| Err (InvalidLocationUrl "createWithNavigation" initialUrl)
+            Finished (InvalidLocationUrl "createWithNavigation" initialUrl)
 
         Just location ->
             createHelper
@@ -283,7 +283,7 @@ createWithNavigationAndFlags :
 createWithNavigationAndFlags onRouteChange program initialUrl flags =
     case Navigation.Extra.locationFromString initialUrl of
         Nothing ->
-            TestContext <| Err (InvalidLocationUrl "createWithNavigationAndFlags" initialUrl)
+            Finished (InvalidLocationUrl "createWithNavigationAndFlags" initialUrl)
 
         Just location ->
             createHelper
@@ -320,12 +320,12 @@ createWithNavigationAndJsonStringFlags :
 createWithNavigationAndJsonStringFlags flagsDecoder onRouteChange program initialUrl flagsJson =
     case Navigation.Extra.locationFromString initialUrl of
         Nothing ->
-            TestContext <| Err (InvalidLocationUrl "createWithNavigationAndJsonStringFlags" initialUrl)
+            Finished (InvalidLocationUrl "createWithNavigationAndJsonStringFlags" initialUrl)
 
         Just location ->
             case Json.Decode.decodeString flagsDecoder flagsJson of
                 Err message ->
-                    TestContext <| Err (InvalidFlags "createWithNavigationAndJsonStringFlags" message)
+                    Finished (InvalidFlags "createWithNavigationAndJsonStringFlags" message)
 
                 Ok flags ->
                     createHelper
@@ -348,27 +348,26 @@ as doing so will make your tests more robust to changes in your program's implem
 
 -}
 update : msg -> TestContext msg model effect -> TestContext msg model effect
-update msg (TestContext result) =
-    TestContext <|
-        case result of
-            Err err ->
-                Err err
+update msg testContext =
+    case testContext of
+        Finished err ->
+            Finished err
 
-            Ok ( program, ( model, _ ), currentLocation ) ->
-                Ok
-                    ( program
-                    , program.update msg model
-                    , currentLocation
-                    )
+        Active ( program, ( model, _ ), currentLocation ) ->
+            Active
+                ( program
+                , program.update msg model
+                , currentLocation
+                )
 
 
 simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
-simulateHelper functionDescription findTarget event (TestContext result) =
-    case result of
-        Err err ->
-            TestContext <| Err err
+simulateHelper functionDescription findTarget event testContext =
+    case testContext of
+        Finished err ->
+            Finished err
 
-        Ok ( program, ( model, _ ), _ ) ->
+        Active ( program, ( model, _ ), _ ) ->
             let
                 targetQuery =
                     program.view model
@@ -381,8 +380,7 @@ simulateHelper functionDescription findTarget event (TestContext result) =
                     |> Test.Runner.getFailureReason
             of
                 Just reason ->
-                    TestContext <|
-                        Err (SimulateFailedToFindTarget functionDescription reason.description)
+                    Finished (SimulateFailedToFindTarget functionDescription reason.description)
 
                 Nothing ->
                     -- Try to simulate the event, now that we know the target exists
@@ -392,11 +390,10 @@ simulateHelper functionDescription findTarget event (TestContext result) =
                             |> Test.Html.Event.toResult
                     of
                         Err message ->
-                            TestContext <|
-                                Err (SimulateFailed functionDescription message)
+                            Finished (SimulateFailed functionDescription message)
 
                         Ok msg ->
-                            update msg (TestContext result)
+                            update msg testContext
 
 
 {-| **PRIVATE** helper for simulating events on input elements with associated labels.
@@ -574,21 +571,21 @@ then the following will allow you to simulate clicking the "Submit" button in th
 
 -}
 within : (Query.Single msg -> Query.Single msg) -> (TestContext msg model effect -> TestContext msg model effect) -> (TestContext msg model effect -> TestContext msg model effect)
-within findTarget onScopedTest ((TestContext result) as testContext) =
+within findTarget onScopedTest testContext =
     let
         replaceView newView testContext =
             case testContext of
-                TestContext (Err err) ->
-                    TestContext (Err err)
+                Finished err ->
+                    Finished err
 
-                TestContext (Ok ( program, state, location )) ->
-                    TestContext (Ok ( { program | view = newView }, state, location ))
+                Active ( program, state, location ) ->
+                    Active ( { program | view = newView }, state, location )
     in
-    case result of
-        Err err ->
-            TestContext (Err err)
+    case testContext of
+        Finished err ->
+            Finished err
 
-        Ok ( program, _, _ ) ->
+        Active ( program, _, _ ) ->
             testContext
                 |> replaceView (program.view >> findTarget)
                 |> onScopedTest
@@ -598,59 +595,57 @@ within findTarget onScopedTest ((TestContext result) as testContext) =
 {-| `url` may be an absolute URL or relative URL
 -}
 routeChange : String -> TestContext msg model effect -> TestContext msg model effect
-routeChange url (TestContext result) =
-    case result of
-        Err err ->
-            TestContext <| Err err
+routeChange url testContext =
+    case testContext of
+        Finished err ->
+            Finished err
 
-        Ok ( program, _, Nothing ) ->
-            TestContext <| Err (ProgramDoesNotSupportNavigation "routeChange")
+        Active ( program, _, Nothing ) ->
+            Finished (ProgramDoesNotSupportNavigation "routeChange")
 
-        Ok ( program, _, Just currentLocation ) ->
+        Active ( program, _, Just currentLocation ) ->
             case
                 Navigation.Extra.resolve currentLocation url
                     |> program.onRouteChange
             of
                 Nothing ->
-                    TestContext result
+                    testContext
 
                 Just msg ->
-                    update msg (TestContext result)
+                    update msg testContext
 
 
 {-| Make an assertion about the current state of a `TestContext`'s model.
 -}
 expectModel : (model -> Expectation) -> TestContext msg model effect -> Expectation
-expectModel assertion (TestContext result) =
+expectModel assertion testContext =
     done <|
-        TestContext <|
-            case result of
-                Err err ->
-                    Err err
+        case testContext of
+            Finished err ->
+                Finished err
 
-                Ok ( _, ( model, _ ), _ ) ->
-                    case assertion model |> Test.Runner.getFailureReason of
-                        Nothing ->
-                            result
+            Active ( _, ( model, _ ), _ ) ->
+                case assertion model |> Test.Runner.getFailureReason of
+                    Nothing ->
+                        testContext
 
-                        Just reason ->
-                            Err (ExpectFailed "expectModel" reason.description reason.reason)
+                    Just reason ->
+                        Finished (ExpectFailed "expectModel" reason.description reason.reason)
 
 
 expectLastEffectHelper : String -> (effect -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
-expectLastEffectHelper functionName assertion (TestContext result) =
-    TestContext <|
-        case result of
-            Err err ->
-                Err err
+expectLastEffectHelper functionName assertion testContext =
+    case testContext of
+        Finished err ->
+            Finished err
 
-            Ok ( _, ( _, lastEffect ), _ ) ->
-                case assertion lastEffect |> Test.Runner.getFailureReason of
-                    Nothing ->
-                        result
+        Active ( _, ( _, lastEffect ), _ ) ->
+            case assertion lastEffect |> Test.Runner.getFailureReason of
+                Nothing ->
+                    testContext
 
-                    Just reason ->
-                        Err (ExpectFailed functionName reason.description reason.reason)
+                Just reason ->
+                    Finished (ExpectFailed functionName reason.description reason.reason)
 
 
 {-| Validates the last effect produced by a `TestContext`'s program without ending the `TestContext`.
@@ -670,24 +665,23 @@ expectLastEffect assertion testContext =
 
 
 expectViewHelper : String -> (Query.Single msg -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
-expectViewHelper functionName assertion (TestContext result) =
-    TestContext <|
-        case result of
-            Err err ->
-                Err err
+expectViewHelper functionName assertion testContext =
+    case testContext of
+        Finished err ->
+            Finished err
 
-            Ok ( program, ( model, _ ), _ ) ->
-                case
-                    model
-                        |> program.view
-                        |> assertion
-                        |> Test.Runner.getFailureReason
-                of
-                    Nothing ->
-                        result
+        Active ( program, ( model, _ ), _ ) ->
+            case
+                model
+                    |> program.view
+                    |> assertion
+                    |> Test.Runner.getFailureReason
+            of
+                Nothing ->
+                    testContext
 
-                    Just reason ->
-                        Err (ExpectFailed functionName reason.description reason.reason)
+                Just reason ->
+                    Finished (ExpectFailed functionName reason.description reason.reason)
 
 
 {-| Validates the the current state of a `TestContext`'s view without ending the `TestContext`.
@@ -739,30 +733,30 @@ as doing so will [make the intent of your test more clear](https://www.artima.co
 
 -}
 done : TestContext msg model effect -> Expectation
-done (TestContext result) =
-    case result of
-        Ok _ ->
+done testContext =
+    case testContext of
+        Active _ ->
             Expect.pass
 
-        Err (ExpectFailed expectationName description reason) ->
+        Finished (ExpectFailed expectationName description reason) ->
             Expect.fail (expectationName ++ ":\n" ++ Test.Runner.Failure.format description reason)
 
-        Err (SimulateFailed functionName message) ->
+        Finished (SimulateFailed functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
 
-        Err (SimulateFailedToFindTarget functionName message) ->
+        Finished (SimulateFailedToFindTarget functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
 
-        Err (InvalidLocationUrl functionName invalidUrl) ->
+        Finished (InvalidLocationUrl functionName invalidUrl) ->
             Expect.fail (functionName ++ ": " ++ "Not a valid absolute URL:\n" ++ toString invalidUrl)
 
-        Err (InvalidFlags functionName message) ->
+        Finished (InvalidFlags functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
 
-        Err (ProgramDoesNotSupportNavigation functionName) ->
+        Finished (ProgramDoesNotSupportNavigation functionName) ->
             Expect.fail (functionName ++ ": Program does not support navigation.  Use TestContext.createWithNavigation or related function to create a TestContext that supports navigation.")
 
-        Err (CustomFailure assertionName message) ->
+        Finished (CustomFailure assertionName message) ->
             Expect.fail (assertionName ++ ": " ++ message)
 
 
@@ -786,11 +780,10 @@ but will also fail the TestContext if the `expectedCount` parameter is invalid):
 
 -}
 fail : String -> String -> TestContext msg model effect -> TestContext msg model effect
-fail assertionName failureMessage (TestContext result) =
-    TestContext <|
-        case result of
-            Err err ->
-                Err err
+fail assertionName failureMessage testContext =
+    case testContext of
+        Finished err ->
+            Finished err
 
-            Ok _ ->
-                Err (CustomFailure assertionName failureMessage)
+        Active _ ->
+            Finished (CustomFailure assertionName failureMessage)
