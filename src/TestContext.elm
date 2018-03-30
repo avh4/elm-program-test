@@ -3,7 +3,9 @@ module TestContext
         ( TestContext
         , check
         , clickButton
+        , clickLink
         , create
+        , createWithBaseUrl
         , createWithFlags
         , createWithJsonStringFlags
         , createWithNavigation
@@ -12,6 +14,7 @@ module TestContext
         , done
         , expectLastEffect
         , expectModel
+        , expectPageChange
         , expectView
         , expectViewHas
         , fail
@@ -33,13 +36,13 @@ module TestContext
 ## Creating
 
 @docs TestContext
-@docs create, createWithFlags, createWithJsonStringFlags
+@docs create, createWithFlags, createWithJsonStringFlags, createWithBaseUrl
 @docs createWithNavigation, createWithNavigationAndFlags, createWithNavigationAndJsonStringFlags
 
 
 ## Simulating user input
 
-@docs clickButton, simulate
+@docs clickButton, clickLink
 @docs fillIn, fillInTextarea
 @docs check
 @docs routeChange
@@ -47,6 +50,7 @@ module TestContext
 
 ## Simulating user input (advanced)
 
+@docs simulate
 @docs within
 
 
@@ -59,6 +63,7 @@ module TestContext
 
 @docs expectViewHas, expectView
 @docs expectLastEffect, expectModel
+@docs expectPageChange
 
 
 ## Intermediate assertions
@@ -116,12 +121,15 @@ type alias TestProgram msg model effect =
 
 
 type Failure
-    = ExpectFailed String String Test.Runner.Failure.Reason
+    = ChangedPage String Navigation.Location
+      -- Errors
+    | ExpectFailed String String Test.Runner.Failure.Reason
     | SimulateFailed String String
     | SimulateFailedToFindTarget String String
     | InvalidLocationUrl String String
     | InvalidFlags String String
     | ProgramDoesNotSupportNavigation String
+    | NoBaseUrl String String
     | CustomFailure String String
 
 
@@ -163,6 +171,32 @@ create program =
         , view = program.view
         , onRouteChange = \_ -> Nothing
         , initialLocation = Nothing
+        }
+
+
+{-| Creates a `TestContext` from the parts of a standard `Html.program`
+and a base URL against which relative URLs can be resolved.
+
+If you don't need to simulate clicking links with relative URLs,
+prefer [`create`](#create).
+
+If your program uses navigation, see [`createWithNavigation`](#createWithNavigation).
+
+-}
+createWithBaseUrl :
+    { init : ( model, effect )
+    , update : msg -> model -> ( model, effect )
+    , view : model -> Html msg
+    }
+    -> String
+    -> TestContext msg model effect
+createWithBaseUrl program baseUrl =
+    createHelper
+        { init = program.init
+        , update = program.update
+        , view = program.view
+        , onRouteChange = \_ -> Nothing
+        , initialLocation = Navigation.Extra.locationFromString baseUrl
         }
 
 
@@ -409,11 +443,12 @@ simulateLabeledInputHelper : String -> String -> String -> List Selector -> ( St
 simulateLabeledInputHelper functionDescription fieldId label additionalInputSelectors event testContext =
     testContext
         |> expectViewHelper functionDescription
-            (Query.has
+            (Query.find
                 [ Selector.tag "label"
                 , Selector.attribute (Html.Attributes.for fieldId)
                 , Selector.text label
                 ]
+                >> Query.has []
             )
         |> simulateHelper functionDescription
             (Query.find <|
@@ -463,6 +498,47 @@ clickButton buttonText testContext =
         )
         Test.Html.Event.click
         testContext
+
+
+{-| Simulates clicking a `<a href="...">` link.
+
+NOTE: Currently, this function requires that you also provide the expected href.
+After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+a future release of this package will remove the `href` parameter.
+
+-}
+clickLink : String -> String -> TestContext msg model effect -> TestContext msg model effect
+clickLink linkText href testContext =
+    let
+        functionDescription =
+            "clickLink " ++ toString linkText
+    in
+    case
+        expectViewHelper functionDescription
+            (Query.find
+                [ Selector.tag "a"
+                , Selector.attribute (Html.Attributes.href href)
+                , Selector.text linkText
+                ]
+                >> Query.has []
+            )
+            testContext
+    of
+        Finished err ->
+            Finished err
+
+        Active ( _, _, finalLocation ) ->
+            case finalLocation of
+                Just location ->
+                    Finished (ChangedPage functionDescription (Navigation.Extra.resolve location href))
+
+                Nothing ->
+                    case Navigation.Extra.locationFromString href of
+                        Nothing ->
+                            Finished (NoBaseUrl "clickLink" href)
+
+                        Just location ->
+                            Finished (ChangedPage functionDescription location)
 
 
 {-| Simulates replacing the text in an input field labeled with the given label.
@@ -738,6 +814,9 @@ done testContext =
         Active _ ->
             Expect.pass
 
+        Finished (ChangedPage cause finalLocation) ->
+            Expect.fail (cause ++ " caused the program to end by navigating to " ++ toString finalLocation ++ ".  NOTE: If this is what you intended, use `expectPageChange` instead of `done`.")
+
         Finished (ExpectFailed expectationName description reason) ->
             Expect.fail (expectationName ++ ":\n" ++ Test.Runner.Failure.format description reason)
 
@@ -756,8 +835,26 @@ done testContext =
         Finished (ProgramDoesNotSupportNavigation functionName) ->
             Expect.fail (functionName ++ ": Program does not support navigation.  Use TestContext.createWithNavigation or related function to create a TestContext that supports navigation.")
 
+        Finished (NoBaseUrl functionName relativeUrl) ->
+            Expect.fail (functionName ++ ": The TestContext does not have a base URL and cannot resolve the relative URL " ++ toString relativeUrl ++ ".  Use TestContext.createWithBaseUrl to create a TestContext that can resolve relative URLs.")
+
         Finished (CustomFailure assertionName message) ->
             Expect.fail (assertionName ++ ": " ++ message)
+
+
+{-| Asserts that the program ended by navigating away to another URL.
+-}
+expectPageChange : String -> TestContext msg model effect -> Expectation
+expectPageChange expectedUrl testContext =
+    case testContext of
+        Finished (ChangedPage cause finalLocation) ->
+            finalLocation.href |> Expect.equal expectedUrl
+
+        Finished _ ->
+            testContext |> done
+
+        Active _ ->
+            Expect.fail "expectPageChange: expected to have navigated to a different URL, but no links were clicked"
 
 
 {-| `fail` can be used to report custom errors if you are writing your own convenience functions to deal with test contexts.
