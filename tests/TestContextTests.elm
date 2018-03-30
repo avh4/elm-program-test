@@ -32,15 +32,18 @@ testUpdate msg model =
     )
 
 
+handleInput : String -> Html.Attribute String
+handleInput fieldId =
+    Html.Events.onInput (\text -> "Input:" ++ fieldId ++ ":" ++ text)
+
+
+handleCheck : String -> Html.Attribute String
+handleCheck fieldId =
+    Html.Events.onCheck (\bool -> "Check:" ++ fieldId ++ ":" ++ toString bool)
+
+
 testView : String -> Html String
 testView model =
-    let
-        handleInput fieldId =
-            Html.Events.onInput (\text -> "Input:" ++ fieldId ++ ":" ++ text)
-
-        handleCheck fieldId =
-            Html.Events.onCheck (\bool -> "Check:" ++ fieldId ++ ":" ++ toString bool)
-    in
     Html.div []
         [ Html.span [] [ Html.text model ]
         , Html.button [ onClick "CLICK" ] [ Html.text "Click Me" ]
@@ -237,6 +240,22 @@ all =
         , test "can simulate text input on a labeled field" <|
             \() ->
                 testContext
+                    |> TestContext.fillIn "field-1" "Field 1" "value99"
+                    |> TestContext.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
+        , test "can simulate text input on a labeled textarea" <|
+            \() ->
+                TestContext.create
+                    { init = testInit
+                    , update = testUpdate
+                    , view =
+                        \_ ->
+                            Html.div []
+                                [ Html.label [ for "field-1" ] [ Html.text "Field 1" ]
+                                , Html.textarea [ id "field-1", handleInput "field-1" ] []
+                                , Html.label [ for "field-2" ] [ Html.text "Field 2" ]
+                                , Html.textarea [ id "field-2", handleInput "field-2" ] []
+                                ]
+                    }
                     |> TestContext.fillIn "field-1" "Field 1" "value99"
                     |> TestContext.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
         , test "can simulate setting a labeled checkbox field" <|

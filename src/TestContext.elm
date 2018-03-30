@@ -88,6 +88,7 @@ import Json.Decode
 import Json.Encode
 import Navigation
 import Navigation.Extra
+import Query.Extra
 import Test.Html.Event
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector exposing (Selector)
@@ -408,8 +409,8 @@ After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/5
 a future release of this package will remove the `fieldId` parameter.
 
 -}
-simulateLabeledInputHelper : String -> String -> String -> List Selector -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
-simulateLabeledInputHelper functionDescription fieldId label additionalInputSelectors event testContext =
+simulateLabeledInputHelper : String -> String -> String -> Bool -> List Selector -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
+simulateLabeledInputHelper functionDescription fieldId label allowTextArea additionalInputSelectors event testContext =
     testContext
         |> expectViewHelper functionDescription
             (Query.has
@@ -419,12 +420,24 @@ simulateLabeledInputHelper functionDescription fieldId label additionalInputSele
                 ]
             )
         |> simulateHelper functionDescription
-            (Query.find <|
+            (Query.Extra.oneOf <|
                 List.concat
-                    [ [ Selector.tag "input"
-                      , Selector.id fieldId
+                    [ [ Query.find <|
+                            List.concat
+                                [ [ Selector.tag "input"
+                                  , Selector.id fieldId
+                                  ]
+                                , additionalInputSelectors
+                                ]
                       ]
-                    , additionalInputSelectors
+                    , if allowTextArea then
+                        [ Query.find
+                            [ Selector.tag "textarea"
+                            , Selector.id fieldId
+                            ]
+                        ]
+                      else
+                        []
                     ]
             )
             event
@@ -495,6 +508,7 @@ fillIn fieldId label newContent testContext =
     simulateLabeledInputHelper ("fillIn " ++ toString label)
         fieldId
         label
+        True
         [-- TODO: should ensure that known special input types are not set, like `type="checkbox"`, etc?
         ]
         (Test.Html.Event.input newContent)
@@ -540,6 +554,7 @@ check fieldId label willBecomeChecked testContext =
     simulateLabeledInputHelper ("check " ++ toString label)
         fieldId
         label
+        False
         [ Selector.attribute (Html.Attributes.type_ "checkbox") ]
         (Test.Html.Event.check willBecomeChecked)
         testContext
