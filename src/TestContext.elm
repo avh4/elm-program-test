@@ -536,28 +536,67 @@ clickLink linkText href testContext =
                 ]
             )
 
+        ctrlClick =
+            ( "click"
+            , Json.Encode.object
+                [ ( "ctrlKey", Json.Encode.bool True )
+                , ( "metaKey", Json.Encode.bool False )
+                ]
+            )
+
+        metaClick =
+            ( "click"
+            , Json.Encode.object
+                [ ( "ctrlKey", Json.Encode.bool False )
+                , ( "metaKey", Json.Encode.bool True )
+                ]
+            )
+
         tryClicking { otherwise } testContext =
             case testContext of
                 Finished err ->
                     Finished err
 
                 Active ( program, ( model, _ ), _ ) ->
-                    case
-                        program.view model
-                            |> findLinkTag
-                            |> Test.Html.Event.simulate normalClick
-                            |> Test.Html.Event.toResult
-                    of
-                        Err message ->
-                            -- the link doesn't have a click handler
-                            testContext |> otherwise
-
-                        Ok msg ->
-                            -- there is a click handler, so simulate that event and ignore the `href`
+                    let
+                        link =
+                            program.view model
+                                |> findLinkTag
+                    in
+                    if respondsTo normalClick link then
+                        -- there is a click handler
+                        -- first make sure the handler properly respects "Open in new tab", etc
+                        if respondsTo ctrlClick link || respondsTo metaClick link then
                             testContext
-                                |> simulateHelper ("clickLink " ++ toString linkText)
-                                    findLinkTag
-                                    normalClick
+                                |> fail functionDescription
+                                    (String.concat
+                                        [ "Found an `<a href=\"...\">` tag has an onClick handler, "
+                                        , "but the handler is overriding ctrl-click and meta-click.\n\n"
+                                        , "A properly behaved single-page app should not override ctrl- and meta-clicks on `<a>` tags "
+                                        , "because this prevents users from opening links in new tabs/windows.\n\n"
+                                        , "Use `onClickPreventDefaultForLinkWithHref` defined at <https://gist.github.com/avh4/712d43d649b7624fab59285a70610707> instead of `onClick` to fix this problem.\n\n"
+                                        , "See discussion of this issue at <https://github.com/elm-lang/navigation/issues/13>."
+                                        ]
+                                    )
+                        else
+                            -- everything looks good, so simulate that event and ignore the `href`
+                            testContext
+                                |> simulateHelper functionDescription findLinkTag normalClick
+                    else
+                        -- the link doesn't have a click handler
+                        testContext |> otherwise
+
+        respondsTo event single =
+            case
+                single
+                    |> Test.Html.Event.simulate event
+                    |> Test.Html.Event.toResult
+            of
+                Err _ ->
+                    False
+
+                Ok _ ->
+                    True
 
         followLink href testContext =
             case testContext of
