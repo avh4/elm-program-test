@@ -2,7 +2,7 @@ module TestContextTests exposing (all)
 
 import Expect
 import Html exposing (Html)
-import Html.Attributes exposing (for, id, type_)
+import Html.Attributes exposing (for, href, id, type_)
 import Html.Events exposing (onClick)
 import Json.Decode
 import Json.Encode
@@ -263,4 +263,77 @@ all =
                 testContext
                     |> TestContext.check "checkbox-1" "Checkbox 1" True
                     |> TestContext.expectModel (Expect.equal "<INIT>;Check:checkbox-1:True")
+        , describe "clicking links" <|
+            let
+                linkProgram =
+                    TestContext.createWithBaseUrl
+                        { init = testInit
+                        , update = testUpdate
+                        , view =
+                            \model ->
+                                Html.div []
+                                    [ Html.a [ href "https://example.com/link" ] [ Html.text "External" ]
+                                    , Html.a [ href "/settings" ] [ Html.text "Relative" ]
+                                    ]
+                        }
+                        "http://localhost:3000/Main.elm"
+            in
+            [ test "can verify an absolute link" <|
+                \() ->
+                    linkProgram
+                        |> TestContext.clickLink "External" "https://example.com/link"
+                        |> TestContext.expectPageChange "https://example.com/link"
+            , test "can verify a relative link" <|
+                \() ->
+                    linkProgram
+                        |> TestContext.clickLink "Relative" "/settings"
+                        |> TestContext.expectPageChange "http://localhost:3000/settings"
+            , test "can verify an internal (single-page app) link" <|
+                \() ->
+                    TestContext.createWithNavigation
+                        .pathname
+                        { init = \location -> ( "<INIT:" ++ location.pathname ++ ">", NoOp )
+                        , update = testUpdate
+                        , view =
+                            \_ ->
+                                Html.div []
+                                    [ Html.a
+                                        [ href "#search"
+                                        , onClickPreventDefaultForLinkWithHref "GoToSearch"
+                                        ]
+                                        [ Html.text "SPA" ]
+                                    ]
+                        }
+                        "http://localhost:3000/"
+                        |> TestContext.clickLink "SPA" "#search"
+                        |> TestContext.expectModel (Expect.equal "<INIT:/>;GoToSearch")
+            ]
         ]
+
+
+onClickPreventDefaultForLinkWithHref : msg -> Html.Attribute msg
+onClickPreventDefaultForLinkWithHref msg =
+    let
+        isSpecialClick : Json.Decode.Decoder Bool
+        isSpecialClick =
+            Json.Decode.map2
+                (\isCtrl isMeta -> isCtrl || isMeta)
+                (Json.Decode.field "ctrlKey" Json.Decode.bool)
+                (Json.Decode.field "metaKey" Json.Decode.bool)
+
+        succeedIfFalse : a -> Bool -> Json.Decode.Decoder a
+        succeedIfFalse msg preventDefault =
+            case preventDefault of
+                False ->
+                    Json.Decode.succeed msg
+
+                True ->
+                    Json.Decode.fail "succeedIfFalse: condition was True"
+    in
+    Html.Events.onWithOptions "click"
+        { stopPropagation = False
+        , preventDefault = True
+        }
+        (isSpecialClick
+            |> Json.Decode.andThen (succeedIfFalse msg)
+        )

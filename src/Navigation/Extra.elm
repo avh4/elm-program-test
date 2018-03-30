@@ -38,4 +38,8 @@ resolve : Navigation.Location -> String -> Navigation.Location
 resolve base url =
     locationFromString url
         -- TODO: implment correct logic (current logic is only correct for "authority-relative" URLs without query or fragment strings)
-        |> Maybe.withDefault { base | pathname = url }
+        |> Maybe.withDefault
+            { base
+                | href = (base.href |> String.split "/" |> List.take 3 |> String.join "/") ++ url
+                , pathname = url
+            }

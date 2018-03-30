@@ -3,7 +3,9 @@ module TestContext
         ( TestContext
         , check
         , clickButton
+        , clickLink
         , create
+        , createWithBaseUrl
         , createWithFlags
         , createWithJsonStringFlags
         , createWithNavigation
@@ -12,6 +14,7 @@ module TestContext
         , done
         , expectLastEffect
         , expectModel
+        , expectPageChange
         , expectView
         , expectViewHas
         , fail
@@ -33,13 +36,13 @@ module TestContext
 ## Creating
 
 @docs TestContext
-@docs create, createWithFlags, createWithJsonStringFlags
+@docs create, createWithFlags, createWithJsonStringFlags, createWithBaseUrl
 @docs createWithNavigation, createWithNavigationAndFlags, createWithNavigationAndJsonStringFlags
 
 
 ## Simulating user input
 
-@docs clickButton, simulate
+@docs clickButton, clickLink
 @docs fillIn, fillInTextarea
 @docs check
 @docs routeChange
@@ -47,6 +50,7 @@ module TestContext
 
 ## Simulating user input (advanced)
 
+@docs simulate
 @docs within
 
 
@@ -59,6 +63,7 @@ module TestContext
 
 @docs expectViewHas, expectView
 @docs expectLastEffect, expectModel
+@docs expectPageChange
 
 
 ## Intermediate assertions
@@ -105,7 +110,8 @@ and a log of any errors that have occurred while simulating interaction with the
 
 -}
 type TestContext msg model effect
-    = TestContext (Result Failure ( TestProgram msg model effect, ( model, effect ), Maybe Navigation.Location ))
+    = Active ( TestProgram msg model effect, ( model, effect ), Maybe Navigation.Location )
+    | Finished Failure
 
 
 type alias TestProgram msg model effect =
@@ -116,12 +122,15 @@ type alias TestProgram msg model effect =
 
 
 type Failure
-    = ExpectFailed String String Test.Runner.Failure.Reason
+    = ChangedPage String Navigation.Location
+      -- Errors
+    | ExpectFailed String String Test.Runner.Failure.Reason
     | SimulateFailed String String
     | SimulateFailedToFindTarget String String
     | InvalidLocationUrl String String
     | InvalidFlags String String
     | ProgramDoesNotSupportNavigation String
+    | NoBaseUrl String String
     | CustomFailure String String
 
 
@@ -134,15 +143,14 @@ createHelper :
     }
     -> TestContext msg model effect
 createHelper program =
-    TestContext <|
-        Ok
-            ( { update = program.update
-              , view = program.view >> Query.fromHtml
-              , onRouteChange = program.onRouteChange
-              }
-            , program.init
-            , program.initialLocation
-            )
+    Active
+        ( { update = program.update
+          , view = program.view >> Query.fromHtml
+          , onRouteChange = program.onRouteChange
+          }
+        , program.init
+        , program.initialLocation
+        )
 
 
 {-| Creates a `TestContext` from the parts of a standard `Html.program`.
@@ -164,6 +172,32 @@ create program =
         , view = program.view
         , onRouteChange = \_ -> Nothing
         , initialLocation = Nothing
+        }
+
+
+{-| Creates a `TestContext` from the parts of a standard `Html.program`
+and a base URL against which relative URLs can be resolved.
+
+If you don't need to simulate clicking links with relative URLs,
+prefer [`create`](#create).
+
+If your program uses navigation, see [`createWithNavigation`](#createWithNavigation).
+
+-}
+createWithBaseUrl :
+    { init : ( model, effect )
+    , update : msg -> model -> ( model, effect )
+    , view : model -> Html msg
+    }
+    -> String
+    -> TestContext msg model effect
+createWithBaseUrl program baseUrl =
+    createHelper
+        { init = program.init
+        , update = program.update
+        , view = program.view
+        , onRouteChange = \_ -> Nothing
+        , initialLocation = Navigation.Extra.locationFromString baseUrl
         }
 
 
@@ -219,7 +253,7 @@ createWithJsonStringFlags :
 createWithJsonStringFlags flagsDecoder program flagsJson =
     case Json.Decode.decodeString flagsDecoder flagsJson of
         Err message ->
-            TestContext <| Err (InvalidFlags "createWithJsonStringFlags" message)
+            Finished (InvalidFlags "createWithJsonStringFlags" message)
 
         Ok flags ->
             createHelper
@@ -249,7 +283,7 @@ createWithNavigation :
 createWithNavigation onRouteChange program initialUrl =
     case Navigation.Extra.locationFromString initialUrl of
         Nothing ->
-            TestContext <| Err (InvalidLocationUrl "createWithNavigation" initialUrl)
+            Finished (InvalidLocationUrl "createWithNavigation" initialUrl)
 
         Just location ->
             createHelper
@@ -284,7 +318,7 @@ createWithNavigationAndFlags :
 createWithNavigationAndFlags onRouteChange program initialUrl flags =
     case Navigation.Extra.locationFromString initialUrl of
         Nothing ->
-            TestContext <| Err (InvalidLocationUrl "createWithNavigationAndFlags" initialUrl)
+            Finished (InvalidLocationUrl "createWithNavigationAndFlags" initialUrl)
 
         Just location ->
             createHelper
@@ -321,12 +355,12 @@ createWithNavigationAndJsonStringFlags :
 createWithNavigationAndJsonStringFlags flagsDecoder onRouteChange program initialUrl flagsJson =
     case Navigation.Extra.locationFromString initialUrl of
         Nothing ->
-            TestContext <| Err (InvalidLocationUrl "createWithNavigationAndJsonStringFlags" initialUrl)
+            Finished (InvalidLocationUrl "createWithNavigationAndJsonStringFlags" initialUrl)
 
         Just location ->
             case Json.Decode.decodeString flagsDecoder flagsJson of
                 Err message ->
-                    TestContext <| Err (InvalidFlags "createWithNavigationAndJsonStringFlags" message)
+                    Finished (InvalidFlags "createWithNavigationAndJsonStringFlags" message)
 
                 Ok flags ->
                     createHelper
@@ -349,27 +383,26 @@ as doing so will make your tests more robust to changes in your program's implem
 
 -}
 update : msg -> TestContext msg model effect -> TestContext msg model effect
-update msg (TestContext result) =
-    TestContext <|
-        case result of
-            Err err ->
-                Err err
+update msg testContext =
+    case testContext of
+        Finished err ->
+            Finished err
 
-            Ok ( program, ( model, _ ), currentLocation ) ->
-                Ok
-                    ( program
-                    , program.update msg model
-                    , currentLocation
-                    )
+        Active ( program, ( model, _ ), currentLocation ) ->
+            Active
+                ( program
+                , program.update msg model
+                , currentLocation
+                )
 
 
 simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
-simulateHelper functionDescription findTarget event (TestContext result) =
-    case result of
-        Err err ->
-            TestContext <| Err err
+simulateHelper functionDescription findTarget event testContext =
+    case testContext of
+        Finished err ->
+            Finished err
 
-        Ok ( program, ( model, _ ), _ ) ->
+        Active ( program, ( model, _ ), _ ) ->
             let
                 targetQuery =
                     program.view model
@@ -382,8 +415,7 @@ simulateHelper functionDescription findTarget event (TestContext result) =
                     |> Test.Runner.getFailureReason
             of
                 Just reason ->
-                    TestContext <|
-                        Err (SimulateFailedToFindTarget functionDescription reason.description)
+                    Finished (SimulateFailedToFindTarget functionDescription reason.description)
 
                 Nothing ->
                     -- Try to simulate the event, now that we know the target exists
@@ -393,11 +425,10 @@ simulateHelper functionDescription findTarget event (TestContext result) =
                             |> Test.Html.Event.toResult
                     of
                         Err message ->
-                            TestContext <|
-                                Err (SimulateFailed functionDescription message)
+                            Finished (SimulateFailed functionDescription message)
 
                         Ok msg ->
-                            update msg (TestContext result)
+                            update msg testContext
 
 
 {-| **PRIVATE** helper for simulating events on input elements with associated labels.
@@ -413,11 +444,12 @@ simulateLabeledInputHelper : String -> String -> String -> Bool -> List Selector
 simulateLabeledInputHelper functionDescription fieldId label allowTextArea additionalInputSelectors event testContext =
     testContext
         |> expectViewHelper functionDescription
-            (Query.has
+            (Query.find
                 [ Selector.tag "label"
                 , Selector.attribute (Html.Attributes.for fieldId)
                 , Selector.text label
                 ]
+                >> Query.has []
             )
         |> simulateHelper functionDescription
             (Query.Extra.oneOf <|
@@ -479,6 +511,130 @@ clickButton buttonText testContext =
         )
         Test.Html.Event.click
         testContext
+
+
+{-| Simulates clicking a `<a href="...">` link.
+
+NOTE: Currently, this function requires that you also provide the expected href.
+After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+a future release of this package will remove the `href` parameter.
+
+Note for testing single-page apps,
+if the target `<a>` tag has an `onClick` handler,
+then the message produced by the handler will be processed
+and the `href` will not be followed.
+NOTE: Currently this function cannot verify that the onClick handler
+sets `preventDefault`, but this will be done in the future after
+<https://github.com/eeue56/elm-html-test/issues/63> is resolved.
+
+-}
+clickLink : String -> String -> TestContext msg model effect -> TestContext msg model effect
+clickLink linkText href testContext =
+    let
+        functionDescription =
+            "clickLink " ++ toString linkText
+
+        findLinkTag =
+            Query.find
+                [ Selector.tag "a"
+                , Selector.attribute (Html.Attributes.href href)
+                , Selector.containing [ Selector.text linkText ]
+                ]
+
+        normalClick =
+            ( "click"
+            , Json.Encode.object
+                [ ( "ctrlKey", Json.Encode.bool False )
+                , ( "metaKey", Json.Encode.bool False )
+                ]
+            )
+
+        ctrlClick =
+            ( "click"
+            , Json.Encode.object
+                [ ( "ctrlKey", Json.Encode.bool True )
+                , ( "metaKey", Json.Encode.bool False )
+                ]
+            )
+
+        metaClick =
+            ( "click"
+            , Json.Encode.object
+                [ ( "ctrlKey", Json.Encode.bool False )
+                , ( "metaKey", Json.Encode.bool True )
+                ]
+            )
+
+        tryClicking { otherwise } testContext =
+            case testContext of
+                Finished err ->
+                    Finished err
+
+                Active ( program, ( model, _ ), _ ) ->
+                    let
+                        link =
+                            program.view model
+                                |> findLinkTag
+                    in
+                    if respondsTo normalClick link then
+                        -- there is a click handler
+                        -- first make sure the handler properly respects "Open in new tab", etc
+                        if respondsTo ctrlClick link || respondsTo metaClick link then
+                            testContext
+                                |> fail functionDescription
+                                    (String.concat
+                                        [ "Found an `<a href=\"...\">` tag has an onClick handler, "
+                                        , "but the handler is overriding ctrl-click and meta-click.\n\n"
+                                        , "A properly behaved single-page app should not override ctrl- and meta-clicks on `<a>` tags "
+                                        , "because this prevents users from opening links in new tabs/windows.\n\n"
+                                        , "Use `onClickPreventDefaultForLinkWithHref` defined at <https://gist.github.com/avh4/712d43d649b7624fab59285a70610707> instead of `onClick` to fix this problem.\n\n"
+                                        , "See discussion of this issue at <https://github.com/elm-lang/navigation/issues/13>."
+                                        ]
+                                    )
+                        else
+                            -- everything looks good, so simulate that event and ignore the `href`
+                            testContext
+                                |> simulateHelper functionDescription findLinkTag normalClick
+                    else
+                        -- the link doesn't have a click handler
+                        testContext |> otherwise
+
+        respondsTo event single =
+            case
+                single
+                    |> Test.Html.Event.simulate event
+                    |> Test.Html.Event.toResult
+            of
+                Err _ ->
+                    False
+
+                Ok _ ->
+                    True
+
+        followLink href testContext =
+            case testContext of
+                Finished err ->
+                    Finished err
+
+                Active ( _, _, finalLocation ) ->
+                    case finalLocation of
+                        Just location ->
+                            Finished (ChangedPage functionDescription (Navigation.Extra.resolve location href))
+
+                        Nothing ->
+                            case Navigation.Extra.locationFromString href of
+                                Nothing ->
+                                    Finished (NoBaseUrl "clickLink" href)
+
+                                Just location ->
+                                    Finished (ChangedPage functionDescription location)
+    in
+    testContext
+        |> expectViewHelper functionDescription
+            (findLinkTag
+                >> Query.has []
+            )
+        |> tryClicking { otherwise = followLink href }
 
 
 {-| Simulates replacing the text in an input field labeled with the given label.
@@ -589,21 +745,21 @@ then the following will allow you to simulate clicking the "Submit" button in th
 
 -}
 within : (Query.Single msg -> Query.Single msg) -> (TestContext msg model effect -> TestContext msg model effect) -> (TestContext msg model effect -> TestContext msg model effect)
-within findTarget onScopedTest ((TestContext result) as testContext) =
+within findTarget onScopedTest testContext =
     let
         replaceView newView testContext =
             case testContext of
-                TestContext (Err err) ->
-                    TestContext (Err err)
+                Finished err ->
+                    Finished err
 
-                TestContext (Ok ( program, state, location )) ->
-                    TestContext (Ok ( { program | view = newView }, state, location ))
+                Active ( program, state, location ) ->
+                    Active ( { program | view = newView }, state, location )
     in
-    case result of
-        Err err ->
-            TestContext (Err err)
+    case testContext of
+        Finished err ->
+            Finished err
 
-        Ok ( program, _, _ ) ->
+        Active ( program, _, _ ) ->
             testContext
                 |> replaceView (program.view >> findTarget)
                 |> onScopedTest
@@ -613,59 +769,57 @@ within findTarget onScopedTest ((TestContext result) as testContext) =
 {-| `url` may be an absolute URL or relative URL
 -}
 routeChange : String -> TestContext msg model effect -> TestContext msg model effect
-routeChange url (TestContext result) =
-    case result of
-        Err err ->
-            TestContext <| Err err
+routeChange url testContext =
+    case testContext of
+        Finished err ->
+            Finished err
 
-        Ok ( program, _, Nothing ) ->
-            TestContext <| Err (ProgramDoesNotSupportNavigation "routeChange")
+        Active ( program, _, Nothing ) ->
+            Finished (ProgramDoesNotSupportNavigation "routeChange")
 
-        Ok ( program, _, Just currentLocation ) ->
+        Active ( program, _, Just currentLocation ) ->
             case
                 Navigation.Extra.resolve currentLocation url
                     |> program.onRouteChange
             of
                 Nothing ->
-                    TestContext result
+                    testContext
 
                 Just msg ->
-                    update msg (TestContext result)
+                    update msg testContext
 
 
 {-| Make an assertion about the current state of a `TestContext`'s model.
 -}
 expectModel : (model -> Expectation) -> TestContext msg model effect -> Expectation
-expectModel assertion (TestContext result) =
+expectModel assertion testContext =
     done <|
-        TestContext <|
-            case result of
-                Err err ->
-                    Err err
+        case testContext of
+            Finished err ->
+                Finished err
 
-                Ok ( _, ( model, _ ), _ ) ->
-                    case assertion model |> Test.Runner.getFailureReason of
-                        Nothing ->
-                            result
+            Active ( _, ( model, _ ), _ ) ->
+                case assertion model |> Test.Runner.getFailureReason of
+                    Nothing ->
+                        testContext
 
-                        Just reason ->
-                            Err (ExpectFailed "expectModel" reason.description reason.reason)
+                    Just reason ->
+                        Finished (ExpectFailed "expectModel" reason.description reason.reason)
 
 
 expectLastEffectHelper : String -> (effect -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
-expectLastEffectHelper functionName assertion (TestContext result) =
-    TestContext <|
-        case result of
-            Err err ->
-                Err err
+expectLastEffectHelper functionName assertion testContext =
+    case testContext of
+        Finished err ->
+            Finished err
 
-            Ok ( _, ( _, lastEffect ), _ ) ->
-                case assertion lastEffect |> Test.Runner.getFailureReason of
-                    Nothing ->
-                        result
+        Active ( _, ( _, lastEffect ), _ ) ->
+            case assertion lastEffect |> Test.Runner.getFailureReason of
+                Nothing ->
+                    testContext
 
-                    Just reason ->
-                        Err (ExpectFailed functionName reason.description reason.reason)
+                Just reason ->
+                    Finished (ExpectFailed functionName reason.description reason.reason)
 
 
 {-| Validates the last effect produced by a `TestContext`'s program without ending the `TestContext`.
@@ -685,24 +839,23 @@ expectLastEffect assertion testContext =
 
 
 expectViewHelper : String -> (Query.Single msg -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
-expectViewHelper functionName assertion (TestContext result) =
-    TestContext <|
-        case result of
-            Err err ->
-                Err err
+expectViewHelper functionName assertion testContext =
+    case testContext of
+        Finished err ->
+            Finished err
 
-            Ok ( program, ( model, _ ), _ ) ->
-                case
-                    model
-                        |> program.view
-                        |> assertion
-                        |> Test.Runner.getFailureReason
-                of
-                    Nothing ->
-                        result
+        Active ( program, ( model, _ ), _ ) ->
+            case
+                model
+                    |> program.view
+                    |> assertion
+                    |> Test.Runner.getFailureReason
+            of
+                Nothing ->
+                    testContext
 
-                    Just reason ->
-                        Err (ExpectFailed functionName reason.description reason.reason)
+                Just reason ->
+                    Finished (ExpectFailed functionName reason.description reason.reason)
 
 
 {-| Validates the the current state of a `TestContext`'s view without ending the `TestContext`.
@@ -754,31 +907,52 @@ as doing so will [make the intent of your test more clear](https://www.artima.co
 
 -}
 done : TestContext msg model effect -> Expectation
-done (TestContext result) =
-    case result of
-        Ok _ ->
+done testContext =
+    case testContext of
+        Active _ ->
             Expect.pass
 
-        Err (ExpectFailed expectationName description reason) ->
+        Finished (ChangedPage cause finalLocation) ->
+            Expect.fail (cause ++ " caused the program to end by navigating to " ++ toString finalLocation.href ++ ".  NOTE: If this is what you intended, use `expectPageChange` instead of `done`.")
+
+        Finished (ExpectFailed expectationName description reason) ->
             Expect.fail (expectationName ++ ":\n" ++ Test.Runner.Failure.format description reason)
 
-        Err (SimulateFailed functionName message) ->
+        Finished (SimulateFailed functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
 
-        Err (SimulateFailedToFindTarget functionName message) ->
+        Finished (SimulateFailedToFindTarget functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
 
-        Err (InvalidLocationUrl functionName invalidUrl) ->
+        Finished (InvalidLocationUrl functionName invalidUrl) ->
             Expect.fail (functionName ++ ": " ++ "Not a valid absolute URL:\n" ++ toString invalidUrl)
 
-        Err (InvalidFlags functionName message) ->
+        Finished (InvalidFlags functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
 
-        Err (ProgramDoesNotSupportNavigation functionName) ->
+        Finished (ProgramDoesNotSupportNavigation functionName) ->
             Expect.fail (functionName ++ ": Program does not support navigation.  Use TestContext.createWithNavigation or related function to create a TestContext that supports navigation.")
 
-        Err (CustomFailure assertionName message) ->
+        Finished (NoBaseUrl functionName relativeUrl) ->
+            Expect.fail (functionName ++ ": The TestContext does not have a base URL and cannot resolve the relative URL " ++ toString relativeUrl ++ ".  Use TestContext.createWithBaseUrl to create a TestContext that can resolve relative URLs.")
+
+        Finished (CustomFailure assertionName message) ->
             Expect.fail (assertionName ++ ": " ++ message)
+
+
+{-| Asserts that the program ended by navigating away to another URL.
+-}
+expectPageChange : String -> TestContext msg model effect -> Expectation
+expectPageChange expectedUrl testContext =
+    case testContext of
+        Finished (ChangedPage cause finalLocation) ->
+            finalLocation.href |> Expect.equal expectedUrl
+
+        Finished _ ->
+            testContext |> done
+
+        Active _ ->
+            Expect.fail "expectPageChange: expected to have navigated to a different URL, but no links were clicked"
 
 
 {-| `fail` can be used to report custom errors if you are writing your own convenience functions to deal with test contexts.
@@ -801,11 +975,10 @@ but will also fail the TestContext if the `expectedCount` parameter is invalid):
 
 -}
 fail : String -> String -> TestContext msg model effect -> TestContext msg model effect
-fail assertionName failureMessage (TestContext result) =
-    TestContext <|
-        case result of
-            Err err ->
-                Err err
+fail assertionName failureMessage testContext =
+    case testContext of
+        Finished err ->
+            Finished err
 
-            Ok _ ->
-                Err (CustomFailure assertionName failureMessage)
+        Active _ ->
+            Finished (CustomFailure assertionName failureMessage)
