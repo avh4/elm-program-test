@@ -39,7 +39,17 @@ handleInput fieldId =
 
 handleCheck : String -> Html.Attribute String
 handleCheck fieldId =
-    Html.Events.onCheck (\bool -> "Check:" ++ fieldId ++ ":" ++ toString bool)
+    Html.Events.onCheck (\bool -> "Check:" ++ fieldId ++ ":" ++ boolToString bool)
+
+
+boolToString : Bool -> String
+boolToString b =
+    case b of
+        True ->
+            "True"
+
+        False ->
+            "False"
 
 
 testView : String -> Html String
@@ -116,8 +126,8 @@ all =
         , test "can create with navigation" <|
             \() ->
                 TestContext.createWithNavigation
-                    .pathname
-                    { init = \location -> ( "<INIT:" ++ location.pathname ++ ">", NoOp )
+                    .path
+                    { init = \location -> ( "<INIT:" ++ location.path ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
@@ -126,8 +136,8 @@ all =
         , test "can simulate a route change" <|
             \() ->
                 TestContext.createWithNavigation
-                    .pathname
-                    { init = \location -> ( "<INIT:" ++ location.pathname ++ ">", NoOp )
+                    .path
+                    { init = \location -> ( "<INIT:" ++ location.path ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
@@ -137,8 +147,8 @@ all =
         , test "can simulate a route change with a relative URL" <|
             \() ->
                 TestContext.createWithNavigation
-                    .pathname
-                    { init = \location -> ( "<INIT:" ++ location.pathname ++ ">", NoOp )
+                    .path
+                    { init = \location -> ( "<INIT:" ++ location.path ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
@@ -148,8 +158,8 @@ all =
         , test "can create with navigation and flags" <|
             \() ->
                 TestContext.createWithNavigationAndFlags
-                    .pathname
-                    { init = \flags location -> ( "<INIT:" ++ location.pathname ++ ":" ++ flags ++ ">", NoOp )
+                    .path
+                    { init = \flags location -> ( "<INIT:" ++ location.path ++ ":" ++ flags ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
@@ -171,8 +181,8 @@ all =
             \() ->
                 TestContext.createWithNavigationAndJsonStringFlags
                     (Json.Decode.field "x" Json.Decode.string)
-                    .pathname
-                    { init = \flags location -> ( "<INIT:" ++ location.pathname ++ ":" ++ flags ++ ">", NoOp )
+                    .path
+                    { init = \flags location -> ( "<INIT:" ++ location.path ++ ":" ++ flags ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
@@ -291,8 +301,8 @@ all =
             , test "can verify an internal (single-page app) link" <|
                 \() ->
                     TestContext.createWithNavigation
-                        .pathname
-                        { init = \location -> ( "<INIT:" ++ location.pathname ++ ">", NoOp )
+                        .path
+                        { init = \location -> ( "<INIT:" ++ location.path ++ ">", NoOp )
                         , update = testUpdate
                         , view =
                             \_ ->
@@ -320,20 +330,19 @@ onClickPreventDefaultForLinkWithHref msg =
                 (\isCtrl isMeta -> isCtrl || isMeta)
                 (Json.Decode.field "ctrlKey" Json.Decode.bool)
                 (Json.Decode.field "metaKey" Json.Decode.bool)
-
-        succeedIfFalse : a -> Bool -> Json.Decode.Decoder a
-        succeedIfFalse msg preventDefault =
-            case preventDefault of
-                False ->
-                    Json.Decode.succeed msg
-
-                True ->
-                    Json.Decode.fail "succeedIfFalse: condition was True"
     in
-    Html.Events.onWithOptions "click"
-        { stopPropagation = False
-        , preventDefault = True
-        }
+    Html.Events.preventDefaultOn "click"
         (isSpecialClick
             |> Json.Decode.andThen (succeedIfFalse msg)
+            |> Json.Decode.map (\m -> ( m, True ))
         )
+
+
+succeedIfFalse : a -> Bool -> Json.Decode.Decoder a
+succeedIfFalse msg preventDefault =
+    case preventDefault of
+        False ->
+            Json.Decode.succeed msg
+
+        True ->
+            Json.Decode.fail "succeedIfFalse: condition was True"

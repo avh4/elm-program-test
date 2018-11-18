@@ -1,9 +1,10 @@
 {
   "devDependencies": {
-    "elm": "^0.18.0",
-    "elm-test": "^0.18.12"
+    "elm": "^0.19.0-bugfix2",
+    "elm-format": "^0.8.1",
+    "elm-test": "^0.19.0-rev3"
   },
   "scripts": {
-    "test": "elm-make --yes --docs documentation.json && elm-package diff && elm-test"
+    "test": "elm-test && elm make --docs documentation.json && elm diff"
   }
 }

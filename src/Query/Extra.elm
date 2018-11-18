@@ -34,6 +34,7 @@ oneOf options single =
     if isFailed single then
         -- the input single is an error, so just return that
         single
+
     else
         case options of
             [] ->
@@ -48,6 +49,7 @@ oneOf options single =
                 if isFailed (next single) then
                     -- this option failed, so try the remaining ones
                     oneOf (rest1 :: rest) single
+
                 else
                     -- this option passed, so return success
                     next single
