@@ -5,6 +5,6 @@
     "elm-test": "^0.19.0-rev3"
   },
   "scripts": {
-    "test": "elm-test && elm make --docs documentation.json && elm diff"
+    "test": "elm-test && elm make --docs documentation.json && elm-format --validate . && elm diff"
   }
 }

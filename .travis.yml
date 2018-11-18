@@ -1,33 +1,14 @@
 sudo: false
 
 language: node_js
-node_js:
-  - "6"
-  - "10"
-
-install:
-  - |
-    if [ ! -d sysconfcpus/bin ];
-    then
-      git clone https://github.com/obmarg/libsysconfcpus.git;
-      cd libsysconfcpus;
-      ./configure --prefix=$TRAVIS_BUILD_DIR/sysconfcpus;
-      make && make install;
-      cd ..;
-    fi
-  - npm install -f
-  - export PATH="`pwd`/node_modules/.bin:$PATH"
-  - elm-package install --yes
-  - rsync -a elm-stuff/ tests/elm-stuff/
-  - (cd tests; elm-package install --yes)
-
-script:
-  - $TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2 elm-make --yes
-  - rsync -a elm-stuff/build-artifacts/ tests/elm-stuff/build-artifacts/
-  - $TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2 npm test
+node_js: "10"
 
 cache:
   directories:
-    - sysconfcpus
-    - elm-stuff
-    - tests/elm-stuff
+    - node_modules
+
+    install:
+  - npm install
+
+script:
+  - npm test
