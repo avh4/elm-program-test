@@ -1,3 +1,8 @@
+## 2.0.0
+
+Updated to support Elm 0.19.
+
+
 ## 1.1.0
 
 New features:
