@@ -2,12 +2,15 @@ module TestContext exposing
     ( TestContext
     , create, createWithFlags, createWithJsonStringFlags, createWithBaseUrl
     , createWithNavigation, createWithNavigationAndFlags, createWithNavigationAndJsonStringFlags
+    , SimulatedEffect(..)
+    , createWithSimulatedEffects
     , clickButton, clickLink
     , fillIn, fillInTextarea
     , check
     , routeChange
     , simulate
     , within
+    , assertHttpRequest
     , update
     , expectViewHas, expectView
     , expectLastEffect, expectModel
@@ -28,6 +31,12 @@ module TestContext exposing
 @docs createWithNavigation, createWithNavigationAndFlags, createWithNavigationAndJsonStringFlags
 
 
+### Simulated effects
+
+@docs SimulatedEffect
+@docs createWithSimulatedEffects
+
+
 ## Simulating user input
 
 @docs clickButton, clickLink
@@ -40,6 +49,11 @@ module TestContext exposing
 
 @docs simulate
 @docs within
+
+
+## Simulating HTTP responses
+
+@docs assertHttpRequest
 
 
 ## Directly sending Msgs
@@ -76,6 +90,7 @@ These functions may be useful if you are writing your own custom assertion funct
 
 import Browser
 import Browser.Navigation
+import Dict exposing (Dict)
 import Expect exposing (Expectation)
 import Html exposing (Html)
 import Html.Attributes
@@ -105,6 +120,7 @@ type TestContext msg model effect
         , currentModel : model
         , lastEffect : effect
         , currentLocation : Maybe Url
+        , http : Dict ( String, String ) ()
         }
     | Finished Failure
 
@@ -126,6 +142,7 @@ type Failure
     | InvalidFlags String String
     | ProgramDoesNotSupportNavigation String
     | NoBaseUrl String String
+    | NoMatchingHttpRequest String { method : String, url : String }
     | CustomFailure String String
 
 
@@ -135,12 +152,24 @@ createHelper :
     , view : model -> Html msg
     , onRouteChange : Url -> Maybe msg
     , initialLocation : Maybe Url
+    , deconstructEffect : effect -> List SimulatedEffect
     }
     -> TestContext msg model effect
 createHelper program =
     let
         ( newModel, newEffect ) =
             program.init
+
+        simulatedEffects =
+            program.deconstructEffect newEffect
+
+        http =
+            List.foldl simulateEffect Dict.empty simulatedEffects
+
+        simulateEffect simulatedEffect httpState =
+            case simulatedEffect of
+                HttpRequest request ->
+                    Dict.insert ( request.method, request.url ) () httpState
     in
     Active
         { program =
@@ -151,6 +180,7 @@ createHelper program =
         , currentModel = newModel
         , lastEffect = newEffect
         , currentLocation = program.initialLocation
+        , http = http
         }
 
 
@@ -173,6 +203,7 @@ create program =
         , view = program.view
         , onRouteChange = \_ -> Nothing
         , initialLocation = Nothing
+        , deconstructEffect = \_ -> []
         }
 
 
@@ -199,6 +230,7 @@ createWithBaseUrl program baseUrl =
         , view = program.view
         , onRouteChange = \_ -> Nothing
         , initialLocation = Url.Extra.locationFromString baseUrl
+        , deconstructEffect = \_ -> []
         }
 
 
@@ -227,6 +259,7 @@ createWithFlags program flags =
         , view = program.view
         , onRouteChange = \_ -> Nothing
         , initialLocation = Nothing
+        , deconstructEffect = \_ -> []
         }
 
 
@@ -263,6 +296,7 @@ createWithJsonStringFlags flagsDecoder program flagsJson =
                 , view = program.view
                 , onRouteChange = \_ -> Nothing
                 , initialLocation = Nothing
+                , deconstructEffect = \_ -> []
                 }
 
 
@@ -293,6 +327,7 @@ createWithNavigation onRouteChange program initialUrl =
                 , view = program.view
                 , onRouteChange = onRouteChange >> Just
                 , initialLocation = Just location
+                , deconstructEffect = \_ -> []
                 }
 
 
@@ -328,6 +363,7 @@ createWithNavigationAndFlags onRouteChange program initialUrl flags =
                 , view = program.view
                 , onRouteChange = onRouteChange >> Just
                 , initialLocation = Just location
+                , deconstructEffect = \_ -> []
                 }
 
 
@@ -370,7 +406,44 @@ createWithNavigationAndJsonStringFlags flagsDecoder onRouteChange program initia
                         , view = program.view
                         , onRouteChange = onRouteChange >> Just
                         , initialLocation = Just location
+                        , deconstructEffect = \_ -> []
                         }
+
+
+{-| This represents an effect that elm-program-test is able to simulate.
+When using `createWithSimulatedEffects` you will provide a function that can translate
+your programs' effects into `SimulatedEffect`s.
+(If you do not use a `create*` function that lets your provide a
+`deconstructEffect : effect -> List SimulatedEffect` function,
+then `TestContext` will not simulate any HTTP effects for you.)
+-}
+type SimulatedEffect
+    = HttpRequest { method : String, url : String }
+
+
+{-| Creates a `TestContext` from the parts of a standard `Html.program`,
+and lets you provide a `deconstructEffect` function that lets `TestContext` simulate HTTP effects
+(this enables you to use `assertHttpRequest`).
+
+If you do not need to simulate HTTP requests, you can use [`create`](#create) instead.
+
+-}
+createWithSimulatedEffects :
+    { init : ( model, effect )
+    , update : msg -> model -> ( model, effect )
+    , view : model -> Html msg
+    , deconstructEffect : effect -> List SimulatedEffect
+    }
+    -> TestContext msg model effect
+createWithSimulatedEffects program =
+    createHelper
+        { init = program.init
+        , update = program.update
+        , view = program.view
+        , onRouteChange = \_ -> Nothing
+        , initialLocation = Nothing
+        , deconstructEffect = program.deconstructEffect
+        }
 
 
 {-| Advances the state of the `TestContext`'s program by using the `TestContext`'s program's update function
@@ -772,6 +845,27 @@ within findTarget onScopedTest testContext =
                 |> replaceView state.program.view
 
 
+{-| A final assertion that checks whether an HTTP request to the specific url and method has been made.
+
+NOTE: You must use `createWithSimulatedEffects` to create your initial `TestContext` to be able to use
+this function.
+
+-}
+assertHttpRequest : { method : String, url : String } -> TestContext msg model effect -> Expectation
+assertHttpRequest request testContext =
+    done <|
+        case testContext of
+            Finished err ->
+                Finished err
+
+            Active state ->
+                if Dict.member ( request.method, request.url ) state.http then
+                    testContext
+
+                else
+                    Finished (NoMatchingHttpRequest "assertHttpRequest" request)
+
+
 replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect
 replaceView newView testContext =
     case testContext of
@@ -960,6 +1054,18 @@ done testContext =
 
         Finished (NoBaseUrl functionName relativeUrl) ->
             Expect.fail (functionName ++ ": The TestContext does not have a base URL and cannot resolve the relative URL " ++ escapeString relativeUrl ++ ".  Use TestContext.createWithBaseUrl to create a TestContext that can resolve relative URLs.")
+
+        Finished (NoMatchingHttpRequest functionName request) ->
+            Expect.fail <|
+                String.concat
+                    [ functionName
+                    , ": "
+                    , "Expected HTTP request ("
+                    , request.method
+                    , " "
+                    , request.url
+                    , ") to have been made, but it was not"
+                    ]
 
         Finished (CustomFailure assertionName message) ->
             Expect.fail (assertionName ++ ": " ++ message)
