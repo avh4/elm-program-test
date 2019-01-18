@@ -100,7 +100,12 @@ and a log of any errors that have occurred while simulating interaction with the
 
 -}
 type TestContext msg model effect
-    = Active ( TestProgram msg model effect, ( model, effect ), Maybe Url )
+    = Active
+        { program : TestProgram msg model effect
+        , currentModel : model
+        , lastEffect : effect
+        , currentLocation : Maybe Url
+        }
     | Finished Failure
 
 
@@ -133,14 +138,20 @@ createHelper :
     }
     -> TestContext msg model effect
 createHelper program =
+    let
+        ( newModel, newEffect ) =
+            program.init
+    in
     Active
-        ( { update = program.update
-          , view = program.view >> Query.fromHtml
-          , onRouteChange = program.onRouteChange
-          }
-        , program.init
-        , program.initialLocation
-        )
+        { program =
+            { update = program.update
+            , view = program.view >> Query.fromHtml
+            , onRouteChange = program.onRouteChange
+            }
+        , currentModel = newModel
+        , lastEffect = newEffect
+        , currentLocation = program.initialLocation
+        }
 
 
 {-| Creates a `TestContext` from the parts of a standard `Html.program`.
@@ -378,12 +389,16 @@ update msg testContext =
         Finished err ->
             Finished err
 
-        Active ( program, ( model, _ ), currentLocation ) ->
+        Active state ->
+            let
+                ( newModel, newEffect ) =
+                    state.program.update msg state.currentModel
+            in
             Active
-                ( program
-                , program.update msg model
-                , currentLocation
-                )
+                { state
+                    | currentModel = newModel
+                    , lastEffect = newEffect
+                }
 
 
 simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
@@ -392,10 +407,10 @@ simulateHelper functionDescription findTarget event testContext =
         Finished err ->
             Finished err
 
-        Active ( program, ( model, _ ), _ ) ->
+        Active state ->
             let
                 targetQuery =
-                    program.view model
+                    state.program.view state.currentModel
                         |> findTarget
             in
             -- First check the target so we can give a better error message if it doesn't exist
@@ -566,10 +581,10 @@ clickLink linkText href testContext =
                 Finished err ->
                     Finished err
 
-                Active ( program, ( model, _ ), _ ) ->
+                Active state ->
                     let
                         link =
-                            program.view model
+                            state.program.view state.currentModel
                                 |> findLinkTag
                     in
                     if respondsTo normalClick link then
@@ -623,8 +638,8 @@ followLink functionDescription href testContext =
         Finished err ->
             Finished err
 
-        Active ( _, _, finalLocation ) ->
-            case finalLocation of
+        Active state ->
+            case state.currentLocation of
                 Just location ->
                     Finished (ChangedPage functionDescription (Url.Extra.resolve location href))
 
@@ -750,11 +765,11 @@ within findTarget onScopedTest testContext =
         Finished err ->
             Finished err
 
-        Active ( program, _, _ ) ->
+        Active state ->
             testContext
-                |> replaceView (program.view >> findTarget)
+                |> replaceView (state.program.view >> findTarget)
                 |> onScopedTest
-                |> replaceView program.view
+                |> replaceView state.program.view
 
 
 replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect
@@ -763,8 +778,15 @@ replaceView newView testContext =
         Finished err ->
             Finished err
 
-        Active ( program, state, location ) ->
-            Active ( { program | view = newView }, state, location )
+        Active state ->
+            let
+                program =
+                    state.program
+            in
+            Active
+                { state
+                    | program = { program | view = newView }
+                }
 
 
 {-| `url` may be an absolute URL or relative URL
@@ -775,19 +797,21 @@ routeChange url testContext =
         Finished err ->
             Finished err
 
-        Active ( program, _, Nothing ) ->
-            Finished (ProgramDoesNotSupportNavigation "routeChange")
-
-        Active ( program, _, Just currentLocation ) ->
-            case
-                Url.Extra.resolve currentLocation url
-                    |> program.onRouteChange
-            of
+        Active state ->
+            case state.currentLocation of
                 Nothing ->
-                    testContext
+                    Finished (ProgramDoesNotSupportNavigation "routeChange")
 
-                Just msg ->
-                    update msg testContext
+                Just currentLocation ->
+                    case
+                        Url.Extra.resolve currentLocation url
+                            |> state.program.onRouteChange
+                    of
+                        Nothing ->
+                            testContext
+
+                        Just msg ->
+                            update msg testContext
 
 
 {-| Make an assertion about the current state of a `TestContext`'s model.
@@ -799,8 +823,8 @@ expectModel assertion testContext =
             Finished err ->
                 Finished err
 
-            Active ( _, ( model, _ ), _ ) ->
-                case assertion model |> Test.Runner.getFailureReason of
+            Active state ->
+                case assertion state.currentModel |> Test.Runner.getFailureReason of
                     Nothing ->
                         testContext
 
@@ -814,8 +838,8 @@ expectLastEffectHelper functionName assertion testContext =
         Finished err ->
             Finished err
 
-        Active ( _, ( _, lastEffect ), _ ) ->
-            case assertion lastEffect |> Test.Runner.getFailureReason of
+        Active state ->
+            case assertion state.lastEffect |> Test.Runner.getFailureReason of
                 Nothing ->
                     testContext
 
@@ -845,10 +869,10 @@ expectViewHelper functionName assertion testContext =
         Finished err ->
             Finished err
 
-        Active ( program, ( model, _ ), _ ) ->
+        Active state ->
             case
-                model
-                    |> program.view
+                state.currentModel
+                    |> state.program.view
                     |> assertion
                     |> Test.Runner.getFailureReason
             of
