@@ -50,7 +50,12 @@ all =
             \() ->
                 start NoEffect
                     |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/" }
-                    |> expectFailure "assertHttpRequest: Expected HTTP request (GET https://example.com/) to have been made, but it was not"
+                    |> expectFailure
+                        (String.join "\n"
+                            [ "assertHttpRequest: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
+                            , "    No requests were made."
+                            ]
+                        )
         , test "can assert that an HTTP request was made from init (success)" <|
             \() ->
                 start (HttpGet "https://example.com/")
@@ -68,8 +73,18 @@ all =
                     |> TestContext.clickButton "Get"
                     |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/buttons/get" }
                     |> expectSuccess
+        , test "error message includes list of pending requests" <|
+            \() ->
+                start (HttpGet "https://example.com/actualRequest")
+                    |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/not-made" }
+                    |> expectFailure
+                        (String.join "\n"
+                            [ "assertHttpRequest: Expected HTTP request (GET https://example.com/not-made) to have been made, but it was not."
+                            , "    The following requests were made:"
+                            , "      - GET https://example.com/actualRequest"
+                            ]
+                        )
 
-        -- TODO: error message includes list of pending requests
         -- TODO: how to handle multiple requests made to the same method/URL?
         -- TODO: give specicif error message if `createWithSimulatedEffects` was not used
         ]

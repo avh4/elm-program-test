@@ -143,7 +143,7 @@ type Failure
     | InvalidFlags String String
     | ProgramDoesNotSupportNavigation String
     | NoBaseUrl String String
-    | NoMatchingHttpRequest String { method : String, url : String }
+    | NoMatchingHttpRequest String { method : String, url : String } (List ( String, String ))
     | CustomFailure String String
 
 
@@ -877,7 +877,7 @@ assertHttpRequest request testContext =
                     testContext
 
                 else
-                    Finished (NoMatchingHttpRequest "assertHttpRequest" request)
+                    Finished (NoMatchingHttpRequest "assertHttpRequest" request (Dict.keys state.http))
 
 
 replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect
@@ -1069,7 +1069,7 @@ done testContext =
         Finished (NoBaseUrl functionName relativeUrl) ->
             Expect.fail (functionName ++ ": The TestContext does not have a base URL and cannot resolve the relative URL " ++ escapeString relativeUrl ++ ".  Use TestContext.createWithBaseUrl to create a TestContext that can resolve relative URLs.")
 
-        Finished (NoMatchingHttpRequest functionName request) ->
+        Finished (NoMatchingHttpRequest functionName request pendingRequests) ->
             Expect.fail <|
                 String.concat
                     [ functionName
@@ -1078,7 +1078,17 @@ done testContext =
                     , request.method
                     , " "
                     , request.url
-                    , ") to have been made, but it was not"
+                    , ") to have been made, but it was not.\n"
+                    , case pendingRequests of
+                        [] ->
+                            "    No requests were made."
+
+                        _ ->
+                            String.concat
+                                [ "    The following requests were made:\n"
+                                , String.join "\n" <|
+                                    List.map (\( method, url ) -> "      - " ++ method ++ " " ++ url) pendingRequests
+                                ]
                     ]
 
         Finished (CustomFailure assertionName message) ->
