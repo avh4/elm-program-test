@@ -120,16 +120,26 @@ type TestContext msg model effect
         , currentModel : model
         , lastEffect : effect
         , currentLocation : Maybe Url
-        , http : Dict ( String, String ) ()
+        , effectSimulation : Maybe ( effect -> List SimulatedEffect, SimulationState )
         }
     | Finished Failure
+
+
+type alias SimulationState =
+    { http : Dict ( String, String ) ()
+    }
+
+
+emptySimulationState : SimulationState
+emptySimulationState =
+    { http = Dict.empty
+    }
 
 
 type alias TestProgram msg model effect =
     { update : msg -> model -> ( model, effect )
     , view : model -> Query.Single msg
     , onRouteChange : Url -> Maybe msg
-    , deconstructEffect : effect -> List SimulatedEffect
     }
 
 
@@ -144,6 +154,7 @@ type Failure
     | ProgramDoesNotSupportNavigation String
     | NoBaseUrl String String
     | NoMatchingHttpRequest String { method : String, url : String } (List ( String, String ))
+    | EffectSimulationNotConfigured String
     | CustomFailure String String
 
 
@@ -153,7 +164,7 @@ createHelper :
     , view : model -> Html msg
     , onRouteChange : Url -> Maybe msg
     , initialLocation : Maybe Url
-    , deconstructEffect : effect -> List SimulatedEffect
+    , deconstructEffect : Maybe (effect -> List SimulatedEffect)
     }
     -> TestContext msg model effect
 createHelper program =
@@ -162,36 +173,37 @@ createHelper program =
             { update = program.update
             , view = program.view >> Query.fromHtml
             , onRouteChange = program.onRouteChange
-            , deconstructEffect = program.deconstructEffect
             }
 
         ( newModel, newEffect ) =
             program.init
-
-        http =
-            processSimulatedEffects program_ newEffect Dict.empty
     in
     Active
         { program = program_
         , currentModel = newModel
         , lastEffect = newEffect
         , currentLocation = program.initialLocation
-        , http = http
+        , effectSimulation =
+            program.deconstructEffect
+                |> Maybe.map (\f -> ( f, emptySimulationState ))
+                |> Maybe.map (applySimulatedEffects newEffect)
         }
 
 
-processSimulatedEffects : TestProgram msg model effect -> effect -> Dict ( String, String ) () -> Dict ( String, String ) ()
-processSimulatedEffects program effect http =
-    let
-        simulatedEffects =
-            program.deconstructEffect effect
+applySimulatedEffects : effect -> ( effect -> List SimulatedEffect, SimulationState ) -> ( effect -> List SimulatedEffect, SimulationState )
+applySimulatedEffects effect ( deconstructEffect, simulationState ) =
+    ( deconstructEffect
+    , List.foldl simulateEffect simulationState (deconstructEffect effect)
+    )
 
-        simulateEffect simulatedEffect httpState =
-            case simulatedEffect of
-                HttpRequest request ->
-                    Dict.insert ( request.method, request.url ) () httpState
-    in
-    List.foldl simulateEffect http simulatedEffects
+
+simulateEffect : SimulatedEffect -> SimulationState -> SimulationState
+simulateEffect simulatedEffect simulationState =
+    case simulatedEffect of
+        HttpRequest request ->
+            { simulationState
+                | http = Dict.insert ( request.method, request.url ) () simulationState.http
+            }
 
 
 {-| Creates a `TestContext` from the parts of a standard `Html.program`.
@@ -213,7 +225,7 @@ create program =
         , view = program.view
         , onRouteChange = \_ -> Nothing
         , initialLocation = Nothing
-        , deconstructEffect = \_ -> []
+        , deconstructEffect = Nothing
         }
 
 
@@ -240,7 +252,7 @@ createWithBaseUrl program baseUrl =
         , view = program.view
         , onRouteChange = \_ -> Nothing
         , initialLocation = Url.Extra.locationFromString baseUrl
-        , deconstructEffect = \_ -> []
+        , deconstructEffect = Nothing
         }
 
 
@@ -269,7 +281,7 @@ createWithFlags program flags =
         , view = program.view
         , onRouteChange = \_ -> Nothing
         , initialLocation = Nothing
-        , deconstructEffect = \_ -> []
+        , deconstructEffect = Nothing
         }
 
 
@@ -306,7 +318,7 @@ createWithJsonStringFlags flagsDecoder program flagsJson =
                 , view = program.view
                 , onRouteChange = \_ -> Nothing
                 , initialLocation = Nothing
-                , deconstructEffect = \_ -> []
+                , deconstructEffect = Nothing
                 }
 
 
@@ -337,7 +349,7 @@ createWithNavigation onRouteChange program initialUrl =
                 , view = program.view
                 , onRouteChange = onRouteChange >> Just
                 , initialLocation = Just location
-                , deconstructEffect = \_ -> []
+                , deconstructEffect = Nothing
                 }
 
 
@@ -373,7 +385,7 @@ createWithNavigationAndFlags onRouteChange program initialUrl flags =
                 , view = program.view
                 , onRouteChange = onRouteChange >> Just
                 , initialLocation = Just location
-                , deconstructEffect = \_ -> []
+                , deconstructEffect = Nothing
                 }
 
 
@@ -416,7 +428,7 @@ createWithNavigationAndJsonStringFlags flagsDecoder onRouteChange program initia
                         , view = program.view
                         , onRouteChange = onRouteChange >> Just
                         , initialLocation = Just location
-                        , deconstructEffect = \_ -> []
+                        , deconstructEffect = Nothing
                         }
 
 
@@ -452,7 +464,7 @@ createWithSimulatedEffects program =
         , view = program.view
         , onRouteChange = \_ -> Nothing
         , initialLocation = Nothing
-        , deconstructEffect = program.deconstructEffect
+        , deconstructEffect = Just program.deconstructEffect
         }
 
 
@@ -476,15 +488,12 @@ update msg testContext =
             let
                 ( newModel, newEffect ) =
                     state.program.update msg state.currentModel
-
-                newHttp =
-                    processSimulatedEffects state.program newEffect state.http
             in
             Active
                 { state
                     | currentModel = newModel
                     , lastEffect = newEffect
-                    , http = newHttp
+                    , effectSimulation = Maybe.map (applySimulatedEffects newEffect) state.effectSimulation
                 }
 
 
@@ -873,11 +882,16 @@ assertHttpRequest request testContext =
                 Finished err
 
             Active state ->
-                if Dict.member ( request.method, request.url ) state.http then
-                    testContext
+                case state.effectSimulation of
+                    Nothing ->
+                        Finished (EffectSimulationNotConfigured "assertHttpRequest")
 
-                else
-                    Finished (NoMatchingHttpRequest "assertHttpRequest" request (Dict.keys state.http))
+                    Just ( _, simulationState ) ->
+                        if Dict.member ( request.method, request.url ) simulationState.http then
+                            testContext
+
+                        else
+                            Finished (NoMatchingHttpRequest "assertHttpRequest" request (Dict.keys simulationState.http))
 
 
 replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect
@@ -1090,6 +1104,9 @@ done testContext =
                                     List.map (\( method, url ) -> "      - " ++ method ++ " " ++ url) pendingRequests
                                 ]
                     ]
+
+        Finished (EffectSimulationNotConfigured functionName) ->
+            Expect.fail ("TEST SETUP ERROR: In order to use " ++ functionName ++ ", you MUST create your TestContext with TestContext.createWithSimulatedEvents")
 
         Finished (CustomFailure assertionName message) ->
             Expect.fail (assertionName ++ ": " ++ message)

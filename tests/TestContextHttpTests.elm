@@ -84,9 +84,17 @@ all =
                             , "      - GET https://example.com/actualRequest"
                             ]
                         )
+        , test "gives explanatory error when using assertHttpRequest without using createWithSimulatedEffects" <|
+            \() ->
+                TestContext.create
+                    { init = ( (), () )
+                    , update = \() () -> ( (), () )
+                    , view = \() -> Html.text "[view]"
+                    }
+                    |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/" }
+                    |> expectFailure "TEST SETUP ERROR: In order to use assertHttpRequest, you MUST create your TestContext with TestContext.createWithSimulatedEvents"
 
         -- TODO: how to handle multiple requests made to the same method/URL?
-        -- TODO: give specicif error message if `createWithSimulatedEffects` was not used
         ]
 
 
