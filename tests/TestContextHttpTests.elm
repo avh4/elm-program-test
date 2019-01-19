@@ -22,11 +22,15 @@ deconstructEffect testEffect =
             [ TestContext.HttpRequest { method = "GET", url = url } ]
 
 
-start : TestEffect -> TestContext () () TestEffect
+type alias TestMsg =
+    TestEffect
+
+
+start : TestEffect -> TestContext TestMsg () TestEffect
 start initialEffect =
     TestContext.createWithSimulatedEffects
         { init = ( (), initialEffect )
-        , update = \() () -> ( (), NoEffect )
+        , update = \msg () -> ( (), msg )
         , view = \() -> Html.text "[view]"
         , deconstructEffect = deconstructEffect
         }
@@ -35,18 +39,24 @@ start initialEffect =
 all : Test
 all =
     describe "TestContext (HTTP API)"
-        [ test "can assert that an HTTP request was made (failure)" <|
+        [ test "can assert that an HTTP request was made from init (failure)" <|
             \() ->
                 start NoEffect
                     |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/" }
                     |> expectFailure "assertHttpRequest: Expected HTTP request (GET https://example.com/) to have been made, but it was not"
-        , test "can assert that an HTTP request was made (success)" <|
+        , test "can assert that an HTTP request was made from init (success)" <|
             \() ->
                 start (HttpGet "https://example.com/")
                     |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/" }
                     |> expectSuccess
+        , test "can assert that an HTTP request was made from update" <|
+            \() ->
+                start NoEffect
+                    |> TestContext.update (HttpGet "https://example.com/from-update")
+                    |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/from-update" }
+                    |> expectSuccess
 
-        -- TODO: effects produced by update are processed
+        -- TODO: verify that simulating user input triggers the update code path
         -- TODO: error message includes list of pending requests
         -- TODO: how to handle multiple requests made to the same method/URL?
         -- TODO: give specicif error message if `createWithSimulatedEffects` was not used

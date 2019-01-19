@@ -129,6 +129,7 @@ type alias TestProgram msg model effect =
     { update : msg -> model -> ( model, effect )
     , view : model -> Query.Single msg
     , onRouteChange : Url -> Maybe msg
+    , deconstructEffect : effect -> List SimulatedEffect
     }
 
 
@@ -157,31 +158,40 @@ createHelper :
     -> TestContext msg model effect
 createHelper program =
     let
+        program_ =
+            { update = program.update
+            , view = program.view >> Query.fromHtml
+            , onRouteChange = program.onRouteChange
+            , deconstructEffect = program.deconstructEffect
+            }
+
         ( newModel, newEffect ) =
             program.init
 
-        simulatedEffects =
-            program.deconstructEffect newEffect
-
         http =
-            List.foldl simulateEffect Dict.empty simulatedEffects
+            processSimulatedEffects program_ newEffect Dict.empty
+    in
+    Active
+        { program = program_
+        , currentModel = newModel
+        , lastEffect = newEffect
+        , currentLocation = program.initialLocation
+        , http = http
+        }
+
+
+processSimulatedEffects : TestProgram msg model effect -> effect -> Dict ( String, String ) () -> Dict ( String, String ) ()
+processSimulatedEffects program effect http =
+    let
+        simulatedEffects =
+            program.deconstructEffect effect
 
         simulateEffect simulatedEffect httpState =
             case simulatedEffect of
                 HttpRequest request ->
                     Dict.insert ( request.method, request.url ) () httpState
     in
-    Active
-        { program =
-            { update = program.update
-            , view = program.view >> Query.fromHtml
-            , onRouteChange = program.onRouteChange
-            }
-        , currentModel = newModel
-        , lastEffect = newEffect
-        , currentLocation = program.initialLocation
-        , http = http
-        }
+    List.foldl simulateEffect http simulatedEffects
 
 
 {-| Creates a `TestContext` from the parts of a standard `Html.program`.
@@ -466,11 +476,15 @@ update msg testContext =
             let
                 ( newModel, newEffect ) =
                     state.program.update msg state.currentModel
+
+                newHttp =
+                    processSimulatedEffects state.program newEffect state.http
             in
             Active
                 { state
                     | currentModel = newModel
                     , lastEffect = newEffect
+                    , http = newHttp
                 }
 
 
