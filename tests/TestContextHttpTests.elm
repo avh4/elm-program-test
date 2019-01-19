@@ -2,6 +2,7 @@ module TestContextHttpTests exposing (all)
 
 import Expect exposing (Expectation)
 import Html
+import Html.Events exposing (onClick)
 import Test exposing (..)
 import Test.Runner
 import TestContext exposing (TestContext)
@@ -31,7 +32,13 @@ start initialEffect =
     TestContext.createWithSimulatedEffects
         { init = ( (), initialEffect )
         , update = \msg () -> ( (), msg )
-        , view = \() -> Html.text "[view]"
+        , view =
+            \() ->
+                Html.div []
+                    [ Html.button
+                        [ onClick (HttpGet "https://example.com/buttons/get") ]
+                        [ Html.text "Get" ]
+                    ]
         , deconstructEffect = deconstructEffect
         }
 
@@ -55,8 +62,13 @@ all =
                     |> TestContext.update (HttpGet "https://example.com/from-update")
                     |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/from-update" }
                     |> expectSuccess
+        , test "can assert that an HTTP request was made via a user interaction" <|
+            \() ->
+                start NoEffect
+                    |> TestContext.clickButton "Get"
+                    |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/buttons/get" }
+                    |> expectSuccess
 
-        -- TODO: verify that simulating user input triggers the update code path
         -- TODO: error message includes list of pending requests
         -- TODO: how to handle multiple requests made to the same method/URL?
         -- TODO: give specicif error message if `createWithSimulatedEffects` was not used
