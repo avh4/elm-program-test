@@ -11,6 +11,7 @@ module TestContext exposing
     , simulate
     , within
     , assertHttpRequest
+    , simulateHttpResponse
     , update
     , expectViewHas, expectView
     , expectLastEffect, expectModel
@@ -54,6 +55,7 @@ module TestContext exposing
 ## Simulating HTTP responses
 
 @docs assertHttpRequest
+@docs simulateHttpResponse
 
 
 ## Directly sending Msgs
@@ -94,6 +96,7 @@ import Dict exposing (Dict)
 import Expect exposing (Expectation)
 import Html exposing (Html)
 import Html.Attributes
+import Http
 import Json.Decode
 import Json.Encode
 import Query.Extra
@@ -120,17 +123,17 @@ type TestContext msg model effect
         , currentModel : model
         , lastEffect : effect
         , currentLocation : Maybe Url
-        , effectSimulation : Maybe ( effect -> List SimulatedEffect, SimulationState )
+        , effectSimulation : Maybe ( effect -> List (SimulatedEffect msg), SimulationState msg )
         }
     | Finished Failure
 
 
-type alias SimulationState =
-    { http : Dict ( String, String ) ()
+type alias SimulationState msg =
+    { http : Dict ( String, String ) (Result Http.Error (List String) -> msg)
     }
 
 
-emptySimulationState : SimulationState
+emptySimulationState : SimulationState msg
 emptySimulationState =
     { http = Dict.empty
     }
@@ -164,7 +167,7 @@ createHelper :
     , view : model -> Html msg
     , onRouteChange : Url -> Maybe msg
     , initialLocation : Maybe Url
-    , deconstructEffect : Maybe (effect -> List SimulatedEffect)
+    , deconstructEffect : Maybe (effect -> List (SimulatedEffect msg))
     }
     -> TestContext msg model effect
 createHelper program =
@@ -190,19 +193,19 @@ createHelper program =
         }
 
 
-applySimulatedEffects : effect -> ( effect -> List SimulatedEffect, SimulationState ) -> ( effect -> List SimulatedEffect, SimulationState )
+applySimulatedEffects : effect -> ( effect -> List (SimulatedEffect msg), SimulationState msg ) -> ( effect -> List (SimulatedEffect msg), SimulationState msg )
 applySimulatedEffects effect ( deconstructEffect, simulationState ) =
     ( deconstructEffect
     , List.foldl simulateEffect simulationState (deconstructEffect effect)
     )
 
 
-simulateEffect : SimulatedEffect -> SimulationState -> SimulationState
+simulateEffect : SimulatedEffect msg -> SimulationState msg -> SimulationState msg
 simulateEffect simulatedEffect simulationState =
     case simulatedEffect of
         HttpRequest request ->
             { simulationState
-                | http = Dict.insert ( request.method, request.url ) () simulationState.http
+                | http = Dict.insert ( request.method, request.url ) request.onRequestComplete simulationState.http
             }
 
 
@@ -439,8 +442,14 @@ your programs' effects into `SimulatedEffect`s.
 `deconstructEffect : effect -> List SimulatedEffect` function,
 then `TestContext` will not simulate any HTTP effects for you.)
 -}
-type SimulatedEffect
-    = HttpRequest { method : String, url : String }
+type SimulatedEffect msg
+    = HttpRequest
+        { method : String
+        , url : String
+
+        -- TODO: generalize the `List String`
+        , onRequestComplete : Result Http.Error (List String) -> msg
+        }
 
 
 {-| Creates a `TestContext` from the parts of a standard `Html.program`,
@@ -454,7 +463,7 @@ createWithSimulatedEffects :
     { init : ( model, effect )
     , update : msg -> model -> ( model, effect )
     , view : model -> Html msg
-    , deconstructEffect : effect -> List SimulatedEffect
+    , deconstructEffect : effect -> List (SimulatedEffect msg)
     }
     -> TestContext msg model effect
 createWithSimulatedEffects program =
@@ -892,6 +901,28 @@ assertHttpRequest request testContext =
 
                         else
                             Finished (NoMatchingHttpRequest "assertHttpRequest" request (Dict.keys simulationState.http))
+
+
+{-| TODO
+-}
+simulateHttpResponse : { method : String, url : String } -> { statusCode : Int, body : List String } -> TestContext msg model effect -> TestContext msg model effect
+simulateHttpResponse request response testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    Finished (EffectSimulationNotConfigured "assertHttpRequest")
+
+                Just ( _, simulationState ) ->
+                    case Dict.get ( request.method, request.url ) simulationState.http of
+                        Nothing ->
+                            Finished (NoMatchingHttpRequest "assertHttpRequest" request (Dict.keys simulationState.http))
+
+                        Just msg ->
+                            update (msg (Ok response.body)) testContext
 
 
 replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect

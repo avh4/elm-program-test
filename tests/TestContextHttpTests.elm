@@ -3,6 +3,7 @@ module TestContextHttpTests exposing (all)
 import Expect exposing (Expectation)
 import Html
 import Html.Events exposing (onClick)
+import Http
 import Test exposing (..)
 import Test.Runner
 import TestContext exposing (TestContext)
@@ -13,31 +14,39 @@ type TestEffect
     | HttpGet String
 
 
-deconstructEffect : TestEffect -> List TestContext.SimulatedEffect
+deconstructEffect : TestEffect -> List (TestContext.SimulatedEffect TestMsg)
 deconstructEffect testEffect =
     case testEffect of
         NoEffect ->
             []
 
         HttpGet url ->
-            [ TestContext.HttpRequest { method = "GET", url = url } ]
+            [ TestContext.HttpRequest { method = "GET", url = url, onRequestComplete = HandleFriendsResponse } ]
 
 
 type TestMsg
     = PassThroughEffect TestEffect
+    | HandleFriendsResponse (Result Http.Error (List String))
 
 
-start : TestEffect -> TestContext TestMsg () TestEffect
+type alias TestModel =
+    String
+
+
+start : TestEffect -> TestContext TestMsg TestModel TestEffect
 start initialEffect =
     TestContext.createWithSimulatedEffects
-        { init = ( (), initialEffect )
+        { init = ( "Init", initialEffect )
         , update =
-            \msg () ->
+            \msg model ->
                 case msg of
                     PassThroughEffect effect ->
-                        ( (), effect )
+                        ( model, effect )
+
+                    HandleFriendsResponse result ->
+                        ( Debug.toString result, NoEffect )
         , view =
-            \() ->
+            \model ->
                 Html.div []
                     [ Html.button
                         [ onClick (PassThroughEffect (HttpGet "https://example.com/buttons/get")) ]
@@ -100,6 +109,13 @@ all =
                         |> expectFailure "TEST SETUP ERROR: In order to use assertHttpRequest, you MUST create your TestContext with TestContext.createWithSimulatedEvents"
 
             -- TODO: how to handle multiple requests made to the same method/URL?
+            ]
+        , describe "simulateHttpResponse"
+            [ test "simulate OK response with valid JSON" <|
+                \() ->
+                    start (HttpGet "https://example.com/friends")
+                        |> TestContext.simulateHttpResponse { method = "GET", url = "https://example.com/friends" } { statusCode = 200, body = [ "Alex", "Kelsey", "Sam" ] }
+                        |> TestContext.expectModel (Expect.equal """Ok ["Alex","Kelsey","Sam"]""")
             ]
         ]
 
