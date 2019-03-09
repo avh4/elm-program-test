@@ -226,6 +226,21 @@ all =
                     |> TestContext.clickButton "Click Me"
                     |> TestContext.shouldHaveLastEffect (Expect.equal (LogUpdate "CLICK"))
                     |> TestContext.done
+        , test "can simulate a response to the last effect" <|
+            \() ->
+                testContext
+                    |> TestContext.clickButton "Click Me"
+                    |> TestContext.simulateLastEffect (\effect -> Ok [ Debug.toString effect ])
+                    |> TestContext.expectModel (Expect.equal "<INIT>;CLICK;LogUpdate \"CLICK\"")
+        , test "can force a failure via simulateLastEffect" <|
+            \() ->
+                testContext
+                    |> TestContext.clickButton "Click Me"
+                    |> TestContext.simulateLastEffect (\effect -> Err "Unexpected effect")
+                    |> TestContext.done
+                    |> Test.Runner.getFailureReason
+                    |> Maybe.map .description
+                    |> Expect.equal (Just "simulateLastEffect failed: Unexpected effect")
         , test "can be forced into failure" <|
             \() ->
                 testContext

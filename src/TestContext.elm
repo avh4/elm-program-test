@@ -12,6 +12,7 @@ module TestContext exposing
     , within
     , assertHttpRequest
     , update
+    , simulateLastEffect
     , expectViewHas, expectView
     , expectLastEffect, expectModel
     , expectPageChange
@@ -59,6 +60,7 @@ module TestContext exposing
 ## Directly sending Msgs
 
 @docs update
+@docs simulateLastEffect
 
 
 ## Final assertions
@@ -149,6 +151,7 @@ type Failure
     | ExpectFailed String String Test.Runner.Failure.Reason
     | SimulateFailed String String
     | SimulateFailedToFindTarget String String
+    | SimulateLastEffectFailed String
     | InvalidLocationUrl String String
     | InvalidFlags String String
     | ProgramDoesNotSupportNavigation String
@@ -476,6 +479,9 @@ This can be used to simulate events that can only be triggered by [commands (`Cm
 
 NOTE: When possible, you should prefer [Simulating user input](#simulating-user-input),
 as doing so will make your tests more robust to changes in your program's implementation details.
+
+NOTE: If you cannot replace a call to `TestContext.upate` with simulating user input,
+when possible you should prefer to use [`simulateLastEffect`](#simulateLastEffect).
 
 -}
 update : msg -> TestContext msg model effect -> TestContext msg model effect
@@ -954,6 +960,31 @@ expectModel assertion testContext =
                         Finished (ExpectFailed "expectModel" reason.description reason.reason)
 
 
+{-| Simulate the outcome of the last effect produced by the program being tested
+by providing a function that can convert the last effect into msgs.
+
+The function you provide will be called with the effect that was returned by the most recent call to `update` or `init` in the TestContext.
+
+If the function returns `Err`, then that will cause the `TestContext` to enter a failure state with the provided message.
+
+If the fuction returns `Ok`, then the list of msgs will be applied in order via `TestContext.update`.
+
+-}
+simulateLastEffect : (effect -> Result String (List msg)) -> TestContext msg model effect -> TestContext msg model effect
+simulateLastEffect toMsgs testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case toMsgs state.lastEffect of
+                Ok msgs ->
+                    List.foldl update testContext msgs
+
+                Err message ->
+                    Finished (SimulateLastEffectFailed message)
+
+
 expectLastEffectHelper : String -> (effect -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
 expectLastEffectHelper functionName assertion testContext =
     case testContext of
@@ -1070,6 +1101,9 @@ done testContext =
 
         Finished (SimulateFailedToFindTarget functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
+
+        Finished (SimulateLastEffectFailed message) ->
+            Expect.fail ("simulateLastEffect failed: " ++ message)
 
         Finished (InvalidLocationUrl functionName invalidUrl) ->
             Expect.fail (functionName ++ ": " ++ "Not a valid absolute URL:\n" ++ escapeString invalidUrl)
