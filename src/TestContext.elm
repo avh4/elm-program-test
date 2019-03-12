@@ -6,7 +6,7 @@ module TestContext exposing
     , createWithSimulatedEffects
     , clickButton, clickLink
     , fillIn, fillInTextarea
-    , check
+    , check, selectOption
     , routeChange
     , simulate
     , within
@@ -42,7 +42,7 @@ module TestContext exposing
 
 @docs clickButton, clickLink
 @docs fillIn, fillInTextarea
-@docs check
+@docs check, selectOption
 @docs routeChange
 
 
@@ -831,6 +831,58 @@ check fieldId label willBecomeChecked testContext =
         [ Selector.attribute (Html.Attributes.type_ "checkbox") ]
         (Test.Html.Event.check willBecomeChecked)
         testContext
+
+
+{-| great docs
+-}
+selectOption : String -> String -> String -> String -> TestContext msg model effect -> TestContext msg model effect
+selectOption fieldId label optionValue optionText testContext =
+    let
+        functionDescription =
+            String.join " "
+                [ "selectOption"
+                , escapeString fieldId
+                , escapeString label
+                , escapeString optionValue
+                , escapeString optionText
+                ]
+    in
+    testContext
+        |> expectViewHelper functionDescription
+            (Query.find
+                [ Selector.tag "label"
+                , Selector.attribute (Html.Attributes.for fieldId)
+                , Selector.text label
+                ]
+                >> Query.has []
+            )
+        |> expectViewHelper functionDescription
+            (Query.find
+                [ Selector.tag "select"
+                , Selector.id fieldId
+                , Selector.containing
+                    [ Selector.tag "option"
+                    , Selector.attribute (Html.Attributes.value optionValue)
+                    , Selector.text optionText
+                    ]
+                ]
+                >> Query.has []
+            )
+        |> simulateHelper functionDescription
+            (Query.find
+                [ Selector.tag "select"
+                , Selector.id fieldId
+                ]
+            )
+            ( "change"
+            , Json.Encode.object
+                [ ( "target"
+                  , Json.Encode.object
+                        [ ( "value", Json.Encode.string optionValue )
+                        ]
+                  )
+                ]
+            )
 
 
 {-| Focus on a part of the view for a particular operation.
