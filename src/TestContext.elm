@@ -833,7 +833,35 @@ check fieldId label willBecomeChecked testContext =
         testContext
 
 
-{-| great docs
+{-| Simulates choosing an option with the given text in a select with a given label
+
+Example: If you have a view like the following,
+
+    import Html
+    import Html.Attributes exposing (for, id, value)
+    import Html.Events exposing (on)
+
+    Html.div []
+        [ Html.label [ for "pet-select" ] [ Html.text "Choose a pet" ]
+        , Html.select [ id "on "change" targetValue ]
+             [ Html.option [ value "dog" ] [ Html.text "Dog" ]
+             , Html.option [ value "hamster" ] [ Html.text "Hamster" ]
+             ]
+        ]
+
+you can simulate selecting an option like this:
+
+    TestContext.selectOption "pet-select" "Choose a pet" "dog" "Dog"
+
+NOTE: Currently, this function requires that you also provide the field id
+(which must match both the `id` attribute of the target `select` element,
+and the `for` attribute of the `label` element) and the value of the option that you are
+selecting. After [eeue56/elm-html-test#51](https://github.com/eeue56/elm-html-test/issues/51) is resolved,
+a future release of this package will remove the `fieldId` and `optionValue` parameters.
+
+If you need more control over the finding the target element or creating the simulated event,
+see [`simulate`](#simulate).
+
 -}
 selectOption : String -> String -> String -> String -> TestContext msg model effect -> TestContext msg model effect
 selectOption fieldId label optionValue optionText testContext =
