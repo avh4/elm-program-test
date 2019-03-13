@@ -1,3 +1,17 @@
+## 2.2.0
+
+New features:
+
+  - functions to simulate select/option input: `selectOption`
+
+
+## 2.1.0
+
+New features:
+
+  - added `simulateLastEffect`
+
+
 ## 2.0.0
 
 Updated to support Elm 0.19.

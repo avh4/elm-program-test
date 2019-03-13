@@ -6,13 +6,14 @@ module TestContext exposing
     , createWithSimulatedEffects
     , clickButton, clickLink
     , fillIn, fillInTextarea
-    , check
+    , check, selectOption
     , routeChange
     , simulate
     , within
     , assertHttpRequest
     , simulateHttpResponse
     , update
+    , simulateLastEffect
     , expectViewHas, expectView
     , expectLastEffect, expectModel
     , expectPageChange
@@ -42,7 +43,7 @@ module TestContext exposing
 
 @docs clickButton, clickLink
 @docs fillIn, fillInTextarea
-@docs check
+@docs check, selectOption
 @docs routeChange
 
 
@@ -61,6 +62,7 @@ module TestContext exposing
 ## Directly sending Msgs
 
 @docs update
+@docs simulateLastEffect
 
 
 ## Final assertions
@@ -152,6 +154,7 @@ type Failure
     | ExpectFailed String String Test.Runner.Failure.Reason
     | SimulateFailed String String
     | SimulateFailedToFindTarget String String
+    | SimulateLastEffectFailed String
     | InvalidLocationUrl String String
     | InvalidFlags String String
     | ProgramDoesNotSupportNavigation String
@@ -485,6 +488,9 @@ This can be used to simulate events that can only be triggered by [commands (`Cm
 
 NOTE: When possible, you should prefer [Simulating user input](#simulating-user-input),
 as doing so will make your tests more robust to changes in your program's implementation details.
+
+NOTE: If you cannot replace a call to `TestContext.upate` with simulating user input,
+when possible you should prefer to use [`simulateLastEffect`](#simulateLastEffect).
 
 -}
 update : msg -> TestContext msg model effect -> TestContext msg model effect
@@ -836,6 +842,86 @@ check fieldId label willBecomeChecked testContext =
         testContext
 
 
+{-| Simulates choosing an option with the given text in a select with a given label
+
+Example: If you have a view like the following,
+
+    import Html
+    import Html.Attributes exposing (for, id, value)
+    import Html.Events exposing (on)
+
+    Html.div []
+        [ Html.label [ for "pet-select" ] [ Html.text "Choose a pet" ]
+        , Html.select [ id "on "change" targetValue ]
+             [ Html.option [ value "dog" ] [ Html.text "Dog" ]
+             , Html.option [ value "hamster" ] [ Html.text "Hamster" ]
+             ]
+        ]
+
+you can simulate selecting an option like this:
+
+    TestContext.selectOption "pet-select" "Choose a pet" "dog" "Dog"
+
+NOTE: Currently, this function requires that you also provide the field id
+(which must match both the `id` attribute of the target `select` element,
+and the `for` attribute of the `label` element) and the value of the option that you are
+selecting. After [eeue56/elm-html-test#51](https://github.com/eeue56/elm-html-test/issues/51) is resolved,
+a future release of this package will remove the `fieldId` and `optionValue` parameters.
+
+If you need more control over the finding the target element or creating the simulated event,
+see [`simulate`](#simulate).
+
+-}
+selectOption : String -> String -> String -> String -> TestContext msg model effect -> TestContext msg model effect
+selectOption fieldId label optionValue optionText testContext =
+    let
+        functionDescription =
+            String.join " "
+                [ "selectOption"
+                , escapeString fieldId
+                , escapeString label
+                , escapeString optionValue
+                , escapeString optionText
+                ]
+    in
+    testContext
+        |> expectViewHelper functionDescription
+            (Query.find
+                [ Selector.tag "label"
+                , Selector.attribute (Html.Attributes.for fieldId)
+                , Selector.text label
+                ]
+                >> Query.has []
+            )
+        |> expectViewHelper functionDescription
+            (Query.find
+                [ Selector.tag "select"
+                , Selector.id fieldId
+                , Selector.containing
+                    [ Selector.tag "option"
+                    , Selector.attribute (Html.Attributes.value optionValue)
+                    , Selector.text optionText
+                    ]
+                ]
+                >> Query.has []
+            )
+        |> simulateHelper functionDescription
+            (Query.find
+                [ Selector.tag "select"
+                , Selector.id fieldId
+                ]
+            )
+            ( "change"
+            , Json.Encode.object
+                [ ( "target"
+                  , Json.Encode.object
+                        [ ( "value", Json.Encode.string optionValue )
+                        ]
+                  )
+                ]
+            )
+
+
 {-| Focus on a part of the view for a particular operation.
 
 For example, if your view produces the following HTML:
@@ -985,6 +1071,31 @@ expectModel assertion testContext =
                         Finished (ExpectFailed "expectModel" reason.description reason.reason)
 
 
+{-| Simulate the outcome of the last effect produced by the program being tested
+by providing a function that can convert the last effect into msgs.
+
+The function you provide will be called with the effect that was returned by the most recent call to `update` or `init` in the TestContext.
+
+If the function returns `Err`, then that will cause the `TestContext` to enter a failure state with the provided message.
+
+If the fuction returns `Ok`, then the list of msgs will be applied in order via `TestContext.update`.
+
+-}
+simulateLastEffect : (effect -> Result String (List msg)) -> TestContext msg model effect -> TestContext msg model effect
+simulateLastEffect toMsgs testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case toMsgs state.lastEffect of
+                Ok msgs ->
+                    List.foldl update testContext msgs
+
+                Err message ->
+                    Finished (SimulateLastEffectFailed message)
+
+
 expectLastEffectHelper : String -> (effect -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
 expectLastEffectHelper functionName assertion testContext =
     case testContext of
@@ -1101,6 +1212,9 @@ done testContext =
 
         Finished (SimulateFailedToFindTarget functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
+
+        Finished (SimulateLastEffectFailed message) ->
+            Expect.fail ("simulateLastEffect failed: " ++ message)
 
         Finished (InvalidLocationUrl functionName invalidUrl) ->
             Expect.fail (functionName ++ ": " ++ "Not a valid absolute URL:\n" ++ escapeString invalidUrl)
