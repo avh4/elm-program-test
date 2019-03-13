@@ -1,8 +1,8 @@
-## master
+## 2.2.0
 
 New features:
 
-  - added `selectOption`
+  - functions to simulate select/option input: `selectOption`
 
 
 ## 2.1.0
