@@ -131,7 +131,7 @@ type TestContext msg model effect
 
 
 type alias SimulationState msg =
-    { http : Dict ( String, String ) (Result Http.Error String -> msg)
+    { http : Dict ( String, String ) (Http.Response String -> msg)
     }
 
 
@@ -452,7 +452,7 @@ type SimulatedEffect msg
     = HttpRequest
         { method : String
         , url : String
-        , onRequestComplete : Result Http.Error String -> msg
+        , onRequestComplete : Http.Response String -> msg
         }
 
 
@@ -1009,7 +1009,29 @@ simulateHttpResponse request response testContext =
                             Finished (NoMatchingHttpRequest "assertHttpRequest" request (Dict.keys simulationState.http))
 
                         Just msg ->
-                            update (msg (Ok response.body)) testContext
+                            let
+                                responseValue =
+                                    if response.statusCode >= 200 && response.statusCode < 300 then
+                                        Http.GoodStatus_
+                                            { url = request.url
+                                            , statusCode = response.statusCode
+                                            , statusText = ""
+                                            , headers = Dict.empty
+                                            }
+                                            response.body
+
+                                    else
+                                        Http.BadStatus_
+                                            { url = request.url
+                                            , statusCode = response.statusCode
+                                            , statusText = ""
+                                            , headers = Dict.empty
+                                            }
+                                            response.body
+                            in
+                            update
+                                (msg responseValue)
+                                testContext
 
 
 replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect

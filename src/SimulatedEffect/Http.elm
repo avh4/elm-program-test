@@ -47,14 +47,30 @@ get { url, expect } =
 {-| Logic for interpreting a response body.
 -}
 type Expect msg
-    = Expect (Result Http.Error String -> msg)
+    = Expect (Http.Response String -> msg)
 
 
 {-| Expect the response body to be a `String`.
 -}
 expectString : (Result Http.Error String -> msg) -> Expect msg
 expectString onResult =
-    Expect onResult
+    Expect <|
+        \response ->
+            case response of
+                Http.BadUrl_ s ->
+                    onResult (Err <| Http.BadUrl s)
+
+                Http.Timeout_ ->
+                    onResult (Err Http.Timeout)
+
+                Http.NetworkError_ ->
+                    onResult (Err Http.NetworkError)
+
+                Http.BadStatus_ metadata body ->
+                    onResult (Err <| Http.BadStatus metadata.statusCode)
+
+                Http.GoodStatus_ _ body ->
+                    onResult (Ok body)
 
 
 {-| Expect the response body to be JSON.
@@ -62,12 +78,21 @@ expectString onResult =
 expectJson : (Result Http.Error a -> msg) -> Decoder a -> Expect msg
 expectJson onResult decoder =
     Expect <|
-        \bodyResult ->
-            case bodyResult of
-                Err error ->
-                    onResult (Err error)
+        \response ->
+            case response of
+                Http.BadUrl_ s ->
+                    onResult (Err <| Http.BadUrl s)
 
-                Ok body ->
+                Http.Timeout_ ->
+                    onResult (Err Http.Timeout)
+
+                Http.NetworkError_ ->
+                    onResult (Err Http.NetworkError)
+
+                Http.BadStatus_ metadata body ->
+                    onResult (Err <| Http.BadStatus metadata.statusCode)
+
+                Http.GoodStatus_ _ body ->
                     case Json.Decode.decodeString decoder body of
                         Err jsonError ->
                             onResult (Err <| Http.BadBody <| Json.Decode.errorToString jsonError)
