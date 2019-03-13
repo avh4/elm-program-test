@@ -1,3 +1,10 @@
+## master
+
+New features:
+
+  - added `selectOption`
+
+
 ## 2.1.0
 
 New features:
