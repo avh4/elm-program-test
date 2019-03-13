@@ -131,7 +131,7 @@ type TestContext msg model effect
 
 
 type alias SimulationState msg =
-    { http : Dict ( String, String ) (Result Http.Error (List String) -> msg)
+    { http : Dict ( String, String ) (Result Http.Error String -> msg)
     }
 
 
@@ -444,14 +444,15 @@ your programs' effects into `SimulatedEffect`s.
 (If you do not use a `create*` function that lets your provide a
 `deconstructEffect : effect -> List SimulatedEffect` function,
 then `TestContext` will not simulate any HTTP effects for you.)
+
+See the `SimulatedEffect.Http` module for functions that make it easier to create `SimulatedEffect` values.
+
 -}
 type SimulatedEffect msg
     = HttpRequest
         { method : String
         , url : String
-
-        -- TODO: generalize the `List String`
-        , onRequestComplete : Result Http.Error (List String) -> msg
+        , onRequestComplete : Result Http.Error String -> msg
         }
 
 
@@ -991,7 +992,7 @@ assertHttpRequest request testContext =
 
 {-| TODO
 -}
-simulateHttpResponse : { method : String, url : String } -> { statusCode : Int, body : List String } -> TestContext msg model effect -> TestContext msg model effect
+simulateHttpResponse : { method : String, url : String } -> { statusCode : Int, body : String } -> TestContext msg model effect -> TestContext msg model effect
 simulateHttpResponse request response testContext =
     case testContext of
         Finished err ->

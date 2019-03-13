@@ -4,6 +4,8 @@ import Expect exposing (Expectation)
 import Html
 import Html.Events exposing (onClick)
 import Http
+import Json.Decode
+import SimulatedEffect.Http
 import Test exposing (..)
 import Test.Runner
 import TestContext exposing (TestContext)
@@ -21,7 +23,13 @@ deconstructEffect testEffect =
             []
 
         HttpGet url ->
-            [ TestContext.HttpRequest { method = "GET", url = url, onRequestComplete = HandleFriendsResponse } ]
+            [ SimulatedEffect.Http.get
+                { url = url
+                , expect =
+                    SimulatedEffect.Http.expectJson HandleFriendsResponse
+                        (Json.Decode.list Json.Decode.string)
+                }
+            ]
 
 
 type TestMsg
@@ -114,7 +122,13 @@ all =
             [ test "simulate OK response with valid JSON" <|
                 \() ->
                     start (HttpGet "https://example.com/friends")
-                        |> TestContext.simulateHttpResponse { method = "GET", url = "https://example.com/friends" } { statusCode = 200, body = [ "Alex", "Kelsey", "Sam" ] }
+                        |> TestContext.simulateHttpResponse
+                            { method = "GET"
+                            , url = "https://example.com/friends"
+                            }
+                            { statusCode = 200
+                            , body = """["Alex","Kelsey","Sam"]"""
+                            }
                         |> TestContext.expectModel (Expect.equal """Ok ["Alex","Kelsey","Sam"]""")
             ]
         ]
