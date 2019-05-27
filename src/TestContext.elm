@@ -19,7 +19,7 @@ module TestContext exposing
     , shouldHave, shouldNotHave, shouldHaveView
     , shouldHaveLastEffect
     , done
-    , fail
+    , fail, createFailed
     )
 
 {-| A `TestContext` simulates the execution of an Elm program.
@@ -86,7 +86,7 @@ To end a `TestContext` without using a [final assertion](#final-assertions), use
 
 These functions may be useful if you are writing your own custom assertion functions.
 
-@docs fail
+@docs fail, createFailed
 
 -}
 
@@ -1301,6 +1301,8 @@ but will also fail the TestContext if the `expectedCount` parameter is invalid):
                     , Test.Html.Selector.text (toString expectedCount)
                     ]
 
+If you are writing a convenience function that is creating a test context, see [`createFailed`](#createFailed).
+
 -}
 fail : String -> String -> TestContext msg model effect -> TestContext msg model effect
 fail assertionName failureMessage testContext =
@@ -1310,3 +1312,13 @@ fail assertionName failureMessage testContext =
 
         Active _ ->
             Finished (CustomFailure assertionName failureMessage)
+
+
+{-| `createFailed` can be used to report custom errors if you are writing your own convenience functions to **create** test contexts.
+
+NOTE: if you are writing a convenience function that takes a `TestContext` as input, you should use [`fail`](#fail) instead, as it provides more context in the test failure message.
+
+-}
+createFailed : String -> String -> TestContext msg model effect
+createFailed functionName failureMessage =
+    Finished (CustomFailure functionName failureMessage)
