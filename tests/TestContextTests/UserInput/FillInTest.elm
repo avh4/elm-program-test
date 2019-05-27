@@ -2,9 +2,8 @@ module TestContextTests.UserInput.FillInTest exposing (all)
 
 import Expect
 import Html exposing (Html)
-import Html.Attributes exposing (for, id, type_)
+import Html.Attributes exposing (for, id)
 import Html.Events exposing (onClick)
-import Json.Decode
 import Test exposing (..)
 import TestContext exposing (TestContext)
 
@@ -33,21 +32,6 @@ handleInput fieldId =
     Html.Events.onInput (\text -> "Input:" ++ fieldId ++ ":" ++ text)
 
 
-handleCheck : String -> Html.Attribute String
-handleCheck fieldId =
-    Html.Events.onCheck (\bool -> "Check:" ++ fieldId ++ ":" ++ boolToString bool)
-
-
-boolToString : Bool -> String
-boolToString b =
-    case b of
-        True ->
-            "True"
-
-        False ->
-            "False"
-
-
 testView : String -> Html String
 testView model =
     Html.div []
@@ -57,8 +41,6 @@ testView model =
             , Html.input [ id "field-1", handleInput "field-1" ] []
             , Html.label [ for "field-2" ] [ Html.text "Field 2" ]
             , Html.input [ id "field-2", handleInput "field-2" ] []
-            , Html.label [ for "checkbox-1" ] [ Html.text "Checkbox 1" ]
-            , Html.input [ type_ "checkbox", id "checkbox-1", handleCheck "checkbox-1" ] []
             ]
         , Html.div []
             [ Html.div [ id "button-a" ]
