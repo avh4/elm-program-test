@@ -550,25 +550,39 @@ a future release of this package will remove the `fieldId` parameter.
 simulateLabeledInputHelper : String -> String -> String -> Bool -> List Selector -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
 simulateLabeledInputHelper functionDescription fieldId label allowTextArea additionalInputSelectors event testContext =
     testContext
-        |> expectViewHelper functionDescription
-            (Query.find
-                [ Selector.tag "label"
-                , Selector.attribute (Html.Attributes.for fieldId)
-                , Selector.text label
-                ]
-                >> Query.has []
-            )
+        |> (if fieldId == "" then
+                identity
+
+            else
+                expectViewHelper functionDescription
+                    (Query.find
+                        [ Selector.tag "label"
+                        , Selector.attribute (Html.Attributes.for fieldId)
+                        , Selector.text label
+                        ]
+                        >> Query.has []
+                    )
+           )
         |> simulateHelper functionDescription
             (Query.Extra.oneOf <|
                 List.concat
-                    [ [ Query.find <|
+                    [ if fieldId == "" then
+                        [ Query.find
+                            [ Selector.tag "label"
+                            , Selector.containing [ Selector.text label ]
+                            ]
+                            >> Query.find [ Selector.tag "input" ]
+                        ]
+
+                      else
+                        [ Query.find <|
                             List.concat
                                 [ [ Selector.tag "input"
                                   , Selector.id fieldId
                                   ]
                                 , additionalInputSelectors
                                 ]
-                      ]
+                        ]
                     , if allowTextArea then
                         [ Query.find
                             [ Selector.tag "textarea"
@@ -756,11 +770,17 @@ followLink functionDescription href testContext =
 
 {-| Simulates replacing the text in an input field labeled with the given label.
 
-NOTE: Currently, this function requires that you also provide the field id
-(which must match both the `id` attribute of the target `input` element,
-and the `for` attribute of the `label` element).
-After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
-a future release of this package will remove the `fieldId` parameter.
+  - `fieldId`: the field id
+    (which must match both the `id` attribute of the target `input` element,
+    and the `for` attribute of the `label` element),
+    or `""` if the `<input>` is a descendant of the `<label>`.
+
+    NOTE: After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+    a future release of this package will remove the `fieldId` parameter.
+
+  - `label`: the label text of the input field
+
+  - `text`: the text that will be used to trigger the `onInput` event of the input field
 
 NOTE: TODO: In the future, this will be generalized to work with
 labeled textareas as well as labeled input fields.

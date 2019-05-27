@@ -57,4 +57,14 @@ all =
                     ]
                     |> TestContext.fillIn "field-1" "Field 1" "value99"
                     |> TestContext.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
+        , test "can find input contained in the label" <|
+            \() ->
+                start
+                    [ Html.label []
+                        [ Html.div [] [ Html.text "Field 1" ]
+                        , Html.input [ handleInput "field-1" ] []
+                        ]
+                    ]
+                    |> TestContext.fillIn "" "Field 1" "value99"
+                    |> TestContext.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
         ]
