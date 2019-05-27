@@ -95,7 +95,7 @@ import Browser.Navigation
 import Dict exposing (Dict)
 import Expect exposing (Expectation)
 import Html exposing (Html)
-import Html.Attributes
+import Html.Attributes exposing (attribute)
 import Json.Decode
 import Json.Encode
 import Query.Extra
@@ -572,6 +572,10 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
                             , Selector.containing [ Selector.text label ]
                             ]
                             >> Query.find [ Selector.tag "input" ]
+                        , Query.find
+                            [ Selector.tag "input"
+                            , Selector.attribute (attribute "aria-label" label)
+                            ]
                         ]
 
                       else
@@ -782,12 +786,29 @@ followLink functionDescription href testContext =
 
   - `text`: the text that will be used to trigger the `onInput` event of the input field
 
-NOTE: TODO: In the future, this will be generalized to work with
-labeled textareas as well as labeled input fields.
-(related to [eeue56/elm-html-test#49](https://github.com/eeue56/elm-html-test/issues/49>))
+There are a few different ways to accessibly label your input fields so that `fillIn` will find them:
 
-NOTE: In the future, this will be generalized to work with
-aria accessiblity attributes in addition to working with standard HTML label elements.
+  - You can place the `<input>` element inside a `<label>` element that also contains the label text.
+
+    ```html
+    <label>
+        Favorite fruit
+        <input>
+    </label>
+    ```
+
+  - You can place the `<input>` and a `<label>` element anywhere on the page and link them with a unique id.
+
+    ```html
+    <label for="fruit">Favorite fruit</label>
+    <input id="fruit"></input>
+    ```
+
+  - You can use the `aria-label` attribute.
+
+    ```html
+    <input aria-label="Favorite fruit"></input>
+    ```
 
 If you need to target a `<textarea>` that does not have a label,
 see [`fillInTextarea`](#fillInTextArea).

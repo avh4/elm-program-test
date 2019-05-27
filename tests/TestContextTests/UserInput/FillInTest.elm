@@ -2,7 +2,7 @@ module TestContextTests.UserInput.FillInTest exposing (all)
 
 import Expect
 import Html exposing (Html)
-import Html.Attributes exposing (for, id)
+import Html.Attributes exposing (attribute, for, id)
 import Html.Events
 import Test exposing (..)
 import TestContext exposing (TestContext)
@@ -64,6 +64,17 @@ all =
                         [ Html.div [] [ Html.text "Field 1" ]
                         , Html.input [ handleInput "field-1" ] []
                         ]
+                    ]
+                    |> TestContext.fillIn "" "Field 1" "value99"
+                    |> TestContext.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
+        , test "can find input with hidden label" <|
+            \() ->
+                start
+                    [ Html.input
+                        [ handleInput "field-1"
+                        , attribute "aria-label" "Field 1"
+                        ]
+                        []
                     ]
                     |> TestContext.fillIn "" "Field 1" "value99"
                     |> TestContext.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
