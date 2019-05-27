@@ -7,6 +7,6 @@
   },
   "scripts": {
     "test": "elm-test && elm make --docs docs.json && elm-format --validate . && elm diff",
-    "watch": "chokidar --initial elm.json 'src/**.elm' 'tests/**.elm' -c 'npm test'"
+    "watch": "chokidar --initial elm.json 'src/**/*.elm' 'tests/**/*.elm' -c 'npm test'"
   }
 }
