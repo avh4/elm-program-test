@@ -1,12 +1,16 @@
 {
   "devDependencies": {
     "chokidar-cli": "^1.2.2",
+    "concurrently": "^4.1.0",
     "elm": "^0.19.0-no-deps",
+    "elm-doc-preview": "^2.0.3",
     "elm-format": "^0.8.1",
     "elm-test": "^0.19.0"
   },
   "scripts": {
     "test": "elm-test && elm make --docs docs.json && elm-format --validate . && elm diff",
-    "watch": "chokidar --initial elm.json 'src/**/*.elm' 'tests/**/*.elm' -c 'npm test'"
+    "watch": "chokidar --initial elm.json 'src/**/*.elm' 'tests/**/*.elm' -c 'npm test'",
+    "run-doc-preview": "elm-doc-preview -p 8001",
+    "start": "concurrently --kill-others npm:watch npm:run-doc-preview"
   }
 }

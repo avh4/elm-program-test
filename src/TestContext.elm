@@ -95,7 +95,7 @@ import Browser.Navigation
 import Dict exposing (Dict)
 import Expect exposing (Expectation)
 import Html exposing (Html)
-import Html.Attributes
+import Html.Attributes exposing (attribute)
 import Json.Decode
 import Json.Encode
 import Query.Extra
@@ -550,25 +550,43 @@ a future release of this package will remove the `fieldId` parameter.
 simulateLabeledInputHelper : String -> String -> String -> Bool -> List Selector -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
 simulateLabeledInputHelper functionDescription fieldId label allowTextArea additionalInputSelectors event testContext =
     testContext
-        |> expectViewHelper functionDescription
-            (Query.find
-                [ Selector.tag "label"
-                , Selector.attribute (Html.Attributes.for fieldId)
-                , Selector.text label
-                ]
-                >> Query.has []
-            )
+        |> (if fieldId == "" then
+                identity
+
+            else
+                expectViewHelper functionDescription
+                    (Query.find
+                        [ Selector.tag "label"
+                        , Selector.attribute (Html.Attributes.for fieldId)
+                        , Selector.text label
+                        ]
+                        >> Query.has []
+                    )
+           )
         |> simulateHelper functionDescription
             (Query.Extra.oneOf <|
                 List.concat
-                    [ [ Query.find <|
+                    [ if fieldId == "" then
+                        [ Query.find
+                            [ Selector.tag "label"
+                            , Selector.containing [ Selector.text label ]
+                            ]
+                            >> Query.find [ Selector.tag "input" ]
+                        , Query.find
+                            [ Selector.tag "input"
+                            , Selector.attribute (attribute "aria-label" label)
+                            ]
+                        ]
+
+                      else
+                        [ Query.find <|
                             List.concat
                                 [ [ Selector.tag "input"
                                   , Selector.id fieldId
                                   ]
                                 , additionalInputSelectors
                                 ]
-                      ]
+                        ]
                     , if allowTextArea then
                         [ Query.find
                             [ Selector.tag "textarea"
@@ -756,18 +774,41 @@ followLink functionDescription href testContext =
 
 {-| Simulates replacing the text in an input field labeled with the given label.
 
-NOTE: Currently, this function requires that you also provide the field id
-(which must match both the `id` attribute of the target `input` element,
-and the `for` attribute of the `label` element).
-After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
-a future release of this package will remove the `fieldId` parameter.
+  - `fieldId`: the field id
+    (which must match both the `id` attribute of the target `input` element,
+    and the `for` attribute of the `label` element),
+    or `""` if the `<input>` is a descendant of the `<label>`.
 
-NOTE: TODO: In the future, this will be generalized to work with
-labeled textareas as well as labeled input fields.
-(related to [eeue56/elm-html-test#49](https://github.com/eeue56/elm-html-test/issues/49>))
+    NOTE: After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+    a future release of this package will remove the `fieldId` parameter.
 
-NOTE: In the future, this will be generalized to work with
-aria accessiblity attributes in addition to working with standard HTML label elements.
+  - `label`: the label text of the input field
+
+  - `text`: the text that will be used to trigger the `onInput` event of the input field
+
+There are a few different ways to accessibly label your input fields so that `fillIn` will find them:
+
+  - You can place the `<input>` element inside a `<label>` element that also contains the label text.
+
+    ```html
+    <label>
+        Favorite fruit
+        <input>
+    </label>
+    ```
+
+  - You can place the `<input>` and a `<label>` element anywhere on the page and link them with a unique id.
+
+    ```html
+    <label for="fruit">Favorite fruit</label>
+    <input id="fruit"></input>
+    ```
+
+  - You can use the `aria-label` attribute.
+
+    ```html
+    <input aria-label="Favorite fruit"></input>
+    ```
 
 If you need to target a `<textarea>` that does not have a label,
 see [`fillInTextarea`](#fillInTextArea).
