@@ -29,8 +29,8 @@ type alias TestMsg =
 
 start : TestEffect -> TestContext TestMsg () TestEffect
 start initialEffect =
-    TestContext.createWithSimulatedEffects
-        { init = ( (), initialEffect )
+    TestContext.createElement
+        { init = \() -> ( (), initialEffect )
         , update = \msg () -> ( (), msg )
         , view =
             \() ->
@@ -39,8 +39,9 @@ start initialEffect =
                         [ onClick (HttpGet "https://example.com/buttons/get") ]
                         [ Html.text "Get" ]
                     ]
-        , deconstructEffect = deconstructEffect
         }
+        |> TestContext.withSimulatedEffects deconstructEffect
+        |> TestContext.start ()
 
 
 all : Test
@@ -84,15 +85,16 @@ all =
                             , "      - GET https://example.com/actualRequest"
                             ]
                         )
-        , test "gives explanatory error when using assertHttpRequest without using createWithSimulatedEffects" <|
+        , test "gives explanatory error when using assertHttpRequest without using withSimulatedEffects" <|
             \() ->
-                TestContext.create
-                    { init = ( (), () )
-                    , update = \() () -> ( (), () )
+                TestContext.createSandbox
+                    { init = ()
+                    , update = \() () -> ()
                     , view = \() -> Html.text "[view]"
                     }
+                    |> TestContext.start ()
                     |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/" }
-                    |> expectFailure "TEST SETUP ERROR: In order to use assertHttpRequest, you MUST create your TestContext with TestContext.createWithSimulatedEvents"
+                    |> expectFailure "TEST SETUP ERROR: In order to use assertHttpRequest, you MUST use TestContext.withSimulatedEffects before calling TestContext.start"
 
         -- TODO: how to handle multiple requests made to the same method/URL?
         ]

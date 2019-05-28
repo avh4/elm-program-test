@@ -11,25 +11,12 @@ import TestContext exposing (TestContext)
 
 testContext : TestContext String String ()
 testContext =
-    TestContext.create
-        { init = testInit
-        , update = testUpdate
+    TestContext.createSandbox
+        { init = "<INIT>"
+        , update = \msg model -> model ++ ";" ++ msg
         , view = testView
         }
-
-
-testInit : ( String, () )
-testInit =
-    ( "<INIT>"
-    , ()
-    )
-
-
-testUpdate : String -> String -> ( String, () )
-testUpdate msg model =
-    ( model ++ ";" ++ msg
-    , ()
-    )
+        |> TestContext.start ()
 
 
 testView : String -> Html String

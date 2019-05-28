@@ -19,18 +19,19 @@ and finally `expectViewHas` is used to assert the final state of the program's d
 ```elm
 import Test exposing (..)
 import Test.Html.Selector exposing (class, text)
-import TestContext exposing (clickButton, expectViewHas)
+import TestContext exposing (clickButton, expectViewHas, start)
 import MyProgram -- just an imaginary example
 
 exampleProgramTest : Test
 exampleProgramTest =
     test "cannot publish without a title" <|
         \() ->
-            TestContext.create
+            TestContext.createElement
                 { init = MyProgram.init
                 , update = MyProgram.update
                 , view = MyProgram.view
                 }
+                |> start ()
                 |> clickButton "New Post"
                 |> clickButton "Publish"
                 |> expectViewHas
@@ -54,14 +55,14 @@ import MyProgram exposing (Flags, Msg, Model) -- just an imaginary example
 
 start : String -> Flags ->  TestContext Msg Model (Cmd Msg)
 start initialUrl flags =
-    TestContext.createWithNavigationAndFlags
-        MyProgram.OnRouteChange -- this is a constructor of MyProgram.Msg that is also used by Navigation.program
-        { init = MyProgram.init -- the type of MyProgram.init is: MyProgram.Flags -> Navigation.Location -> (MyProgram.Model, Cmd MyProgram.Msg)
+    TestContext.createApplication
+        { onUrlChange = MyProgram.OnRouteChange
+        , init = MyProgram.init -- the type of MyProgram.init is: MyProgram.Flags -> Navigation.Location -> (MyProgram.Model, Cmd MyProgram.Msg)
         , update = MyProgram.update
         , view = MyProgram.view
         }
-        initialUrl
-        flags
+        |> TestContext.withBaseUrl initialUrl
+        |> TestContext.start flags
 
 exampleProgramTest : Test
 exampleProgramTest =
@@ -94,13 +95,14 @@ startDatePicker :
         (DateTimePicker.State, Maybe Date) -- model: simply the state needed by the view being tested
         (Cmd never) -- effect: could use any type here, but Cmd seems least confusing
 startDatePicker =
-    TestContext.create
-        { init = ((DateTimePicker.initialState, Nothing), Cmd.none)
+    TestContext.element
+        { init = \() -> ((DateTimePicker.initialState, Nothing), Cmd.none)
         , update = newState model -> (newState, Cmd.none)
         , view =
             \(state, value) ->
                 DateTimePicker.dateTimePicker (,) [] state value
         }
+        |> TestContext.start ()
 
 datePickerTest : Test
 datePickerTest =

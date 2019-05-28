@@ -8,23 +8,19 @@ import Test exposing (..)
 import TestContext exposing (TestContext)
 
 
-type TestEffect
-    = NoOp
-    | LogUpdate String
-
-
 handleInput : String -> Html.Attribute String
 handleInput fieldId =
     Html.Events.onInput (\text -> "Input:" ++ fieldId ++ ":" ++ text)
 
 
-start : List (Html String) -> TestContext String String TestEffect
+start : List (Html String) -> TestContext String String ()
 start view =
-    TestContext.create
-        { init = ( "<INIT>", NoOp )
-        , update = \msg model -> ( model ++ ";" ++ msg, LogUpdate msg )
+    TestContext.createSandbox
+        { init = "<INIT>"
+        , update = \msg model -> model ++ ";" ++ msg
         , view = \_ -> Html.node "body" [] view
         }
+        |> TestContext.start ()
 
 
 all : Test

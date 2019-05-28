@@ -14,13 +14,6 @@ type TestEffect
     | LogUpdate String
 
 
-testInit : ( String, TestEffect )
-testInit =
-    ( "<INIT>"
-    , NoOp
-    )
-
-
 testUpdate : String -> String -> ( String, TestEffect )
 testUpdate msg model =
     ( model ++ ";" ++ msg
@@ -28,11 +21,11 @@ testUpdate msg model =
     )
 
 
-linkProgram : TestContext String String TestEffect
+linkProgram : TestContext String String ()
 linkProgram =
-    TestContext.createWithBaseUrl
-        { init = testInit
-        , update = testUpdate
+    TestContext.createSandbox
+        { init = "<INIT>"
+        , update = \msg model -> model ++ ";" ++ msg
         , view =
             \model ->
                 Html.div []
@@ -40,7 +33,8 @@ linkProgram =
                     , Html.a [ href "/settings" ] [ Html.text "Relative" ]
                     ]
         }
-        "http://localhost:3000/Main.elm"
+        |> TestContext.withBaseUrl "http://localhost:3000/Main.elm"
+        |> TestContext.start ()
 
 
 all : Test
@@ -58,21 +52,25 @@ all =
                     |> TestContext.expectPageChange "http://localhost:3000/settings"
         , test "can verify an internal (single-page app) link" <|
             \() ->
-                TestContext.createWithNavigation
-                    .path
-                    { init = \location -> ( "<INIT:" ++ location.path ++ ">", NoOp )
+                TestContext.createApplication
+                    { onUrlChange = .path
+                    , onUrlRequest = \_ -> Debug.todo "ClickLinkTest:onUrlRequest"
+                    , init = \() location key -> ( "<INIT:" ++ location.path ++ ">", NoOp )
                     , update = testUpdate
                     , view =
                         \_ ->
-                            Html.div []
+                            { title = "page title"
+                            , body =
                                 [ Html.a
                                     [ href "#search"
                                     , onClickPreventDefaultForLinkWithHref "GoToSearch"
                                     ]
                                     [ Html.text "SPA" ]
                                 ]
+                            }
                     }
-                    "http://localhost:3000/"
+                    |> TestContext.withBaseUrl "http://localhost:3000/"
+                    |> TestContext.start ()
                     |> TestContext.clickLink "SPA" "#search"
                     |> TestContext.expectModel (Expect.equal "<INIT:/>;GoToSearch")
         ]
