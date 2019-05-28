@@ -9,7 +9,7 @@ module TestContext exposing
     , routeChange
     , simulate
     , within
-    , assertHttpRequest
+    , assertHttpRequestWasMade
     , simulateHttpSuccess, simulateHttpResponse
     , update
     , simulateLastEffect
@@ -54,7 +54,7 @@ module TestContext exposing
 
 ## Simulating HTTP responses
 
-@docs assertHttpRequest
+@docs assertHttpRequestWasMade
 @docs simulateHttpSuccess, simulateHttpResponse
 
 
@@ -927,8 +927,8 @@ within findTarget onScopedTest testContext =
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-assertHttpRequest : { method : String, url : String } -> TestContext msg model effect -> Expectation
-assertHttpRequest request testContext =
+assertHttpRequestWasMade : String -> String -> TestContext msg model effect -> Expectation
+assertHttpRequestWasMade method url testContext =
     done <|
         case testContext of
             Finished err ->
@@ -937,14 +937,14 @@ assertHttpRequest request testContext =
             Active state ->
                 case state.effectSimulation of
                     Nothing ->
-                        Finished (EffectSimulationNotConfigured "assertHttpRequest")
+                        Finished (EffectSimulationNotConfigured "assertHttpRequestWasMade")
 
                     Just ( _, simulationState ) ->
-                        if Dict.member ( request.method, request.url ) simulationState.http then
+                        if Dict.member ( method, url ) simulationState.http then
                             testContext
 
                         else
-                            Finished (NoMatchingHttpRequest "assertHttpRequest" request (Dict.keys simulationState.http))
+                            Finished (NoMatchingHttpRequest "assertHttpRequestWasMade" { method = method, url = url } (Dict.keys simulationState.http))
 
 
 {-| Simulates an HTTP 200 response to a pending request with the given method and url.

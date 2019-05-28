@@ -72,37 +72,37 @@ all =
             [ test "can assert that an HTTP request was made from init (failure)" <|
                 \() ->
                     start NoEffect
-                        |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/" }
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectFailure
                             (String.join "\n"
-                                [ "assertHttpRequest: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
+                                [ "assertHttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
                                 , "    No requests were made."
                                 ]
                             )
             , test "can assert that an HTTP request was made from init (success)" <|
                 \() ->
                     start (HttpGet "https://example.com/")
-                        |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/" }
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectSuccess
             , test "can assert that an HTTP request was made from update" <|
                 \() ->
                     start NoEffect
                         |> TestContext.update (PassThroughEffect (HttpGet "https://example.com/from-update"))
-                        |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/from-update" }
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/from-update"
                         |> expectSuccess
             , test "can assert that an HTTP request was made via a user interaction" <|
                 \() ->
                     start NoEffect
                         |> TestContext.clickButton "Get"
-                        |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/buttons/get" }
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/buttons/get"
                         |> expectSuccess
             , test "error message includes list of pending requests" <|
                 \() ->
                     start (HttpGet "https://example.com/actualRequest")
-                        |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/not-made" }
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/not-made"
                         |> expectFailure
                             (String.join "\n"
-                                [ "assertHttpRequest: Expected HTTP request (GET https://example.com/not-made) to have been made, but it was not."
+                                [ "assertHttpRequestWasMade: Expected HTTP request (GET https://example.com/not-made) to have been made, but it was not."
                                 , "    The following requests were made:"
                                 , "      - GET https://example.com/actualRequest"
                                 ]
@@ -115,8 +115,8 @@ all =
                         , view = \() -> Html.text "[view]"
                         }
                         |> TestContext.start ()
-                        |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/" }
-                        |> expectFailure "TEST SETUP ERROR: In order to use assertHttpRequest, you MUST use TestContext.withSimulatedEffects before calling TestContext.start"
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> expectFailure "TEST SETUP ERROR: In order to use assertHttpRequestWasMade, you MUST use TestContext.withSimulatedEffects before calling TestContext.start"
 
             -- TODO: how to handle multiple requests made to the same method/URL?
             ]
