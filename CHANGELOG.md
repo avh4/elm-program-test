@@ -1,3 +1,12 @@
+## 2.3.0
+
+New features:
+
+  - `fillIn` now works with id-less `<input>` tags that are descendants of their `<label>`
+  - `fillIn` now works with `aria-label` attributes
+  - added `createFailed` for use in writing helper functions that create `TestContext`s
+
+
 ## 2.2.0
 
 New features:
