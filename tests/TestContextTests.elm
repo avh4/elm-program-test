@@ -80,11 +80,12 @@ testView model =
 
 testContext : TestContext String String TestEffect
 testContext =
-    TestContext.create
-        { init = testInit
+    TestContext.createElement
+        { init = \() -> testInit
         , update = testUpdate
         , view = testView
         }
+        |> TestContext.start ()
 
 
 all : Test
@@ -106,65 +107,88 @@ all =
                     |> TestContext.expectModel (Expect.equal "<INIT>;CLICK")
         , test "can create with flags" <|
             \() ->
-                TestContext.createWithFlags
+                TestContext.createElement
                     { init = \flags -> ( "<INIT:" ++ flags ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
-                    "flags"
+                    |> TestContext.start "flags"
                     |> TestContext.expectModel (Expect.equal "<INIT:flags>")
         , test "can create with JSON string flags" <|
             \() ->
-                TestContext.createWithJsonStringFlags
-                    (Json.Decode.field "y" Json.Decode.string)
+                TestContext.createElement
                     { init = \flags -> ( "<INIT:" ++ flags ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
-                    """{"y": "fromJson"}"""
+                    |> TestContext.withJsonStringFlags (Json.Decode.field "y" Json.Decode.string)
+                    |> TestContext.start """{"y": "fromJson"}"""
                     |> TestContext.expectModel (Expect.equal "<INIT:fromJson>")
         , test "can create with navigation" <|
             \() ->
-                TestContext.createWithNavigation
-                    .path
-                    { init = \location -> ( "<INIT:" ++ location.path ++ ">", NoOp )
+                TestContext.createApplication
+                    { onUrlChange = .path
+                    , onUrlRequest = \_ -> Debug.todo "TestContextTests-1:onUrlRequest"
+                    , init = \() location key -> ( "<INIT:" ++ location.path ++ ">", NoOp )
                     , update = testUpdate
-                    , view = testView
+                    , view =
+                        \model ->
+                            { title = "page title"
+                            , body = [ testView model ]
+                            }
                     }
-                    "https://example.com/path"
+                    |> TestContext.withBaseUrl "https://example.com/path"
+                    |> TestContext.start ()
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>")
         , test "can simulate a route change" <|
             \() ->
-                TestContext.createWithNavigation
-                    .path
-                    { init = \location -> ( "<INIT:" ++ location.path ++ ">", NoOp )
+                TestContext.createApplication
+                    { onUrlChange = .path
+                    , onUrlRequest = \_ -> Debug.todo "TestContextTests-2:onUrlRequest"
+                    , init = \() location key -> ( "<INIT:" ++ location.path ++ ">", NoOp )
                     , update = testUpdate
-                    , view = testView
+                    , view =
+                        \model ->
+                            { title = "page title"
+                            , body = [ testView model ]
+                            }
                     }
-                    "https://example.com/path"
+                    |> TestContext.withBaseUrl "https://example.com/path"
+                    |> TestContext.start ()
                     |> TestContext.routeChange "https://example.com/new"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>;/new")
         , test "can simulate a route change with a relative URL" <|
             \() ->
-                TestContext.createWithNavigation
-                    .path
-                    { init = \location -> ( "<INIT:" ++ location.path ++ ">", NoOp )
+                TestContext.createApplication
+                    { onUrlChange = .path
+                    , onUrlRequest = \_ -> Debug.todo "TestContextTests-3:onUrlRequest"
+                    , init = \() location key -> ( "<INIT:" ++ location.path ++ ">", NoOp )
                     , update = testUpdate
-                    , view = testView
+                    , view =
+                        \model ->
+                            { title = "page title"
+                            , body = [ testView model ]
+                            }
                     }
-                    "https://example.com/path"
+                    |> TestContext.withBaseUrl "https://example.com/path"
+                    |> TestContext.start ()
                     |> TestContext.routeChange "/new"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>;/new")
         , test "can create with navigation and flags" <|
             \() ->
-                TestContext.createWithNavigationAndFlags
-                    .path
-                    { init = \flags location -> ( "<INIT:" ++ location.path ++ ":" ++ flags ++ ">", NoOp )
+                TestContext.createApplication
+                    { onUrlChange = .path
+                    , onUrlRequest = \_ -> Debug.todo "TestContextTests-4:onUrlRequest"
+                    , init = \flags location key -> ( "<INIT:" ++ location.path ++ ":" ++ flags ++ ">", NoOp )
                     , update = testUpdate
-                    , view = testView
+                    , view =
+                        \model ->
+                            { title = "page title"
+                            , body = [ testView model ]
+                            }
                     }
-                    "https://example.com/path"
-                    "flags"
+                    |> TestContext.withBaseUrl "https://example.com/path"
+                    |> TestContext.start "flags"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path:flags>")
         , test "can assert on the view" <|
             \() ->
@@ -179,15 +203,20 @@ all =
                         (Query.find [ Selector.tag "span" ] >> Query.has [ Selector.text "<INIT>" ])
         , test "can create with navigation and JSON string flags" <|
             \() ->
-                TestContext.createWithNavigationAndJsonStringFlags
-                    (Json.Decode.field "x" Json.Decode.string)
-                    .path
-                    { init = \flags location -> ( "<INIT:" ++ location.path ++ ":" ++ flags ++ ">", NoOp )
+                TestContext.createApplication
+                    { onUrlChange = .path
+                    , onUrlRequest = \_ -> Debug.todo "TestContextTests-5:onUrlRequest"
+                    , init = \flags location key -> ( "<INIT:" ++ location.path ++ ":" ++ flags ++ ">", NoOp )
                     , update = testUpdate
-                    , view = testView
+                    , view =
+                        \model ->
+                            { title = "page title"
+                            , body = [ testView model ]
+                            }
                     }
-                    "https://example.com/path"
-                    """{"x": "fromJson"}"""
+                    |> TestContext.withJsonStringFlags (Json.Decode.field "x" Json.Decode.string)
+                    |> TestContext.withBaseUrl "https://example.com/path"
+                    |> TestContext.start """{"x": "fromJson"}"""
                     |> TestContext.expectModel (Expect.equal "<INIT:/path:fromJson>")
         , test "can assert on the view concisely given Html.Test.Selectors" <|
             \() ->
