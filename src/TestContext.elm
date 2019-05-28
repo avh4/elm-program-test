@@ -959,6 +959,17 @@ assertHttpRequestWasMade method url testContext =
                             Finished (NoMatchingHttpRequest "assertHttpRequestWasMade" { method = method, url = url } (Dict.keys simulationState.http))
 
 
+{-| Allows you to check the details of a pending HTTP request.
+
+If you only care about whether the a request was made to the correct URL, see [`assertHttpRequestWasMade`](#assertHttpRequestWasMade).
+
+    ...
+        |> assertHttpRequest "POST"
+            "https://example.com/save"
+            (.body >> Expect.equal """{"content":"updated!"}""")
+        |> ...
+
+-}
 assertHttpRequest : String -> String -> ({ body : String } -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
 assertHttpRequest method url checkRequest testContext =
     case testContext of
