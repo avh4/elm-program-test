@@ -1,6 +1,7 @@
 module SimulatedEffect.Http exposing
-    ( get
-    , Expect, expectString, expectJson
+    ( get, post
+    , Body, emptyBody, stringBody, jsonBody
+    , Expect, expectString, expectJson, Error
     )
 
 {-| This module parallels [elm/http's `Http` module](https://package.elm-lang.org/packages/elm/http/2.0.0/Http).
@@ -12,17 +13,23 @@ to help you implement the function to provide when using `TestContext.withSimula
 
 # Requests
 
-@docs get
+@docs get, post
+
+
+# Body
+
+@docs Body, emptyBody, stringBody, jsonBody
 
 
 # Expect
 
-@docs Expect, expectString, expectJson
+@docs Expect, expectString, expectJson, Error
 
 -}
 
 import Http
 import Json.Decode exposing (Decoder)
+import Json.Encode
 import SimulatedEffect as SimulatedEffect exposing (SimulatedEffect(..))
 
 
@@ -41,7 +48,73 @@ get { url, expect } =
     SimulatedEffect.HttpRequest
         { method = "GET"
         , url = url
+        , body = ""
         , onRequestComplete = onResult
+        }
+
+
+{-| Create a `POST` request.
+-}
+post :
+    { url : String
+    , body : Body
+    , expect : Expect msg
+    }
+    -> SimulatedEffect msg
+post request =
+    let
+        (Expect onResult) =
+            request.expect
+    in
+    SimulatedEffect.HttpRequest
+        { method = "POST"
+        , url = request.url
+        , body =
+            case request.body of
+                EmptyBody ->
+                    ""
+
+                StringBody body ->
+                    body.content
+        , onRequestComplete = onResult
+        }
+
+
+{-| Represents the body of a `Request`.
+-}
+type Body
+    = EmptyBody
+    | StringBody
+        { contentType : String
+        , content : String
+        }
+
+
+{-| Create an empty body for your `Request`.
+-}
+emptyBody : Body
+emptyBody =
+    EmptyBody
+
+
+{-| Put some JSON value in the body of your `Request`. This will automatically
+add the `Content-Type: application/json` header.
+-}
+jsonBody : Json.Encode.Value -> Body
+jsonBody value =
+    StringBody
+        { contentType = "application/json"
+        , content = Json.Encode.encode 0 value
+        }
+
+
+{-| Put some string in the body of your `Request`.
+-}
+stringBody : String -> String -> Body
+stringBody contentType content =
+    StringBody
+        { contentType = contentType
+        , content = content
         }
 
 
@@ -100,3 +173,8 @@ expectJson onResult decoder =
 
                         Ok value ->
                             onResult (Ok value)
+
+
+{-| -}
+type alias Error =
+    Http.Error

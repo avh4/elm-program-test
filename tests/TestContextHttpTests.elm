@@ -3,9 +3,8 @@ module TestContextHttpTests exposing (all)
 import Expect exposing (Expectation)
 import Html
 import Html.Events exposing (onClick)
-import Http
 import Json.Decode
-import SimulatedEffect.Http
+import SimulatedEffect.Http as Http
 import Test exposing (..)
 import Test.Runner
 import TestContext exposing (TestContext)
@@ -14,6 +13,7 @@ import TestContext exposing (TestContext)
 type TestEffect
     = NoEffect
     | HttpGet String
+    | HttpPost String String
 
 
 deconstructEffect : TestEffect -> List (TestContext.SimulatedEffect TestMsg)
@@ -23,11 +23,19 @@ deconstructEffect testEffect =
             []
 
         HttpGet url ->
-            [ SimulatedEffect.Http.get
+            [ Http.get
                 { url = url
                 , expect =
-                    SimulatedEffect.Http.expectJson HandleFriendsResponse
+                    Http.expectJson HandleFriendsResponse
                         (Json.Decode.list Json.Decode.string)
+                }
+            ]
+
+        HttpPost url body ->
+            [ Http.post
+                { url = url
+                , body = Http.stringBody "application/json" body
+                , expect = Http.expectString HandlePostResponse
                 }
             ]
 
@@ -35,6 +43,7 @@ deconstructEffect testEffect =
 type TestMsg
     = PassThroughEffect TestEffect
     | HandleFriendsResponse (Result Http.Error (List String))
+    | HandlePostResponse (Result Http.Error String)
 
 
 type alias TestModel =
@@ -52,6 +61,9 @@ start initialEffect =
                         ( model, effect )
 
                     HandleFriendsResponse result ->
+                        ( Debug.toString result, NoEffect )
+
+                    HandlePostResponse result ->
                         ( Debug.toString result, NoEffect )
         , view =
             \_ ->
@@ -117,6 +129,23 @@ all =
                         |> TestContext.start ()
                         |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectFailure "TEST SETUP ERROR: In order to use assertHttpRequestWasMade, you MUST use TestContext.withSimulatedEffects before calling TestContext.start"
+            , test "can assert on request body" <|
+                \() ->
+                    start (HttpPost "https://example.com/ok" """{"ok":true}""")
+                        |> TestContext.assertHttpRequest "POST"
+                            "https://example.com/ok"
+                            (.body >> Expect.equal """{"ok":900}""")
+                        |> TestContext.done
+                        |> expectFailure
+                            (String.join "\n"
+                                [ "assertHttpRequest:"
+                                , """"{\\"ok\\":true}\""""
+                                , "╵"
+                                , "│ Expect.equal"
+                                , "╷"
+                                , """"{\\"ok\\":900}\""""
+                                ]
+                            )
 
             -- TODO: how to handle multiple requests made to the same method/URL?
             ]
@@ -150,7 +179,7 @@ expectSuccess actualResult =
             Expect.pass
 
         Just actualInfo ->
-            Expect.fail ("Expected a success, but got a failure: " ++ actualInfo.description)
+            Expect.fail ("expectSuccess: Expected a success, but got a failure:\n" ++ actualInfo.description)
 
 
 expectFailure : String -> Expectation -> Expectation

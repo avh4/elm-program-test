@@ -22,5 +22,6 @@ type SimulatedEffect msg
     = HttpRequest
         { method : String
         , url : String
+        , body : String
         , onRequestComplete : Http.Response String -> msg
         }

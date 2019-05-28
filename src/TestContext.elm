@@ -9,7 +9,7 @@ module TestContext exposing
     , routeChange
     , simulate
     , within
-    , assertHttpRequestWasMade
+    , assertHttpRequestWasMade, assertHttpRequest
     , simulateHttpSuccess, simulateHttpResponse
     , update
     , simulateLastEffect
@@ -54,7 +54,7 @@ module TestContext exposing
 
 ## Simulating HTTP responses
 
-@docs assertHttpRequestWasMade
+@docs assertHttpRequestWasMade, assertHttpRequest
 @docs simulateHttpSuccess, simulateHttpResponse
 
 
@@ -130,7 +130,12 @@ type TestContext msg model effect
 
 
 type alias SimulationState msg =
-    { http : Dict ( String, String ) (Http.Response String -> msg)
+    { http : Dict ( String, String ) ( HttpRequest, Http.Response String -> msg )
+    }
+
+
+type alias HttpRequest =
+    { body : String
     }
 
 
@@ -206,7 +211,12 @@ simulateEffect simulatedEffect simulationState =
     case simulatedEffect of
         SimulatedEffect.HttpRequest request ->
             { simulationState
-                | http = Dict.insert ( request.method, request.url ) request.onRequestComplete simulationState.http
+                | http =
+                    Dict.insert ( request.method, request.url )
+                        ( { body = request.body }
+                        , request.onRequestComplete
+                        )
+                        simulationState.http
             }
 
 
@@ -924,6 +934,8 @@ within findTarget onScopedTest testContext =
 
 {-| A final assertion that checks whether an HTTP request to the specific url and method has been made.
 
+If you want to check the headers or request body, see [`assertHttpRequest`](#assertHttpRequest).
+
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
@@ -947,6 +959,32 @@ assertHttpRequestWasMade method url testContext =
                             Finished (NoMatchingHttpRequest "assertHttpRequestWasMade" { method = method, url = url } (Dict.keys simulationState.http))
 
 
+assertHttpRequest : String -> String -> ({ body : String } -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
+assertHttpRequest method url checkRequest testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    Finished (EffectSimulationNotConfigured "assertHttpRequest")
+
+                Just ( _, simulationState ) ->
+                    case Dict.get ( method, url ) simulationState.http of
+                        Just ( request, _ ) ->
+                            case Test.Runner.getFailureReason (checkRequest request) of
+                                Nothing ->
+                                    -- check succeeded
+                                    testContext
+
+                                Just reason ->
+                                    Finished (ExpectFailed "assertHttpRequest" reason.description reason.reason)
+
+                        Nothing ->
+                            Finished (NoMatchingHttpRequest "assertHttpRequest" { method = method, url = url } (Dict.keys simulationState.http))
+
+
 {-| Simulates an HTTP 200 response to a pending request with the given method and url.
 If you need more control over the response, see [`simulateHttpResponse`](#simulateHttpResponse).
 
@@ -955,6 +993,8 @@ If you need more control over the response, see [`simulateHttpResponse`](#simula
             "https://example.com/time.json"
             """{"currentTime":1559013158}"""
         |> ...
+
+If you want to check the headers or request body, see [`assertHttpRequest`](#assertHttpRequest).
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
@@ -992,7 +1032,7 @@ simulateHttpResponse request response testContext =
                         Nothing ->
                             Finished (NoMatchingHttpRequest "simulateHttpResponse" request (Dict.keys simulationState.http))
 
-                        Just msg ->
+                        Just ( _, msg ) ->
                             let
                                 responseValue =
                                     if response.statusCode >= 200 && response.statusCode < 300 then
