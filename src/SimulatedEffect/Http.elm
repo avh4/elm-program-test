@@ -3,10 +3,11 @@ module SimulatedEffect.Http exposing
     , Expect, expectString, expectJson
     )
 
-{-| This module parallels [elm/http's `Http` module](https://package.elm-lang.org/packages/elm/http/2.0.0/Http). PRs are welcome to add any functions that are missing.
+{-| This module parallels [elm/http's `Http` module](https://package.elm-lang.org/packages/elm/http/2.0.0/Http).
+PRs are welcome to add any functions that are missing.
 
 The functions here produce `SimulatedEffect`s instead of `Cmd`s, which are meant to be used
-to help you implement your `deconstructEffect` function when using `TestContext.createWithSimulatedEffects`.
+to help you implement the function to provide when using `TestContext.withSimulatedEffects`.
 
 
 # Requests
@@ -22,7 +23,7 @@ to help you implement your `deconstructEffect` function when using `TestContext.
 
 import Http
 import Json.Decode exposing (Decoder)
-import TestContext as SimulatedEffect exposing (SimulatedEffect(..))
+import SimulatedEffect as SimulatedEffect exposing (SimulatedEffect(..))
 
 
 {-| Create a `GET` request.

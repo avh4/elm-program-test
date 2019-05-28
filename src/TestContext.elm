@@ -2,7 +2,7 @@ module TestContext exposing
     ( TestContext, start
     , createSandbox, createElement, createDocument, createApplication
     , ProgramDefinition, withBaseUrl, withJsonStringFlags
-    , SimulatedEffect(..), withSimulatedEffects
+    , SimulatedEffect, withSimulatedEffects
     , clickButton, clickLink
     , fillIn, fillInTextarea
     , check, selectOption
@@ -92,7 +92,6 @@ These functions may be useful if you are writing your own custom assertion funct
 -}
 
 import Browser
-import Browser.Navigation
 import Dict exposing (Dict)
 import Expect exposing (Expectation)
 import Html exposing (Html)
@@ -101,6 +100,7 @@ import Http
 import Json.Decode
 import Json.Encode
 import Query.Extra
+import SimulatedEffect exposing (SimulatedEffect)
 import Test.Html.Event
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector exposing (Selector)
@@ -204,7 +204,7 @@ applySimulatedEffects effect ( deconstructEffect, simulationState ) =
 simulateEffect : SimulatedEffect msg -> SimulationState msg -> SimulationState msg
 simulateEffect simulatedEffect simulationState =
     case simulatedEffect of
-        HttpRequest request ->
+        SimulatedEffect.HttpRequest request ->
             { simulationState
                 | http = Dict.insert ( request.method, request.url ) request.onRequestComplete simulationState.http
             }
@@ -394,12 +394,8 @@ then `TestContext` will not simulate any HTTP effects for you.)
 See the `SimulatedEffect.Http` module for functions that make it easier to create `SimulatedEffect` values.
 
 -}
-type SimulatedEffect msg
-    = HttpRequest
-        { method : String
-        , url : String
-        , onRequestComplete : Http.Response String -> msg
-        }
+type alias SimulatedEffect msg =
+    SimulatedEffect.SimulatedEffect msg
 
 
 {-| Advances the state of the `TestContext`'s program by using the `TestContext`'s program's update function
