@@ -3,7 +3,7 @@
     "name": "avh4/elm-program-test",
     "summary": "Test Elm programs",
     "license": "MIT",
-    "version": "2.2.0",
+    "version": "2.3.0",
     "exposed-modules": [
         "TestContext"
     ],
