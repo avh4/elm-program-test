@@ -10,7 +10,7 @@ module TestContext exposing
     , simulate
     , within
     , assertHttpRequest
-    , simulateHttpResponse
+    , simulateHttpSuccess, simulateHttpResponse
     , update
     , simulateLastEffect
     , expectViewHas, expectView
@@ -55,7 +55,7 @@ module TestContext exposing
 ## Simulating HTTP responses
 
 @docs assertHttpRequest
-@docs simulateHttpResponse
+@docs simulateHttpSuccess, simulateHttpResponse
 
 
 ## Directly sending Msgs
@@ -947,7 +947,34 @@ assertHttpRequest request testContext =
                             Finished (NoMatchingHttpRequest "assertHttpRequest" request (Dict.keys simulationState.http))
 
 
-{-| TODO
+{-| Simulates an HTTP 200 response to a pending request with the given method and url.
+If you need more control over the response, see [`simulateHttpResponse`](#simulateHttpResponse).
+
+    ...
+        |> simulateHttpSuccess "GET"
+            "https://example.com/time.json"
+            """{"currentTime":1559013158}"""
+        |> ...
+
+NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
+
+-}
+simulateHttpSuccess : String -> String -> String -> TestContext msg model effect -> TestContext msg model effect
+simulateHttpSuccess method url responseBody =
+    simulateHttpResponse
+        { method = method
+        , url = url
+        }
+        { statusCode = 200
+        , body = responseBody
+        }
+
+
+{-| Simulates a response to a pending HTTP request.
+The test will fail if there is no pending request matching the given method and url.
+
+NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
+
 -}
 simulateHttpResponse : { method : String, url : String } -> { statusCode : Int, body : String } -> TestContext msg model effect -> TestContext msg model effect
 simulateHttpResponse request response testContext =
@@ -958,12 +985,12 @@ simulateHttpResponse request response testContext =
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished (EffectSimulationNotConfigured "assertHttpRequest")
+                    Finished (EffectSimulationNotConfigured "simulateHttpResponse")
 
                 Just ( _, simulationState ) ->
                     case Dict.get ( request.method, request.url ) simulationState.http of
                         Nothing ->
-                            Finished (NoMatchingHttpRequest "assertHttpRequest" request (Dict.keys simulationState.http))
+                            Finished (NoMatchingHttpRequest "simulateHttpResponse" request (Dict.keys simulationState.http))
 
                         Just msg ->
                             let

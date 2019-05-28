@@ -124,13 +124,9 @@ all =
             [ test "simulate OK response with valid JSON" <|
                 \() ->
                     start (HttpGet "https://example.com/friends")
-                        |> TestContext.simulateHttpResponse
-                            { method = "GET"
-                            , url = "https://example.com/friends"
-                            }
-                            { statusCode = 200
-                            , body = """["Alex","Kelsey","Sam"]"""
-                            }
+                        |> TestContext.simulateHttpSuccess "GET"
+                            "https://example.com/friends"
+                            """["Alex","Kelsey","Sam"]"""
                         |> TestContext.expectModel (Expect.equal """Ok ["Alex","Kelsey","Sam"]""")
             , test "simulate error response" <|
                 \() ->
