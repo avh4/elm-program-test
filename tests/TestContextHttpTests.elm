@@ -43,8 +43,8 @@ type alias TestModel =
 
 start : TestEffect -> TestContext TestMsg TestModel TestEffect
 start initialEffect =
-    TestContext.createWithSimulatedEffects
-        { init = ( "Init", initialEffect )
+    TestContext.createElement
+        { init = \() -> ( "Init", initialEffect )
         , update =
             \msg model ->
                 case msg of
@@ -54,14 +54,15 @@ start initialEffect =
                     HandleFriendsResponse result ->
                         ( Debug.toString result, NoEffect )
         , view =
-            \model ->
+            \_ ->
                 Html.div []
                     [ Html.button
                         [ onClick (PassThroughEffect (HttpGet "https://example.com/buttons/get")) ]
                         [ Html.text "Get" ]
                     ]
-        , deconstructEffect = deconstructEffect
         }
+        |> TestContext.withSimulatedEffects deconstructEffect
+        |> TestContext.start ()
 
 
 all : Test
@@ -108,13 +109,14 @@ all =
                             )
             , test "gives explanatory error when using assertHttpRequest without using createWithSimulatedEffects" <|
                 \() ->
-                    TestContext.create
-                        { init = ( (), () )
-                        , update = \() () -> ( (), () )
+                    TestContext.createSandbox
+                        { init = ()
+                        , update = \() () -> ()
                         , view = \() -> Html.text "[view]"
                         }
+                        |> TestContext.start ()
                         |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/" }
-                        |> expectFailure "TEST SETUP ERROR: In order to use assertHttpRequest, you MUST create your TestContext with TestContext.createWithSimulatedEvents"
+                        |> expectFailure "TEST SETUP ERROR: In order to use assertHttpRequest, you MUST use TestContext.withSimulatedEffects before calling TestContext.start"
 
             -- TODO: how to handle multiple requests made to the same method/URL?
             ]

@@ -1,9 +1,8 @@
 module TestContext exposing
-    ( TestContext
-    , create, createWithFlags, createWithJsonStringFlags, createWithBaseUrl
-    , createWithNavigation, createWithNavigationAndFlags, createWithNavigationAndJsonStringFlags
-    , SimulatedEffect(..)
-    , createWithSimulatedEffects
+    ( TestContext, start
+    , createSandbox, createElement, createDocument, createApplication
+    , ProgramDefinition, withBaseUrl, withJsonStringFlags
+    , SimulatedEffect(..), withSimulatedEffects
     , clickButton, clickLink
     , fillIn, fillInTextarea
     , check, selectOption
@@ -20,7 +19,7 @@ module TestContext exposing
     , shouldHave, shouldNotHave, shouldHaveView
     , shouldHaveLastEffect
     , done
-    , fail
+    , fail, createFailed
     )
 
 {-| A `TestContext` simulates the execution of an Elm program.
@@ -28,15 +27,15 @@ module TestContext exposing
 
 ## Creating
 
-@docs TestContext
-@docs create, createWithFlags, createWithJsonStringFlags, createWithBaseUrl
-@docs createWithNavigation, createWithNavigationAndFlags, createWithNavigationAndJsonStringFlags
+@docs TestContext, start
+
+@docs createSandbox, createElement, createDocument, createApplication
+@docs ProgramDefinition, withBaseUrl, withJsonStringFlags
 
 
 ### Simulated effects
 
-@docs SimulatedEffect
-@docs createWithSimulatedEffects
+@docs SimulatedEffect, withSimulatedEffects
 
 
 ## Simulating user input
@@ -88,7 +87,7 @@ To end a `TestContext` without using a [final assertion](#final-assertions), use
 
 These functions may be useful if you are writing your own custom assertion functions.
 
-@docs fail
+@docs fail, createFailed
 
 -}
 
@@ -97,7 +96,7 @@ import Browser.Navigation
 import Dict exposing (Dict)
 import Expect exposing (Expectation)
 import Html exposing (Html)
-import Html.Attributes
+import Html.Attributes exposing (attribute)
 import Http
 import Json.Decode
 import Json.Encode
@@ -169,11 +168,10 @@ createHelper :
     , update : msg -> model -> ( model, effect )
     , view : model -> Html msg
     , onRouteChange : Url -> Maybe msg
-    , initialLocation : Maybe Url
-    , deconstructEffect : Maybe (effect -> List (SimulatedEffect msg))
     }
+    -> ProgramOptions msg effect
     -> TestContext msg model effect
-createHelper program =
+createHelper program options =
     let
         program_ =
             { update = program.update
@@ -188,9 +186,9 @@ createHelper program =
         { program = program_
         , currentModel = newModel
         , lastEffect = newEffect
-        , currentLocation = program.initialLocation
+        , currentLocation = options.baseUrl
         , effectSimulation =
-            program.deconstructEffect
+            options.deconstructEffect
                 |> Maybe.map (\f -> ( f, emptySimulationState ))
                 |> Maybe.map (applySimulatedEffects newEffect)
         }
@@ -212,237 +210,185 @@ simulateEffect simulatedEffect simulationState =
             }
 
 
-{-| Creates a `TestContext` from the parts of a standard `Html.program`.
+{-| Creates a `ProgramDefinition` from the parts of a `Browser.sandbox` program.
 
-See other `create*` functions below if the program you want to test
-uses flags or nagivation.
+See other `create*` functions below if the program you want to test does not use `Browser.sandbox`.
 
 -}
-create :
-    { init : ( model, effect )
-    , update : msg -> model -> ( model, effect )
+createSandbox :
+    { init : model
+    , update : msg -> model -> model
     , view : model -> Html msg
     }
-    -> TestContext msg model effect
-create program =
-    createHelper
-        { init = program.init
-        , update = program.update
-        , view = program.view
-        , onRouteChange = \_ -> Nothing
-        , initialLocation = Nothing
-        , deconstructEffect = Nothing
-        }
+    -> ProgramDefinition () msg model ()
+createSandbox program =
+    ProgramDefinition emptyOptions <|
+        \location () ->
+            createHelper
+                { init = ( program.init, () )
+                , update = \msg model -> ( program.update msg model, () )
+                , view = program.view
+                , onRouteChange = \_ -> Nothing
+                }
 
 
-{-| Creates a `TestContext` from the parts of a standard `Html.program`
-and a base URL against which relative URLs can be resolved.
-
-If you don't need to simulate clicking links with relative URLs,
-prefer [`create`](#create).
-
-If your program uses navigation, see [`createWithNavigation`](#createWithNavigation).
-
+{-| Represents an unstarted test program.
+Use [`start`](#start) to start the program being tested.
 -}
-createWithBaseUrl :
-    { init : ( model, effect )
-    , update : msg -> model -> ( model, effect )
-    , view : model -> Html msg
+type ProgramDefinition flags msg model effect
+    = ProgramDefinition (ProgramOptions msg effect) (Maybe Url -> flags -> ProgramOptions msg effect -> TestContext msg model effect)
+
+
+type alias ProgramOptions msg effect =
+    { baseUrl : Maybe Url
+    , deconstructEffect : Maybe (effect -> List (SimulatedEffect msg))
     }
-    -> String
-    -> TestContext msg model effect
-createWithBaseUrl program baseUrl =
-    createHelper
-        { init = program.init
-        , update = program.update
-        , view = program.view
-        , onRouteChange = \_ -> Nothing
-        , initialLocation = Url.Extra.locationFromString baseUrl
-        , deconstructEffect = Nothing
-        }
 
 
-{-| Creates a `TestContext` from the parts of a standard with flags (`Html.programWithFlags`).
+emptyOptions : ProgramOptions msg effect
+emptyOptions =
+    { baseUrl = Nothing
+    , deconstructEffect = Nothing
+    }
 
-If your program uses `Json.Encode.Value` as its flags type,
-you may find [`createWithJsonStringFlags`](#createWithJsonStringFlags) useful.
 
-If your program does not use flags, see [`create`](#create).
+{-| Creates a `TestContext` from the parts of a `Browser.element` program.
 
-See other `create*` functions below if the program you want to test
-uses nagivation.
+See other `create*` functions below if the program you want to test does not use `Browser.element`.
 
 -}
-createWithFlags :
+createElement :
     { init : flags -> ( model, effect )
-    , update : msg -> model -> ( model, effect )
     , view : model -> Html msg
+    , update : msg -> model -> ( model, effect )
     }
-    -> flags
-    -> TestContext msg model effect
-createWithFlags program flags =
-    createHelper
-        { init = program.init flags
-        , update = program.update
-        , view = program.view
-        , onRouteChange = \_ -> Nothing
-        , initialLocation = Nothing
-        , deconstructEffect = Nothing
-        }
-
-
-{-| A simplified way to create a `TestContext` for a program that decodes its flags with a JSON decoder.
-
-If your program does not use `Json.Encode.Value` as its flags type,
-or you want more control over how the flags are provided in your tests,
-see [`createWithFlags`](#createWithFlags).
-
-If your program does not use flags, see [`create`](#create).
-
-See other `create*` functions below if the program you want to test
-uses nagivation.
-
--}
-createWithJsonStringFlags :
-    Json.Decode.Decoder flags
-    ->
-        { init : flags -> ( model, effect )
-        , update : msg -> model -> ( model, effect )
-        , view : model -> Html msg
-        }
-    -> String
-    -> TestContext msg model effect
-createWithJsonStringFlags flagsDecoder program flagsJson =
-    case Json.Decode.decodeString flagsDecoder flagsJson of
-        Err message ->
-            Finished (InvalidFlags "createWithJsonStringFlags" (Json.Decode.errorToString message))
-
-        Ok flags ->
+    -> ProgramDefinition flags msg model effect
+createElement program =
+    ProgramDefinition emptyOptions <|
+        \location flags ->
             createHelper
                 { init = program.init flags
                 , update = program.update
                 , view = program.view
                 , onRouteChange = \_ -> Nothing
-                , initialLocation = Nothing
-                , deconstructEffect = Nothing
                 }
 
 
-{-| Creates a `TestContext` from the parts of a `Navigation.program`.
-
-See other `create*` functions above and below if the program you want to test
-uses flags or does not use nagivation.
-
--}
-createWithNavigation :
-    (Url -> msg)
-    ->
-        { init : Url -> ( model, effect )
-        , update : msg -> model -> ( model, effect )
-        , view : model -> Html msg
-        }
-    -> String
-    -> TestContext msg model effect
-createWithNavigation onRouteChange program initialUrl =
-    case Url.Extra.locationFromString initialUrl of
-        Nothing ->
-            Finished (InvalidLocationUrl "createWithNavigation" initialUrl)
-
-        Just location ->
-            createHelper
-                { init = program.init location
-                , update = program.update
-                , view = program.view
-                , onRouteChange = onRouteChange >> Just
-                , initialLocation = Just location
-                , deconstructEffect = Nothing
-                }
-
-
-{-| Creates a `TestContext` from the parts of a program with navigation and flags (`Navigation.programWithFlags`).
+{-| Starts the given test program by initializing it with the given flags.
 
 If your program uses `Json.Encode.Value` as its flags type,
-you may find [`createWithNavigationAndJsonStringFlags`](#createWithNavigationAndJsonStringFlags) useful.
-
-If your program does not use flags, see [`createWithNavigation`](#createWithNavigation).
-
-If your program does not use navigation, see [`createWithFlags`](#createWithFlags).
+you may find [`withJsonStringFlags`](#withJsonStringFlags) useful.
 
 -}
-createWithNavigationAndFlags :
-    (Url -> msg)
-    ->
-        { init : flags -> Url -> ( model, effect )
-        , update : msg -> model -> ( model, effect )
-        , view : model -> Html msg
-        }
-    -> String
-    -> flags
-    -> TestContext msg model effect
-createWithNavigationAndFlags onRouteChange program initialUrl flags =
-    case Url.Extra.locationFromString initialUrl of
-        Nothing ->
-            Finished (InvalidLocationUrl "createWithNavigationAndFlags" initialUrl)
+start : flags -> ProgramDefinition flags msg model effect -> TestContext msg model effect
+start flags (ProgramDefinition options program) =
+    program options.baseUrl flags options
 
-        Just location ->
+
+{-| Sets the initial browser URL
+
+You must set this when using `createApplication`,
+or when testing clicking links with relative URLs with [`clickLink`](#clickLink) and [`expectPageChange`](#expectPageChange).
+
+-}
+withBaseUrl : String -> ProgramDefinition flags msg model effect -> ProgramDefinition flags msg model effect
+withBaseUrl baseUrl (ProgramDefinition options program) =
+    case Url.Extra.locationFromString baseUrl of
+        Nothing ->
+            ProgramDefinition options (\_ _ _ -> Finished (InvalidLocationUrl "startWithBaseUrl" baseUrl))
+
+        Just url ->
+            ProgramDefinition { options | baseUrl = Just url } program
+
+
+{-| Provides a convenient way to provide flags for a program that decodes flags from JSON.
+By providing the JSON decoder, you can then provide the flags as a JSON string when calling
+[`start`](#start).
+-}
+withJsonStringFlags :
+    Json.Decode.Decoder flags
+    -> ProgramDefinition flags msg model effect
+    -> ProgramDefinition String msg model effect
+withJsonStringFlags decoder (ProgramDefinition options program) =
+    ProgramDefinition options <|
+        \location json ->
+            case Json.Decode.decodeString decoder json of
+                Ok flags ->
+                    program location flags
+
+                Err message ->
+                    \_ -> Finished (InvalidFlags "withJsonStringFlags" (Json.Decode.errorToString message))
+
+
+{-| This allows you to provide a function that lets `TestContext` simulate HTTP effects
+(this enables you to use [`assertHttpRequest`](#assertHttpRequest)).
+
+You only need to use this if you need to simulate HTTP requests.
+
+-}
+withSimulatedEffects :
+    (effect -> List (SimulatedEffect msg))
+    -> ProgramDefinition flags msg model effect
+    -> ProgramDefinition flags msg model effect
+withSimulatedEffects fn (ProgramDefinition options program) =
+    ProgramDefinition { options | deconstructEffect = Just fn } program
+
+
+{-| Creates a `TestContext` from the parts of a `Browser.document` program.
+
+See other `create*` functions below if the program you want to test does not use `Browser.document`.
+
+-}
+createDocument :
+    { init : flags -> ( model, effect )
+    , view : model -> Browser.Document msg
+    , update : msg -> model -> ( model, effect )
+    }
+    -> ProgramDefinition flags msg model effect
+createDocument program =
+    ProgramDefinition emptyOptions <|
+        \location flags ->
             createHelper
-                { init = program.init flags location
+                { init = program.init flags
                 , update = program.update
-                , view = program.view
-                , onRouteChange = onRouteChange >> Just
-                , initialLocation = Just location
-                , deconstructEffect = Nothing
+                , view = \model -> Html.node "body" [] (program.view model).body
+                , onRouteChange = \_ -> Nothing
                 }
 
 
-{-| A simplified way to create a `TestContext` for a program with navigation that decodes its flags with a JSON decoder.
+{-| Creates a `TestContext` from the parts of a `Browser.application` program.
 
-If your program does not use `Json.Encode.Value` as its flags type,
-or you want more control over how the flags are provided in your tests,
-see [`createWithNavigationAndFlags`](#createWithNavigationAndFlags).
-
-If your program does not use flags, see [`createWithNavigation`](#createWithNavigation).
-
-If your program does not use navigation, see [`createWithJsonStringFlags`](#createWithJsonStringFlags).
+See other `create*` functions below if the program you want to test does not use `Browser.application`.
 
 -}
-createWithNavigationAndJsonStringFlags :
-    Json.Decode.Decoder flags
-    -> (Url -> msg)
-    ->
-        { init : flags -> Url -> ( model, effect )
-        , update : msg -> model -> ( model, effect )
-        , view : model -> Html msg
-        }
-    -> String
-    -> String
-    -> TestContext msg model effect
-createWithNavigationAndJsonStringFlags flagsDecoder onRouteChange program initialUrl flagsJson =
-    case Url.Extra.locationFromString initialUrl of
-        Nothing ->
-            Finished (InvalidLocationUrl "createWithNavigationAndJsonStringFlags" initialUrl)
+createApplication :
+    { init : flags -> Url -> () -> ( model, effect )
+    , view : model -> Browser.Document msg
+    , update : msg -> model -> ( model, effect )
+    , onUrlRequest : Browser.UrlRequest -> msg
+    , onUrlChange : Url -> msg
+    }
+    -> ProgramDefinition flags msg model effect
+createApplication program =
+    ProgramDefinition emptyOptions <|
+        \location flags ->
+            case location of
+                Nothing ->
+                    \_ -> Finished (NoBaseUrl "createApplication" "")
 
-        Just location ->
-            case Json.Decode.decodeString flagsDecoder flagsJson of
-                Err message ->
-                    Finished (InvalidFlags "createWithNavigationAndJsonStringFlags" (Json.Decode.errorToString message))
-
-                Ok flags ->
+                Just url ->
                     createHelper
-                        { init = program.init flags location
+                        { init = program.init flags url ()
                         , update = program.update
-                        , view = program.view
-                        , onRouteChange = onRouteChange >> Just
-                        , initialLocation = Just location
-                        , deconstructEffect = Nothing
+                        , view = \model -> Html.node "body" [] (program.view model).body
+                        , onRouteChange = program.onUrlChange >> Just
                         }
 
 
 {-| This represents an effect that elm-program-test is able to simulate.
-When using `createWithSimulatedEffects` you will provide a function that can translate
+When using `withSimulatedEffects` you will provide a function that can translate
 your programs' effects into `SimulatedEffect`s.
-(If you do not use a `create*` function that lets your provide a
-`deconstructEffect : effect -> List SimulatedEffect` function,
+(If you do not use `withSimulatedEffects`,
 then `TestContext` will not simulate any HTTP effects for you.)
 
 See the `SimulatedEffect.Http` module for functions that make it easier to create `SimulatedEffect` values.
@@ -453,31 +399,6 @@ type SimulatedEffect msg
         { method : String
         , url : String
         , onRequestComplete : Http.Response String -> msg
-        }
-
-
-{-| Creates a `TestContext` from the parts of a standard `Html.program`,
-and lets you provide a `deconstructEffect` function that lets `TestContext` simulate HTTP effects
-(this enables you to use `assertHttpRequest`).
-
-If you do not need to simulate HTTP requests, you can use [`create`](#create) instead.
-
--}
-createWithSimulatedEffects :
-    { init : ( model, effect )
-    , update : msg -> model -> ( model, effect )
-    , view : model -> Html msg
-    , deconstructEffect : effect -> List (SimulatedEffect msg)
-    }
-    -> TestContext msg model effect
-createWithSimulatedEffects program =
-    createHelper
-        { init = program.init
-        , update = program.update
-        , view = program.view
-        , onRouteChange = \_ -> Nothing
-        , initialLocation = Nothing
-        , deconstructEffect = Just program.deconstructEffect
         }
 
 
@@ -560,25 +481,43 @@ a future release of this package will remove the `fieldId` parameter.
 simulateLabeledInputHelper : String -> String -> String -> Bool -> List Selector -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
 simulateLabeledInputHelper functionDescription fieldId label allowTextArea additionalInputSelectors event testContext =
     testContext
-        |> expectViewHelper functionDescription
-            (Query.find
-                [ Selector.tag "label"
-                , Selector.attribute (Html.Attributes.for fieldId)
-                , Selector.text label
-                ]
-                >> Query.has []
-            )
+        |> (if fieldId == "" then
+                identity
+
+            else
+                expectViewHelper functionDescription
+                    (Query.find
+                        [ Selector.tag "label"
+                        , Selector.attribute (Html.Attributes.for fieldId)
+                        , Selector.text label
+                        ]
+                        >> Query.has []
+                    )
+           )
         |> simulateHelper functionDescription
             (Query.Extra.oneOf <|
                 List.concat
-                    [ [ Query.find <|
+                    [ if fieldId == "" then
+                        [ Query.find
+                            [ Selector.tag "label"
+                            , Selector.containing [ Selector.text label ]
+                            ]
+                            >> Query.find [ Selector.tag "input" ]
+                        , Query.find
+                            [ Selector.tag "input"
+                            , Selector.attribute (attribute "aria-label" label)
+                            ]
+                        ]
+
+                      else
+                        [ Query.find <|
                             List.concat
                                 [ [ Selector.tag "input"
                                   , Selector.id fieldId
                                   ]
                                 , additionalInputSelectors
                                 ]
-                      ]
+                        ]
                     , if allowTextArea then
                         [ Query.find
                             [ Selector.tag "textarea"
@@ -766,18 +705,41 @@ followLink functionDescription href testContext =
 
 {-| Simulates replacing the text in an input field labeled with the given label.
 
-NOTE: Currently, this function requires that you also provide the field id
-(which must match both the `id` attribute of the target `input` element,
-and the `for` attribute of the `label` element).
-After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
-a future release of this package will remove the `fieldId` parameter.
+  - `fieldId`: the field id
+    (which must match both the `id` attribute of the target `input` element,
+    and the `for` attribute of the `label` element),
+    or `""` if the `<input>` is a descendant of the `<label>`.
 
-NOTE: TODO: In the future, this will be generalized to work with
-labeled textareas as well as labeled input fields.
-(related to [eeue56/elm-html-test#49](https://github.com/eeue56/elm-html-test/issues/49>))
+    NOTE: After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+    a future release of this package will remove the `fieldId` parameter.
 
-NOTE: In the future, this will be generalized to work with
-aria accessiblity attributes in addition to working with standard HTML label elements.
+  - `label`: the label text of the input field
+
+  - `text`: the text that will be used to trigger the `onInput` event of the input field
+
+There are a few different ways to accessibly label your input fields so that `fillIn` will find them:
+
+  - You can place the `<input>` element inside a `<label>` element that also contains the label text.
+
+    ```html
+    <label>
+        Favorite fruit
+        <input>
+    </label>
+    ```
+
+  - You can place the `<input>` and a `<label>` element anywhere on the page and link them with a unique id.
+
+    ```html
+    <label for="fruit">Favorite fruit</label>
+    <input id="fruit"></input>
+    ```
+
+  - You can use the `aria-label` attribute.
+
+    ```html
+    <input aria-label="Favorite fruit"></input>
+    ```
 
 If you need to target a `<textarea>` that does not have a label,
 see [`fillInTextarea`](#fillInTextArea).
@@ -966,8 +928,7 @@ within findTarget onScopedTest testContext =
 
 {-| A final assertion that checks whether an HTTP request to the specific url and method has been made.
 
-NOTE: You must use `createWithSimulatedEffects` to create your initial `TestContext` to be able to use
-this function.
+NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
 assertHttpRequest : { method : String, url : String } -> TestContext msg model effect -> Expectation
@@ -1246,10 +1207,10 @@ done testContext =
             Expect.fail (functionName ++ ":\n" ++ message)
 
         Finished (ProgramDoesNotSupportNavigation functionName) ->
-            Expect.fail (functionName ++ ": Program does not support navigation.  Use TestContext.createWithNavigation or related function to create a TestContext that supports navigation.")
+            Expect.fail (functionName ++ ": Program does not support navigation.  Use TestContext.application to create a TestContext that supports navigation.")
 
         Finished (NoBaseUrl functionName relativeUrl) ->
-            Expect.fail (functionName ++ ": The TestContext does not have a base URL and cannot resolve the relative URL " ++ escapeString relativeUrl ++ ".  Use TestContext.createWithBaseUrl to create a TestContext that can resolve relative URLs.")
+            Expect.fail (functionName ++ ": The TestContext does not have a base URL and cannot resolve the relative URL " ++ escapeString relativeUrl ++ ".  Use TestContext.startWithBaseUrl to create a TestContext that can resolve relative URLs.")
 
         Finished (NoMatchingHttpRequest functionName request pendingRequests) ->
             Expect.fail <|
@@ -1274,7 +1235,7 @@ done testContext =
                     ]
 
         Finished (EffectSimulationNotConfigured functionName) ->
-            Expect.fail ("TEST SETUP ERROR: In order to use " ++ functionName ++ ", you MUST create your TestContext with TestContext.createWithSimulatedEvents")
+            Expect.fail ("TEST SETUP ERROR: In order to use " ++ functionName ++ ", you MUST use TestContext.withSimulatedEffects before calling TestContext.start")
 
         Finished (CustomFailure assertionName message) ->
             Expect.fail (assertionName ++ ": " ++ message)
@@ -1314,6 +1275,8 @@ but will also fail the TestContext if the `expectedCount` parameter is invalid):
                     , Test.Html.Selector.text (toString expectedCount)
                     ]
 
+If you are writing a convenience function that is creating a test context, see [`createFailed`](#createFailed).
+
 -}
 fail : String -> String -> TestContext msg model effect -> TestContext msg model effect
 fail assertionName failureMessage testContext =
@@ -1323,3 +1286,13 @@ fail assertionName failureMessage testContext =
 
         Active _ ->
             Finished (CustomFailure assertionName failureMessage)
+
+
+{-| `createFailed` can be used to report custom errors if you are writing your own convenience functions to **create** test contexts.
+
+NOTE: if you are writing a convenience function that takes a `TestContext` as input, you should use [`fail`](#fail) instead, as it provides more context in the test failure message.
+
+-}
+createFailed : String -> String -> TestContext msg model effect
+createFailed functionName failureMessage =
+    Finished (CustomFailure functionName failureMessage)

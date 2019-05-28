@@ -1,38 +1,22 @@
-module TestContextUserInputTests exposing (all)
+module TestContextTests.UserInput.SelectOptionTest exposing (all)
 
 import Expect exposing (Expectation)
 import Html exposing (Html)
 import Html.Attributes exposing (for, id, value)
 import Html.Events exposing (on)
-import Json.Decode
 import Test exposing (..)
-import Test.Html.Query as Query
-import Test.Html.Selector as Selector
 import Test.Runner
 import TestContext exposing (TestContext)
 
 
 testContext : TestContext String String ()
 testContext =
-    TestContext.create
-        { init = testInit
-        , update = testUpdate
+    TestContext.createSandbox
+        { init = "<INIT>"
+        , update = \msg model -> model ++ ";" ++ msg
         , view = testView
         }
-
-
-testInit : ( String, () )
-testInit =
-    ( "<INIT>"
-    , ()
-    )
-
-
-testUpdate : String -> String -> ( String, () )
-testUpdate msg model =
-    ( model ++ ";" ++ msg
-    , ()
-    )
+        |> TestContext.start ()
 
 
 testView : String -> Html String
@@ -60,26 +44,24 @@ testView model =
 
 all : Test
 all =
-    describe "simulating user input"
-        [ describe "selectOption"
-            [ test "can select an option" <|
-                \() ->
-                    testContext
-                        |> TestContext.selectOption "pet-select" "Choose a pet" "hamster-value" "Hamster"
-                        |> TestContext.expectModel (Expect.equal "<INIT>;hamster-value")
-            , test "fails if there is no onChange handler" <|
-                \() ->
-                    testContext
-                        |> TestContext.selectOption "name-select" "Choose a name" "george-value" "George"
-                        |> TestContext.done
-                        |> Test.Runner.getFailureReason
-                        |> Maybe.map .description
-                        |> Maybe.withDefault "<Expected selectOption to fail, but it succeeded>"
-                        |> Expect.all
-                            [ expectContains "selectOption"
-                            , expectContains "The event change does not exist on the found node."
-                            ]
-            ]
+    describe "TestContext.selectionOption"
+        [ test "can select an option" <|
+            \() ->
+                testContext
+                    |> TestContext.selectOption "pet-select" "Choose a pet" "hamster-value" "Hamster"
+                    |> TestContext.expectModel (Expect.equal "<INIT>;hamster-value")
+        , test "fails if there is no onChange handler" <|
+            \() ->
+                testContext
+                    |> TestContext.selectOption "name-select" "Choose a name" "george-value" "George"
+                    |> TestContext.done
+                    |> Test.Runner.getFailureReason
+                    |> Maybe.map .description
+                    |> Maybe.withDefault "<Expected selectOption to fail, but it succeeded>"
+                    |> Expect.all
+                        [ expectContains "selectOption"
+                        , expectContains "The event change does not exist on the found node."
+                        ]
         ]
 
 

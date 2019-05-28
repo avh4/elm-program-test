@@ -2,7 +2,7 @@ module TestContextTests exposing (all)
 
 import Expect
 import Html exposing (Html)
-import Html.Attributes exposing (for, href, id, type_)
+import Html.Attributes exposing (for, id, type_)
 import Html.Events exposing (onClick)
 import Json.Decode
 import Json.Encode
@@ -80,11 +80,12 @@ testView model =
 
 testContext : TestContext String String TestEffect
 testContext =
-    TestContext.create
-        { init = testInit
+    TestContext.createElement
+        { init = \() -> testInit
         , update = testUpdate
         , view = testView
         }
+        |> TestContext.start ()
 
 
 all : Test
@@ -106,65 +107,88 @@ all =
                     |> TestContext.expectModel (Expect.equal "<INIT>;CLICK")
         , test "can create with flags" <|
             \() ->
-                TestContext.createWithFlags
+                TestContext.createElement
                     { init = \flags -> ( "<INIT:" ++ flags ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
-                    "flags"
+                    |> TestContext.start "flags"
                     |> TestContext.expectModel (Expect.equal "<INIT:flags>")
         , test "can create with JSON string flags" <|
             \() ->
-                TestContext.createWithJsonStringFlags
-                    (Json.Decode.field "y" Json.Decode.string)
+                TestContext.createElement
                     { init = \flags -> ( "<INIT:" ++ flags ++ ">", NoOp )
                     , update = testUpdate
                     , view = testView
                     }
-                    """{"y": "fromJson"}"""
+                    |> TestContext.withJsonStringFlags (Json.Decode.field "y" Json.Decode.string)
+                    |> TestContext.start """{"y": "fromJson"}"""
                     |> TestContext.expectModel (Expect.equal "<INIT:fromJson>")
         , test "can create with navigation" <|
             \() ->
-                TestContext.createWithNavigation
-                    .path
-                    { init = \location -> ( "<INIT:" ++ location.path ++ ">", NoOp )
+                TestContext.createApplication
+                    { onUrlChange = .path
+                    , onUrlRequest = \_ -> Debug.todo "TestContextTests-1:onUrlRequest"
+                    , init = \() location key -> ( "<INIT:" ++ location.path ++ ">", NoOp )
                     , update = testUpdate
-                    , view = testView
+                    , view =
+                        \model ->
+                            { title = "page title"
+                            , body = [ testView model ]
+                            }
                     }
-                    "https://example.com/path"
+                    |> TestContext.withBaseUrl "https://example.com/path"
+                    |> TestContext.start ()
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>")
         , test "can simulate a route change" <|
             \() ->
-                TestContext.createWithNavigation
-                    .path
-                    { init = \location -> ( "<INIT:" ++ location.path ++ ">", NoOp )
+                TestContext.createApplication
+                    { onUrlChange = .path
+                    , onUrlRequest = \_ -> Debug.todo "TestContextTests-2:onUrlRequest"
+                    , init = \() location key -> ( "<INIT:" ++ location.path ++ ">", NoOp )
                     , update = testUpdate
-                    , view = testView
+                    , view =
+                        \model ->
+                            { title = "page title"
+                            , body = [ testView model ]
+                            }
                     }
-                    "https://example.com/path"
+                    |> TestContext.withBaseUrl "https://example.com/path"
+                    |> TestContext.start ()
                     |> TestContext.routeChange "https://example.com/new"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>;/new")
         , test "can simulate a route change with a relative URL" <|
             \() ->
-                TestContext.createWithNavigation
-                    .path
-                    { init = \location -> ( "<INIT:" ++ location.path ++ ">", NoOp )
+                TestContext.createApplication
+                    { onUrlChange = .path
+                    , onUrlRequest = \_ -> Debug.todo "TestContextTests-3:onUrlRequest"
+                    , init = \() location key -> ( "<INIT:" ++ location.path ++ ">", NoOp )
                     , update = testUpdate
-                    , view = testView
+                    , view =
+                        \model ->
+                            { title = "page title"
+                            , body = [ testView model ]
+                            }
                     }
-                    "https://example.com/path"
+                    |> TestContext.withBaseUrl "https://example.com/path"
+                    |> TestContext.start ()
                     |> TestContext.routeChange "/new"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>;/new")
         , test "can create with navigation and flags" <|
             \() ->
-                TestContext.createWithNavigationAndFlags
-                    .path
-                    { init = \flags location -> ( "<INIT:" ++ location.path ++ ":" ++ flags ++ ">", NoOp )
+                TestContext.createApplication
+                    { onUrlChange = .path
+                    , onUrlRequest = \_ -> Debug.todo "TestContextTests-4:onUrlRequest"
+                    , init = \flags location key -> ( "<INIT:" ++ location.path ++ ":" ++ flags ++ ">", NoOp )
                     , update = testUpdate
-                    , view = testView
+                    , view =
+                        \model ->
+                            { title = "page title"
+                            , body = [ testView model ]
+                            }
                     }
-                    "https://example.com/path"
-                    "flags"
+                    |> TestContext.withBaseUrl "https://example.com/path"
+                    |> TestContext.start "flags"
                     |> TestContext.expectModel (Expect.equal "<INIT:/path:flags>")
         , test "can assert on the view" <|
             \() ->
@@ -179,15 +203,20 @@ all =
                         (Query.find [ Selector.tag "span" ] >> Query.has [ Selector.text "<INIT>" ])
         , test "can create with navigation and JSON string flags" <|
             \() ->
-                TestContext.createWithNavigationAndJsonStringFlags
-                    (Json.Decode.field "x" Json.Decode.string)
-                    .path
-                    { init = \flags location -> ( "<INIT:" ++ location.path ++ ":" ++ flags ++ ">", NoOp )
+                TestContext.createApplication
+                    { onUrlChange = .path
+                    , onUrlRequest = \_ -> Debug.todo "TestContextTests-5:onUrlRequest"
+                    , init = \flags location key -> ( "<INIT:" ++ location.path ++ ":" ++ flags ++ ">", NoOp )
                     , update = testUpdate
-                    , view = testView
+                    , view =
+                        \model ->
+                            { title = "page title"
+                            , body = [ testView model ]
+                            }
                     }
-                    "https://example.com/path"
-                    """{"x": "fromJson"}"""
+                    |> TestContext.withJsonStringFlags (Json.Decode.field "x" Json.Decode.string)
+                    |> TestContext.withBaseUrl "https://example.com/path"
+                    |> TestContext.start """{"x": "fromJson"}"""
                     |> TestContext.expectModel (Expect.equal "<INIT:/path:fromJson>")
         , test "can assert on the view concisely given Html.Test.Selectors" <|
             \() ->
@@ -249,11 +278,6 @@ all =
                     |> Test.Runner.getFailureReason
                     |> Maybe.map .description
                     |> Expect.equal (Just "custom: Because I said so")
-        , test "can simulate textarea input" <|
-            \() ->
-                testContext
-                    |> TestContext.fillInTextarea "ABC"
-                    |> TestContext.expectModel (Expect.equal "<INIT>;Input:textarea:ABC")
         , test "can narrow down the area to specified element" <|
             \() ->
                 testContext
@@ -262,102 +286,9 @@ all =
                         (TestContext.clickButton "Ambiguous click")
                     |> TestContext.clickButton "Click Me"
                     |> TestContext.expectModel (Expect.equal "<INIT>;CLICK-B;CLICK")
-        , test "can simulate text input on a labeled field" <|
-            \() ->
-                testContext
-                    |> TestContext.fillIn "field-1" "Field 1" "value99"
-                    |> TestContext.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
-        , test "can simulate text input on a labeled textarea" <|
-            \() ->
-                TestContext.create
-                    { init = testInit
-                    , update = testUpdate
-                    , view =
-                        \_ ->
-                            Html.div []
-                                [ Html.label [ for "field-1" ] [ Html.text "Field 1" ]
-                                , Html.textarea [ id "field-1", handleInput "field-1" ] []
-                                , Html.label [ for "field-2" ] [ Html.text "Field 2" ]
-                                , Html.textarea [ id "field-2", handleInput "field-2" ] []
-                                ]
-                    }
-                    |> TestContext.fillIn "field-1" "Field 1" "value99"
-                    |> TestContext.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
         , test "can simulate setting a labeled checkbox field" <|
             \() ->
                 testContext
                     |> TestContext.check "checkbox-1" "Checkbox 1" True
                     |> TestContext.expectModel (Expect.equal "<INIT>;Check:checkbox-1:True")
-        , describe "clicking links" <|
-            let
-                linkProgram =
-                    TestContext.createWithBaseUrl
-                        { init = testInit
-                        , update = testUpdate
-                        , view =
-                            \model ->
-                                Html.div []
-                                    [ Html.a [ href "https://example.com/link" ] [ Html.text "External" ]
-                                    , Html.a [ href "/settings" ] [ Html.text "Relative" ]
-                                    ]
-                        }
-                        "http://localhost:3000/Main.elm"
-            in
-            [ test "can verify an absolute link" <|
-                \() ->
-                    linkProgram
-                        |> TestContext.clickLink "External" "https://example.com/link"
-                        |> TestContext.expectPageChange "https://example.com/link"
-            , test "can verify a relative link" <|
-                \() ->
-                    linkProgram
-                        |> TestContext.clickLink "Relative" "/settings"
-                        |> TestContext.expectPageChange "http://localhost:3000/settings"
-            , test "can verify an internal (single-page app) link" <|
-                \() ->
-                    TestContext.createWithNavigation
-                        .path
-                        { init = \location -> ( "<INIT:" ++ location.path ++ ">", NoOp )
-                        , update = testUpdate
-                        , view =
-                            \_ ->
-                                Html.div []
-                                    [ Html.a
-                                        [ href "#search"
-                                        , onClickPreventDefaultForLinkWithHref "GoToSearch"
-                                        ]
-                                        [ Html.text "SPA" ]
-                                    ]
-                        }
-                        "http://localhost:3000/"
-                        |> TestContext.clickLink "SPA" "#search"
-                        |> TestContext.expectModel (Expect.equal "<INIT:/>;GoToSearch")
-            ]
         ]
-
-
-onClickPreventDefaultForLinkWithHref : msg -> Html.Attribute msg
-onClickPreventDefaultForLinkWithHref msg =
-    let
-        isSpecialClick : Json.Decode.Decoder Bool
-        isSpecialClick =
-            Json.Decode.map2
-                (\isCtrl isMeta -> isCtrl || isMeta)
-                (Json.Decode.field "ctrlKey" Json.Decode.bool)
-                (Json.Decode.field "metaKey" Json.Decode.bool)
-    in
-    Html.Events.preventDefaultOn "click"
-        (isSpecialClick
-            |> Json.Decode.andThen (succeedIfFalse msg)
-            |> Json.Decode.map (\m -> ( m, True ))
-        )
-
-
-succeedIfFalse : a -> Bool -> Json.Decode.Decoder a
-succeedIfFalse msg preventDefault =
-    case preventDefault of
-        False ->
-            Json.Decode.succeed msg
-
-        True ->
-            Json.Decode.fail "succeedIfFalse: condition was True"
