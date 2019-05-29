@@ -31,7 +31,7 @@ to help you implement the function to provide when using `TestContext.withSimula
 
 # Expect
 
-@docs Expect, expectString, expectJson, Error
+@docs Expect, expectString, expectJson, expectWhatever, Error
 
 
 # Elaborate Expectations
@@ -207,6 +207,29 @@ expectJson onResult decoder =
 
                         Ok value ->
                             onResult (Ok value)
+
+
+{-| Expect the response body to be whatever.
+-}
+expectWhatever : (Result Error () -> msg) -> Expect msg
+expectWhatever onResult =
+    Expect <|
+        \response ->
+            case response of
+                Http.BadUrl_ s ->
+                    onResult (Err <| Http.BadUrl s)
+
+                Http.Timeout_ ->
+                    onResult (Err Http.Timeout)
+
+                Http.NetworkError_ ->
+                    onResult (Err Http.NetworkError)
+
+                Http.BadStatus_ metadata _ ->
+                    onResult (Err <| Http.BadStatus metadata.statusCode)
+
+                Http.GoodStatus_ _ _ ->
+                    onResult (Ok ())
 
 
 {-| -}

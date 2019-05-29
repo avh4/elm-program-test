@@ -11,53 +11,14 @@ import Test.Runner
 import TestContext exposing (TestContext)
 
 
-type TestEffect
-    = NoEffect
-    | HttpGet String
-    | HttpPost String String
-    | HttpTask String
-
-
-deconstructEffect : TestEffect -> List (TestContext.SimulatedEffect TestMsg)
-deconstructEffect testEffect =
-    case testEffect of
-        NoEffect ->
-            []
-
-        HttpGet url ->
-            [ Http.get
-                { url = url
-                , expect =
-                    Http.expectJson HandleFriendsResponse
-                        (Json.Decode.list Json.Decode.string)
-                }
-            ]
-
-        HttpPost url body ->
-            [ Http.post
-                { url = url
-                , body = Http.stringBody "application/json" body
-                , expect = Http.expectString HandlePostResponse
-                }
-            ]
-
-        HttpTask url ->
-            [ Http.task
-                { method = "GET"
-                , headers = []
-                , url = url
-                , body = Http.emptyBody
-                , resolver = Http.stringResolver (\response -> Ok "")
-                , timeout = Nothing
-                }
-                |> Task.attempt HandlePostResponse
-            ]
+type alias TestEffect =
+    List (TestContext.SimulatedEffect TestMsg)
 
 
 type TestMsg
     = PassThroughEffect TestEffect
     | HandleFriendsResponse (Result Http.Error (List String))
-    | HandlePostResponse (Result Http.Error String)
+    | HandleStringResponse (Result Http.Error String)
 
 
 type alias TestModel =
@@ -75,19 +36,29 @@ start initialEffect =
                         ( model, effect )
 
                     HandleFriendsResponse result ->
-                        ( Debug.toString result, NoEffect )
+                        ( Debug.toString result, [] )
 
-                    HandlePostResponse result ->
-                        ( Debug.toString result, NoEffect )
+                    HandleStringResponse result ->
+                        ( Debug.toString result, [] )
         , view =
             \_ ->
                 Html.div []
                     [ Html.button
-                        [ onClick (PassThroughEffect (HttpGet "https://example.com/buttons/get")) ]
+                        [ onClick
+                            (PassThroughEffect
+                                [ Http.get
+                                    { url = "https://example.com/buttons/get"
+                                    , expect =
+                                        Http.expectJson HandleFriendsResponse
+                                            (Json.Decode.list Json.Decode.string)
+                                    }
+                                ]
+                            )
+                        ]
                         [ Html.text "Get" ]
                     ]
         }
-        |> TestContext.withSimulatedEffects deconstructEffect
+        |> TestContext.withSimulatedEffects identity
         |> TestContext.start ()
 
 
@@ -97,7 +68,7 @@ all =
         [ describe "assertHttpRequest"
             [ test "can assert that an HTTP request was made from init (failure)" <|
                 \() ->
-                    start NoEffect
+                    start []
                         |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectFailure
                             (String.join "\n"
@@ -107,29 +78,39 @@ all =
                             )
             , test "can assert that an HTTP request was made from init (success)" <|
                 \() ->
-                    start (HttpGet "https://example.com/")
+                    start [ Http.get { url = "https://example.com/", expect = Http.expectString HandleStringResponse } ]
                         |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectSuccess
             , test "can assert that an HTTP request was made via a Task" <|
                 \() ->
-                    start (HttpTask "https://example.com/get")
+                    start
+                        [ Http.task
+                            { method = "GET"
+                            , headers = []
+                            , url = "https://example.com/get"
+                            , body = Http.emptyBody
+                            , resolver = Http.stringResolver (\_ -> Ok "")
+                            , timeout = Nothing
+                            }
+                            |> Task.attempt HandleStringResponse
+                        ]
                         |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/get"
                         |> expectSuccess
             , test "can assert that an HTTP request was made from update" <|
                 \() ->
-                    start NoEffect
-                        |> TestContext.update (PassThroughEffect (HttpGet "https://example.com/from-update"))
+                    start []
+                        |> TestContext.update (PassThroughEffect [ Http.get { url = "https://example.com/from-update", expect = Http.expectString HandleStringResponse } ])
                         |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/from-update"
                         |> expectSuccess
             , test "can assert that an HTTP request was made via a user interaction" <|
                 \() ->
-                    start NoEffect
+                    start []
                         |> TestContext.clickButton "Get"
                         |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/buttons/get"
                         |> expectSuccess
             , test "error message includes list of pending requests" <|
                 \() ->
-                    start (HttpGet "https://example.com/actualRequest")
+                    start [ Http.get { url = "https://example.com/actualRequest", expect = Http.expectString HandleStringResponse } ]
                         |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/not-made"
                         |> expectFailure
                             (String.join "\n"
@@ -150,7 +131,13 @@ all =
                         |> expectFailure "TEST SETUP ERROR: In order to use assertHttpRequestWasMade, you MUST use TestContext.withSimulatedEffects before calling TestContext.start"
             , test "can assert on request body" <|
                 \() ->
-                    start (HttpPost "https://example.com/ok" """{"ok":true}""")
+                    start
+                        [ Http.post
+                            { url = "https://example.com/ok"
+                            , body = Http.stringBody "application/json" """{"ok":true}"""
+                            , expect = Http.expectString HandleStringResponse
+                            }
+                        ]
                         |> TestContext.assertHttpRequest "POST"
                             "https://example.com/ok"
                             (.body >> Expect.equal """{"ok":900}""")
@@ -171,14 +158,21 @@ all =
         , describe "simulateHttpResponse"
             [ test "simulate OK response with valid JSON" <|
                 \() ->
-                    start (HttpGet "https://example.com/friends")
+                    start
+                        [ Http.get
+                            { url = "https://example.com/friends"
+                            , expect =
+                                Http.expectJson HandleFriendsResponse
+                                    (Json.Decode.list Json.Decode.string)
+                            }
+                        ]
                         |> TestContext.simulateHttpSuccess "GET"
                             "https://example.com/friends"
                             """["Alex","Kelsey","Sam"]"""
                         |> TestContext.expectModel (Expect.equal """Ok ["Alex","Kelsey","Sam"]""")
             , test "simulate error response" <|
                 \() ->
-                    start (HttpGet "https://example.com/friends")
+                    start [ Http.get { url = "https://example.com/friends", expect = Http.expectString HandleStringResponse } ]
                         |> TestContext.simulateHttpResponse
                             { method = "GET"
                             , url = "https://example.com/friends"
