@@ -100,7 +100,7 @@ import Http
 import Json.Decode
 import Json.Encode
 import Query.Extra
-import SimulatedEffect exposing (SimulatedEffect)
+import SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
 import Test.Html.Event
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector exposing (Selector)
@@ -130,7 +130,7 @@ type TestContext msg model effect
 
 
 type alias SimulationState msg =
-    { http : Dict ( String, String ) ( HttpRequest, Http.Response String -> msg )
+    { http : Dict ( String, String ) ( HttpRequest, Http.Response String -> SimulatedTask msg msg )
     }
 
 
@@ -209,12 +209,18 @@ applySimulatedEffects effect ( deconstructEffect, simulationState ) =
 simulateEffect : SimulatedEffect msg -> SimulationState msg -> SimulationState msg
 simulateEffect simulatedEffect simulationState =
     case simulatedEffect of
+        SimulatedEffect.Task (SimulatedEffect.Succeed _) ->
+            simulationState
+
+        SimulatedEffect.Task (SimulatedEffect.Fail _) ->
+            simulationState
+
         SimulatedEffect.Task (SimulatedEffect.HttpRequest request) ->
             { simulationState
                 | http =
                     Dict.insert ( request.method, request.url )
                         ( { body = request.body }
-                        , request.onRequestComplete >> joinResult
+                        , request.onRequestComplete
                         )
                         simulationState.http
             }
@@ -448,6 +454,31 @@ update msg testContext =
                     , lastEffect = newEffect
                     , effectSimulation = Maybe.map (applySimulatedEffects newEffect) state.effectSimulation
                 }
+
+
+applyTaskResult : SimulatedTask msg msg -> TestContext msg model effect -> TestContext msg model effect
+applyTaskResult task =
+    case task of
+        SimulatedEffect.Succeed msg ->
+            update msg
+
+        SimulatedEffect.Fail msg ->
+            update msg
+
+        SimulatedEffect.HttpRequest request ->
+            \testContext ->
+                case testContext of
+                    Finished err ->
+                        Finished err
+
+                    Active state ->
+                        Active
+                            { state
+                                | effectSimulation =
+                                    Maybe.map
+                                        (Tuple.mapSecond <| simulateEffect (SimulatedEffect.Task task))
+                                        state.effectSimulation
+                            }
 
 
 simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
@@ -1074,7 +1105,7 @@ simulateHttpResponse request response testContext =
                                             }
                                             response.body
                             in
-                            update
+                            applyTaskResult
                                 (msg responseValue)
                                 testContext
 

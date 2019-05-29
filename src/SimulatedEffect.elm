@@ -23,9 +23,11 @@ type SimulatedEffect msg
 
 
 type SimulatedTask x a
-    = HttpRequest
+    = Succeed a
+    | Fail x
+    | HttpRequest
         { method : String
         , url : String
         , body : String
-        , onRequestComplete : Http.Response String -> Result x a
+        , onRequestComplete : Http.Response String -> SimulatedTask x a
         }

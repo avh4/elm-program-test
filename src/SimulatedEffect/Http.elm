@@ -2,7 +2,7 @@ module SimulatedEffect.Http exposing
     ( get, post
     , Header, header
     , Body, emptyBody, stringBody, jsonBody
-    , Expect, expectString, expectJson, Error
+    , Expect, expectString, expectJson, expectWhatever, Error
     , Response
     , task, Resolver, stringResolver
     )
@@ -68,7 +68,7 @@ get { url, expect } =
         { method = "GET"
         , url = url
         , body = ""
-        , onRequestComplete = onResult >> Ok
+        , onRequestComplete = onResult >> SimulatedEffect.Succeed
         }
         |> SimulatedEffect.Task
 
@@ -96,7 +96,7 @@ post request =
 
                 StringBody body ->
                     body.content
-        , onRequestComplete = onResult >> Ok
+        , onRequestComplete = onResult >> SimulatedEffect.Succeed
         }
         |> SimulatedEffect.Task
 
@@ -274,11 +274,20 @@ task request =
 {-| Describes how to resolve an HTTP task.
 -}
 type Resolver x a
-    = StringResolver (Response String -> Result x a)
+    = StringResolver (Response String -> SimulatedTask x a)
 
 
 {-| Turn a response with a `String` body into a result.
 -}
 stringResolver : (Response String -> Result x a) -> Resolver x a
-stringResolver =
-    Elm.Kernel.Http.expect "" identity
+stringResolver f =
+    let
+        fromResult result =
+            case result of
+                Err x ->
+                    SimulatedEffect.Fail x
+
+                Ok a ->
+                    SimulatedEffect.Succeed a
+    in
+    StringResolver (f >> fromResult)

@@ -181,6 +181,51 @@ all =
                             , body = ""
                             }
                         |> TestContext.expectModel (Expect.equal """Err (BadStatus 500)""")
+            , test "can resolve a chain of requests" <|
+                \() ->
+                    start
+                        [ Http.task
+                            { method = "GET"
+                            , headers = []
+                            , url = "https://example.com/A"
+                            , body = Http.emptyBody
+                            , resolver = Http.stringResolver (\_ -> Ok "A-return")
+                            , timeout = Nothing
+                            }
+                            |> Task.andThen
+                                (\aResult ->
+                                    Http.task
+                                        { method = "GET"
+                                        , headers = []
+                                        , url = "https://example.com/B/" ++ aResult
+                                        , body = Http.emptyBody
+                                        , resolver = Http.stringResolver (\_ -> Ok "B-return")
+                                        , timeout = Nothing
+                                        }
+                                )
+                            |> Task.andThen
+                                (\bResult ->
+                                    Http.task
+                                        { method = "GET"
+                                        , headers = []
+                                        , url = "https://example.com/C/" ++ bResult
+                                        , body = Http.emptyBody
+                                        , resolver = Http.stringResolver (\_ -> Ok "C-return")
+                                        , timeout = Nothing
+                                        }
+                                )
+                            |> Task.attempt HandleStringResponse
+                        ]
+                        |> TestContext.simulateHttpSuccess "GET"
+                            "https://example.com/A"
+                            """{}"""
+                        |> TestContext.simulateHttpSuccess "GET"
+                            "https://example.com/B/A-return"
+                            """{}"""
+                        |> TestContext.simulateHttpSuccess "GET"
+                            "https://example.com/C/B-return"
+                            """{}"""
+                        |> TestContext.expectModel (Expect.equal """Ok "C-return\"""")
             ]
         ]
 
