@@ -72,11 +72,12 @@ andThen f task =
         SimulatedEffect.Fail x ->
             SimulatedEffect.Fail x
 
-        SimulatedEffect.HttpRequest request ->
-            SimulatedEffect.HttpRequest
+        SimulatedEffect.HttpTask request ->
+            SimulatedEffect.HttpTask
                 { method = request.method
                 , url = request.url
                 , body = request.body
+                , headers = request.headers
                 , onRequestComplete = request.onRequestComplete >> andThen f
                 }
 
@@ -113,10 +114,11 @@ mapError f task =
         SimulatedEffect.Fail x ->
             SimulatedEffect.Fail (f x)
 
-        SimulatedEffect.HttpRequest request ->
-            SimulatedEffect.HttpRequest
+        SimulatedEffect.HttpTask request ->
+            SimulatedEffect.HttpTask
                 { method = request.method
                 , url = request.url
                 , body = request.body
+                , headers = request.headers
                 , onRequestComplete = request.onRequestComplete >> mapError f
                 }

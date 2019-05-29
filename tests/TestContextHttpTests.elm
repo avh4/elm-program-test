@@ -7,6 +7,7 @@ import Json.Decode
 import SimulatedEffect.Http as Http
 import SimulatedEffect.Task as Task
 import Test exposing (..)
+import Test.Http
 import Test.Runner
 import TestContext exposing (TestContext)
 
@@ -150,6 +151,32 @@ all =
                                 , "│ Expect.equal"
                                 , "╷"
                                 , """"{\\"ok\\":900}\""""
+                                ]
+                            )
+            , test "can assert on request headers" <|
+                \() ->
+                    start
+                        [ Http.request
+                            { method = "POST"
+                            , headers = [ Http.header "X-Elm-Test" "Value 99" ]
+                            , url = "https://example.com/ok"
+                            , body = Http.stringBody "text/plain" "##"
+                            , expect = Http.expectString HandleStringResponse
+                            , timeout = Nothing
+                            , tracker = Nothing
+                            }
+                        ]
+                        |> TestContext.assertHttpRequest "POST"
+                            "https://example.com/ok"
+                            (Test.Http.hasHeader "Content-Type" "application/json")
+                        |> TestContext.done
+                        |> expectFailure
+                            (String.join "\n"
+                                [ "assertHttpRequest:"
+                                , "Expected HTTP header Content-Type: application/json"
+                                , "but got headers:"
+                                , "    Content-Type: text/plain"
+                                , "    X-Elm-Test: Value 99"
                                 ]
                             )
 

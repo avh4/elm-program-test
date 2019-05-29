@@ -1,4 +1,4 @@
-module SimulatedEffect exposing (SimulatedEffect(..), SimulatedTask(..))
+module SimulatedEffect exposing (HttpRequest, SimulatedEffect(..), SimulatedTask(..))
 
 {-| This module contains the simulated effects that you can use with `TestContext.withSimulatedEffects`.
 
@@ -25,9 +25,13 @@ type SimulatedEffect msg
 type SimulatedTask x a
     = Succeed a
     | Fail x
-    | HttpRequest
-        { method : String
-        , url : String
-        , body : String
-        , onRequestComplete : Http.Response String -> SimulatedTask x a
-        }
+    | HttpTask (HttpRequest x a)
+
+
+type alias HttpRequest x a =
+    { method : String
+    , url : String
+    , body : String
+    , headers : List ( String, String )
+    , onRequestComplete : Http.Response String -> SimulatedTask x a
+    }

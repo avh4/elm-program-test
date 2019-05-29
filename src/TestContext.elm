@@ -130,7 +130,7 @@ type TestContext msg model effect
 
 
 type alias SimulationState msg =
-    { http : Dict ( String, String ) ( HttpRequest, Http.Response String -> SimulatedTask msg msg )
+    { http : Dict ( String, String ) (SimulatedEffect.HttpRequest msg msg)
     }
 
 
@@ -215,25 +215,13 @@ simulateEffect simulatedEffect simulationState =
         SimulatedEffect.Task (SimulatedEffect.Fail _) ->
             simulationState
 
-        SimulatedEffect.Task (SimulatedEffect.HttpRequest request) ->
+        SimulatedEffect.Task (SimulatedEffect.HttpTask request) ->
             { simulationState
                 | http =
                     Dict.insert ( request.method, request.url )
-                        ( { body = request.body }
-                        , request.onRequestComplete
-                        )
+                        request
                         simulationState.http
             }
-
-
-joinResult : Result a a -> a
-joinResult result =
-    case result of
-        Err a ->
-            a
-
-        Ok a ->
-            a
 
 
 {-| Creates a `ProgramDefinition` from the parts of a `Browser.sandbox` program.
@@ -465,7 +453,7 @@ applyTaskResult task =
         SimulatedEffect.Fail msg ->
             update msg
 
-        SimulatedEffect.HttpRequest request ->
+        SimulatedEffect.HttpTask request ->
             \testContext ->
                 case testContext of
                     Finished err ->
@@ -1011,7 +999,12 @@ If you only care about whether the a request was made to the correct URL, see [`
         |> ...
 
 -}
-assertHttpRequest : String -> String -> ({ body : String } -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
+assertHttpRequest :
+    String
+    -> String
+    -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
+    -> TestContext msg model effect
+    -> TestContext msg model effect
 assertHttpRequest method url checkRequest testContext =
     case testContext of
         Finished err ->
@@ -1024,7 +1017,7 @@ assertHttpRequest method url checkRequest testContext =
 
                 Just ( _, simulationState ) ->
                     case Dict.get ( method, url ) simulationState.http of
-                        Just ( request, _ ) ->
+                        Just request ->
                             case Test.Runner.getFailureReason (checkRequest request) of
                                 Nothing ->
                                     -- check succeeded
@@ -1069,7 +1062,7 @@ NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you ca
 
 -}
 simulateHttpResponse : { method : String, url : String } -> { statusCode : Int, body : String } -> TestContext msg model effect -> TestContext msg model effect
-simulateHttpResponse request response testContext =
+simulateHttpResponse expectedRequest response testContext =
     case testContext of
         Finished err ->
             Finished err
@@ -1080,16 +1073,16 @@ simulateHttpResponse request response testContext =
                     Finished (EffectSimulationNotConfigured "simulateHttpResponse")
 
                 Just ( _, simulationState ) ->
-                    case Dict.get ( request.method, request.url ) simulationState.http of
+                    case Dict.get ( expectedRequest.method, expectedRequest.url ) simulationState.http of
                         Nothing ->
-                            Finished (NoMatchingHttpRequest "simulateHttpResponse" request (Dict.keys simulationState.http))
+                            Finished (NoMatchingHttpRequest "simulateHttpResponse" expectedRequest (Dict.keys simulationState.http))
 
-                        Just ( _, msg ) ->
+                        Just actualRequest ->
                             let
                                 responseValue =
                                     if response.statusCode >= 200 && response.statusCode < 300 then
                                         Http.GoodStatus_
-                                            { url = request.url
+                                            { url = expectedRequest.url
                                             , statusCode = response.statusCode
                                             , statusText = ""
                                             , headers = Dict.empty
@@ -1098,7 +1091,7 @@ simulateHttpResponse request response testContext =
 
                                     else
                                         Http.BadStatus_
-                                            { url = request.url
+                                            { url = expectedRequest.url
                                             , statusCode = response.statusCode
                                             , statusText = ""
                                             , headers = Dict.empty
@@ -1106,7 +1099,7 @@ simulateHttpResponse request response testContext =
                                             response.body
                             in
                             applyTaskResult
-                                (msg responseValue)
+                                (actualRequest.onRequestComplete responseValue)
                                 testContext
 
 

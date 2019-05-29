@@ -1,5 +1,5 @@
 module SimulatedEffect.Http exposing
-    ( get, post
+    ( get, post, request
     , Header, header
     , Body, emptyBody, stringBody, jsonBody
     , Expect, expectString, expectJson, expectWhatever, Error
@@ -16,7 +16,7 @@ to help you implement the function to provide when using `TestContext.withSimula
 
 # Requests
 
-@docs get, post
+@docs get, post, request
 
 
 # Header
@@ -49,7 +49,6 @@ import Http
 import Json.Decode exposing (Decoder)
 import Json.Encode
 import SimulatedEffect as SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
-import Task exposing (Task)
 
 
 {-| Create a `GET` request.
@@ -59,18 +58,16 @@ get :
     , expect : Expect msg
     }
     -> SimulatedEffect msg
-get { url, expect } =
-    let
-        (Expect onResult) =
-            expect
-    in
-    SimulatedEffect.HttpRequest
+get r =
+    request
         { method = "GET"
-        , url = url
-        , body = ""
-        , onRequestComplete = onResult >> SimulatedEffect.Succeed
+        , headers = []
+        , url = r.url
+        , body = emptyBody
+        , expect = r.expect
+        , timeout = Nothing
+        , tracker = Nothing
         }
-        |> SimulatedEffect.Task
 
 
 {-| Create a `POST` request.
@@ -81,16 +78,47 @@ post :
     , expect : Expect msg
     }
     -> SimulatedEffect msg
-post request =
+post r =
+    request
+        { method = "POST"
+        , headers = []
+        , url = r.url
+        , body = r.body
+        , expect = r.expect
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+{-| Create a custom request.
+-}
+request :
+    { method : String
+    , headers : List Header
+    , url : String
+    , body : Body
+    , expect : Expect msg
+    , timeout : Maybe Float
+    , tracker : Maybe String
+    }
+    -> SimulatedEffect msg
+request r =
     let
         (Expect onResult) =
-            request.expect
+            r.expect
     in
-    SimulatedEffect.HttpRequest
-        { method = "POST"
-        , url = request.url
+    SimulatedEffect.HttpTask
+        { method = r.method
+        , url = r.url
+        , headers =
+            case r.body of
+                EmptyBody ->
+                    r.headers
+
+                StringBody body ->
+                    ( "Content-Type", body.contentType ) :: r.headers
         , body =
-            case request.body of
+            case r.body of
                 EmptyBody ->
                     ""
 
@@ -103,15 +131,15 @@ post request =
 
 {-| An HTTP header for configuring requests.
 -}
-type Header
-    = Header String String
+type alias Header =
+    ( String, String )
 
 
 {-| Create a `Header`.
 -}
 header : String -> String -> Header
 header =
-    Header
+    Tuple.pair
 
 
 {-| Represents the body of a `Request`.
@@ -197,7 +225,7 @@ expectJson onResult decoder =
                 Http.NetworkError_ ->
                     onResult (Err Http.NetworkError)
 
-                Http.BadStatus_ metadata body ->
+                Http.BadStatus_ metadata _ ->
                     onResult (Err <| Http.BadStatus metadata.statusCode)
 
                 Http.GoodStatus_ _ body ->
@@ -253,19 +281,20 @@ task :
     , timeout : Maybe Float
     }
     -> SimulatedTask x a
-task request =
-    SimulatedEffect.HttpRequest
-        { method = request.method
-        , url = request.url
+task r =
+    SimulatedEffect.HttpTask
+        { method = r.method
+        , url = r.url
+        , headers = r.headers
         , body =
-            case request.body of
+            case r.body of
                 EmptyBody ->
                     ""
 
                 StringBody body ->
                     body.content
         , onRequestComplete =
-            case request.resolver of
+            case r.resolver of
                 StringResolver f ->
                     f
         }
