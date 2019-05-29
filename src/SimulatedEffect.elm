@@ -1,4 +1,4 @@
-module SimulatedEffect exposing (SimulatedEffect(..))
+module SimulatedEffect exposing (SimulatedEffect(..), SimulatedTask(..))
 
 {-| This module contains the simulated effects that you can use with `TestContext.withSimulatedEffects`.
 
@@ -19,9 +19,13 @@ your programs' effects into `SimulatedEffect`s.
 then `TestContext` will not simulate any HTTP effects for you.)
 -}
 type SimulatedEffect msg
+    = Task (SimulatedTask msg msg)
+
+
+type SimulatedTask x a
     = HttpRequest
         { method : String
         , url : String
         , body : String
-        , onRequestComplete : Http.Response String -> msg
+        , onRequestComplete : Http.Response String -> Result x a
         }

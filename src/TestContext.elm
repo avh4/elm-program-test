@@ -209,15 +209,25 @@ applySimulatedEffects effect ( deconstructEffect, simulationState ) =
 simulateEffect : SimulatedEffect msg -> SimulationState msg -> SimulationState msg
 simulateEffect simulatedEffect simulationState =
     case simulatedEffect of
-        SimulatedEffect.HttpRequest request ->
+        SimulatedEffect.Task (SimulatedEffect.HttpRequest request) ->
             { simulationState
                 | http =
                     Dict.insert ( request.method, request.url )
                         ( { body = request.body }
-                        , request.onRequestComplete
+                        , request.onRequestComplete >> joinResult
                         )
                         simulationState.http
             }
+
+
+joinResult : Result a a -> a
+joinResult result =
+    case result of
+        Err a ->
+            a
+
+        Ok a ->
+            a
 
 
 {-| Creates a `ProgramDefinition` from the parts of a `Browser.sandbox` program.

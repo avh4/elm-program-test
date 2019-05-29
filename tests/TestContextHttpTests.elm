@@ -5,6 +5,7 @@ import Html
 import Html.Events exposing (onClick)
 import Json.Decode
 import SimulatedEffect.Http as Http
+import SimulatedEffect.Task as Task
 import Test exposing (..)
 import Test.Runner
 import TestContext exposing (TestContext)
@@ -14,6 +15,7 @@ type TestEffect
     = NoEffect
     | HttpGet String
     | HttpPost String String
+    | HttpTask String
 
 
 deconstructEffect : TestEffect -> List (TestContext.SimulatedEffect TestMsg)
@@ -37,6 +39,18 @@ deconstructEffect testEffect =
                 , body = Http.stringBody "application/json" body
                 , expect = Http.expectString HandlePostResponse
                 }
+            ]
+
+        HttpTask url ->
+            [ Http.task
+                { method = "GET"
+                , headers = []
+                , url = url
+                , body = Http.emptyBody
+                , resolver = Http.stringResolver (\response -> Ok "")
+                , timeout = Nothing
+                }
+                |> Task.attempt HandlePostResponse
             ]
 
 
@@ -95,6 +109,11 @@ all =
                 \() ->
                     start (HttpGet "https://example.com/")
                         |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> expectSuccess
+            , test "can assert that an HTTP request was made via a Task" <|
+                \() ->
+                    start (HttpTask "https://example.com/get")
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/get"
                         |> expectSuccess
             , test "can assert that an HTTP request was made from update" <|
                 \() ->

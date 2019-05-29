@@ -1,7 +1,10 @@
 module SimulatedEffect.Http exposing
     ( get, post
+    , Header, header
     , Body, emptyBody, stringBody, jsonBody
     , Expect, expectString, expectJson, Error
+    , Response
+    , task, Resolver, stringResolver
     )
 
 {-| This module parallels [elm/http's `Http` module](https://package.elm-lang.org/packages/elm/http/2.0.0/Http).
@@ -16,6 +19,11 @@ to help you implement the function to provide when using `TestContext.withSimula
 @docs get, post
 
 
+# Header
+
+@docs Header, header
+
+
 # Body
 
 @docs Body, emptyBody, stringBody, jsonBody
@@ -25,12 +33,23 @@ to help you implement the function to provide when using `TestContext.withSimula
 
 @docs Expect, expectString, expectJson, Error
 
+
+# Elaborate Expectations
+
+@docs Response
+
+
+# Tasks
+
+@docs task, Resolver, stringResolver
+
 -}
 
 import Http
 import Json.Decode exposing (Decoder)
 import Json.Encode
-import SimulatedEffect as SimulatedEffect exposing (SimulatedEffect(..))
+import SimulatedEffect as SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
+import Task exposing (Task)
 
 
 {-| Create a `GET` request.
@@ -49,8 +68,9 @@ get { url, expect } =
         { method = "GET"
         , url = url
         , body = ""
-        , onRequestComplete = onResult
+        , onRequestComplete = onResult >> Ok
         }
+        |> SimulatedEffect.Task
 
 
 {-| Create a `POST` request.
@@ -76,8 +96,22 @@ post request =
 
                 StringBody body ->
                     body.content
-        , onRequestComplete = onResult
+        , onRequestComplete = onResult >> Ok
         }
+        |> SimulatedEffect.Task
+
+
+{-| An HTTP header for configuring requests.
+-}
+type Header
+    = Header String String
+
+
+{-| Create a `Header`.
+-}
+header : String -> String -> Header
+header =
+    Header
 
 
 {-| Represents the body of a `Request`.
@@ -178,3 +212,50 @@ expectJson onResult decoder =
 {-| -}
 type alias Error =
     Http.Error
+
+
+{-| -}
+type alias Response body =
+    Http.Response body
+
+
+{-| Just like [`request`](#request), but it creates a `Task`.
+-}
+task :
+    { method : String
+    , headers : List Header
+    , url : String
+    , body : Body
+    , resolver : Resolver x a
+    , timeout : Maybe Float
+    }
+    -> SimulatedTask x a
+task request =
+    SimulatedEffect.HttpRequest
+        { method = request.method
+        , url = request.url
+        , body =
+            case request.body of
+                EmptyBody ->
+                    ""
+
+                StringBody body ->
+                    body.content
+        , onRequestComplete =
+            case request.resolver of
+                StringResolver f ->
+                    f
+        }
+
+
+{-| Describes how to resolve an HTTP task.
+-}
+type Resolver x a
+    = StringResolver (Response String -> Result x a)
+
+
+{-| Turn a response with a `String` body into a result.
+-}
+stringResolver : (Response String -> Result x a) -> Resolver x a
+stringResolver =
+    Elm.Kernel.Http.expect "" identity
