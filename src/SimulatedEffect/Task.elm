@@ -5,7 +5,7 @@ module SimulatedEffect.Task exposing
     , mapError
     )
 
-{-| This module parallels [elm/core's `Task` module](https://package.elm-lang.org/packages/elm/core/latest/Task).
+{-| This module parallels [elm/core's `Task` module](https://package.elm-lang.org/packages/elm/core/1.0.2/Task).
 PRs are welcome to add any functions that are missing.
 
 The functions here produce `SimulatedTasks`s instead of `Tasks`s
@@ -76,6 +76,9 @@ andThen f task =
                 , onRequestComplete = request.onRequestComplete >> andThen f
                 }
 
+        SimulatedEffect.SleepTask delay onResult ->
+            SimulatedEffect.SleepTask delay (onResult >> andThen f)
+
 
 {-| A task that succeeds immediately when run.
 -}
@@ -117,3 +120,6 @@ mapError f task =
                 , headers = request.headers
                 , onRequestComplete = request.onRequestComplete >> mapError f
                 }
+
+        SimulatedEffect.SleepTask delay onResult ->
+            SimulatedEffect.SleepTask delay (onResult >> mapError f)

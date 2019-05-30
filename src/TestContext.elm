@@ -11,6 +11,7 @@ module TestContext exposing
     , within
     , assertHttpRequestWasMade, assertHttpRequest
     , simulateHttpOk, simulateHttpResponse
+    , advanceTime
     , update
     , simulateLastEffect
     , expectViewHas, expectView
@@ -58,6 +59,11 @@ module TestContext exposing
 @docs simulateHttpOk, simulateHttpResponse
 
 
+## Simulating time
+
+@docs advanceTime
+
+
 ## Directly sending Msgs
 
 @docs update
@@ -99,6 +105,7 @@ import Html.Attributes exposing (attribute)
 import Http
 import Json.Decode
 import Json.Encode
+import PairingHeap
 import Query.Extra
 import SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
 import Test.Html.Event
@@ -181,7 +188,7 @@ createHelper program options =
         , effectSimulation = Maybe.map EffectSimulation.init options.deconstructEffect
         }
         |> queueEffect newEffect
-        |> drainWorkQueue
+        |> drain
 
 
 {-| Creates a `ProgramDefinition` from the parts of a `Browser.sandbox` program.
@@ -294,10 +301,15 @@ withJsonStringFlags decoder (ProgramDefinition options program) =
                     \_ -> Finished (InvalidFlags "withJsonStringFlags" (Json.Decode.errorToString message))
 
 
-{-| This allows you to provide a function that lets `TestContext` simulate HTTP effects
-(this enables you to use [`assertHttpRequest`](#assertHttpRequest)).
+{-| This allows you to provide a function that lets `TestContext` simulate effects that would become `Cmd`s and `Task`s
+when your app runs in production
+(this enables you to use [`simulateHttpResponse`](#simulateHttpResponse), [`advanceTime`](#advanceTime), etc.).
 
-You only need to use this if you need to simulate HTTP requests.
+You only need to use this if you need to [simulate HTTP requests](#simulating-http-responses)
+or the [passing of time](#simulating-time).
+
+See the `SimulatedEffect.*` modules in this package for functions that you can use to implement
+the required `effect -> List (SimulatedEffect msg)` function for your `effect` type.
 
 -}
 withSimulatedEffects :
@@ -370,6 +382,7 @@ which parallel the modules your real program would use to create `Cmd`s and `Tas
 
   - [`SimulatedEffect.Http`](SimulatedEffect-Http) (parallels `Http` from `elm/http`)
   - [`SimulatedEffect.Task`](SimulatedEffect-Task) (parallels `Task` from `elm/core`)
+  - [`SimulatedEffect.Process`](SimulatedEffect-Process) (parallels `Process` from `elm/core`)
 
 -}
 type alias SimulatedEffect msg =
@@ -410,7 +423,7 @@ update msg testContext =
                     , lastEffect = newEffect
                 }
                 |> queueEffect newEffect
-                |> drainWorkQueue
+                |> drain
 
 
 simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
@@ -921,6 +934,26 @@ queueEffect effect =
     withSimulation (EffectSimulation.queueEffect effect)
 
 
+drain : TestContext msg model effect -> TestContext msg model effect
+drain =
+    let
+        advanceTimeIfSimulating t testContext =
+            case testContext of
+                Finished _ ->
+                    testContext
+
+                Active state ->
+                    case state.effectSimulation of
+                        Nothing ->
+                            testContext
+
+                        Just _ ->
+                            advanceTime t testContext
+    in
+    advanceTimeIfSimulating 0
+        >> drainWorkQueue
+
+
 drainWorkQueue : TestContext msg model effect -> TestContext msg model effect
 drainWorkQueue testContext =
     case testContext of
@@ -950,7 +983,7 @@ drainWorkQueue testContext =
                             in
                             Active { state | effectSimulation = Just newSimulation }
                                 |> updateMaybe msg
-                                |> drainWorkQueue
+                                |> drain
 
 
 {-| A final assertion that checks whether an HTTP request to the specific url and method has been made.
@@ -1090,7 +1123,88 @@ simulateHttpResponse method url response testContext =
                             withSimulation
                                 (EffectSimulation.queueTask (actualRequest.onRequestComplete response))
                                 testContext
-                                |> drainWorkQueue
+                                |> drain
+
+
+{-| Simulates the passing of time.
+The `Int` parameter is the number of milliseconds to simulate.
+This will cause any pending `Task.sleep`s to trigger if their delay has elapsed.
+
+NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
+
+-}
+advanceTime : Int -> TestContext msg model effect -> TestContext msg model effect
+advanceTime delta testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    Finished (EffectSimulationNotConfigured "advanceTime")
+
+                Just simulation ->
+                    advanceTo (simulation.state.nowMs + delta) testContext
+
+
+advanceTo : Int -> TestContext msg model effect -> TestContext msg model effect
+advanceTo end testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    Finished (EffectSimulationNotConfigured "advanceTo")
+
+                Just simulation ->
+                    let
+                        ss =
+                            simulation.state
+                    in
+                    case PairingHeap.findMin simulation.state.futureTasks of
+                        Nothing ->
+                            -- No future tasks to check
+                            Active
+                                { state
+                                    | effectSimulation =
+                                        Just
+                                            { simulation
+                                                | state = { ss | nowMs = end }
+                                            }
+                                }
+
+                        Just ( t, task ) ->
+                            if t <= end then
+                                Active
+                                    { state
+                                        | effectSimulation =
+                                            Just
+                                                { simulation
+                                                    | state =
+                                                        { ss
+                                                            | nowMs = t
+                                                            , futureTasks = PairingHeap.deleteMin simulation.state.futureTasks
+                                                        }
+                                                }
+                                    }
+                                    |> withSimulation
+                                        (EffectSimulation.queueTask (task ()))
+                                    |> drain
+                                    |> advanceTo end
+
+                            else
+                                -- next task is further in the future than we are advancing
+                                Active
+                                    { state
+                                        | effectSimulation =
+                                            Just
+                                                { simulation
+                                                    | state = { ss | nowMs = end }
+                                                }
+                                    }
 
 
 replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect

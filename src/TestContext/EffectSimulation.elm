@@ -10,6 +10,7 @@ module TestContext.EffectSimulation exposing
 
 import Dict exposing (Dict)
 import Fifo exposing (Fifo)
+import PairingHeap exposing (PairingHeap)
 import SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
 
 
@@ -30,12 +31,16 @@ init f =
 
 type alias SimulationState msg =
     { http : Dict ( String, String ) (SimulatedEffect.HttpRequest msg msg)
+    , futureTasks : PairingHeap Int (() -> SimulatedTask msg msg)
+    , nowMs : Int
     }
 
 
 emptySimulationState : SimulationState msg
 emptySimulationState =
     { http = Dict.empty
+    , futureTasks = PairingHeap.empty
+    , nowMs = 0
     }
 
 
@@ -94,6 +99,14 @@ simulateTask task simulationState =
                     Dict.insert ( request.method, request.url )
                         request
                         simulationState.http
+              }
+            , Nothing
+            )
+
+        SimulatedEffect.SleepTask delay onResult ->
+            ( { simulationState
+                | futureTasks =
+                    PairingHeap.insert (simulationState.nowMs + round delay) onResult simulationState.futureTasks
               }
             , Nothing
             )
