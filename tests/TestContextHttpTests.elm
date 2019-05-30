@@ -120,7 +120,7 @@ all =
                                 , "      - GET https://example.com/actualRequest"
                                 ]
                             )
-            , test "gives explanatory error when using assertHttpRequest without using createWithSimulatedEffects" <|
+            , test "gives explanatory error when using assertHttpRequest without using withSimulatedEffects" <|
                 \() ->
                     TestContext.createSandbox
                         { init = ()
