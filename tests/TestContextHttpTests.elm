@@ -202,10 +202,20 @@ all =
                     start [ Http.get { url = "https://example.com/friends", expect = Http.expectString HandleStringResponse } ]
                         |> TestContext.simulateHttpResponse "GET"
                             "https://example.com/friends"
-                            { statusCode = 500
-                            , body = ""
-                            }
+                            (Test.Http.httpResponse
+                                { statusCode = 500
+                                , headers = []
+                                , body = ""
+                                }
+                            )
                         |> TestContext.expectModel (Expect.equal """Err (BadStatus 500)""")
+            , test "can simulate network error" <|
+                \() ->
+                    start [ Http.get { url = "https://example.com/friends", expect = Http.expectString HandleStringResponse } ]
+                        |> TestContext.simulateHttpResponse "GET"
+                            "https://example.com/friends"
+                            Test.Http.networkError
+                        |> TestContext.expectModel (Expect.equal """Err NetworkError""")
             , test "can resolve a chain of requests" <|
                 \() ->
                     start

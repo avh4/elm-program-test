@@ -104,6 +104,7 @@ import SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
 import Test.Html.Event
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector exposing (Selector)
+import Test.Http
 import Test.Runner
 import Test.Runner.Failure
 import Url exposing (Url)
@@ -1048,18 +1049,24 @@ simulateHttpSuccess : String -> String -> String -> TestContext msg model effect
 simulateHttpSuccess method url responseBody =
     simulateHttpResponse method
         url
-        { statusCode = 200
-        , body = responseBody
-        }
+        (Test.Http.httpResponse
+            { statusCode = 200
+            , body = responseBody
+            , headers = []
+            }
+        )
 
 
 {-| Simulates a response to a pending HTTP request.
 The test will fail if there is no pending request matching the given method and url.
 
+You may find it helpful to see the ["Responses" section in `Test.Http`](Test-Http#responses)
+for convenient ways to create `Http.Response` values.
+
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-simulateHttpResponse : String -> String -> { statusCode : Int, body : String } -> TestContext msg model effect -> TestContext msg model effect
+simulateHttpResponse : String -> String -> Http.Response String -> TestContext msg model effect -> TestContext msg model effect
 simulateHttpResponse method url response testContext =
     case testContext of
         Finished err ->
@@ -1076,28 +1083,8 @@ simulateHttpResponse method url response testContext =
                             Finished (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulationState.http))
 
                         Just actualRequest ->
-                            let
-                                responseValue =
-                                    if response.statusCode >= 200 && response.statusCode < 300 then
-                                        Http.GoodStatus_
-                                            { url = url
-                                            , statusCode = response.statusCode
-                                            , statusText = ""
-                                            , headers = Dict.empty
-                                            }
-                                            response.body
-
-                                    else
-                                        Http.BadStatus_
-                                            { url = url
-                                            , statusCode = response.statusCode
-                                            , statusText = ""
-                                            , headers = Dict.empty
-                                            }
-                                            response.body
-                            in
                             applyTaskResult
-                                (actualRequest.onRequestComplete responseValue)
+                                (actualRequest.onRequestComplete response)
                                 testContext
 
 
