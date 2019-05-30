@@ -10,7 +10,7 @@ module TestContext exposing
     , simulate
     , within
     , assertHttpRequestWasMade, assertHttpRequest
-    , simulateHttpSuccess, simulateHttpResponse
+    , simulateHttpOk, simulateHttpResponse
     , update
     , simulateLastEffect
     , expectViewHas, expectView
@@ -55,7 +55,7 @@ module TestContext exposing
 ## Simulating HTTP responses
 
 @docs assertHttpRequestWasMade, assertHttpRequest
-@docs simulateHttpSuccess, simulateHttpResponse
+@docs simulateHttpOk, simulateHttpResponse
 
 
 ## Directly sending Msgs
@@ -991,6 +991,9 @@ assertHttpRequestWasMade method url testContext =
 
 {-| Allows you to check the details of a pending HTTP request.
 
+See the ["Expectations" section of `Test.Http`](Test-Http#expectations) for functions that might be helpful
+in create an expectation on the request.
+
 If you only care about whether the a request was made to the correct URL, see [`assertHttpRequestWasMade`](#assertHttpRequestWasMade).
 
     ...
@@ -1032,21 +1035,25 @@ assertHttpRequest method url checkRequest testContext =
 
 
 {-| Simulates an HTTP 200 response to a pending request with the given method and url.
-If you need more control over the response, see [`simulateHttpResponse`](#simulateHttpResponse).
 
     ...
-        |> simulateHttpSuccess "GET"
+        |> simulateHttpOk "GET"
             "https://example.com/time.json"
             """{"currentTime":1559013158}"""
         |> ...
 
-If you want to check the headers or request body, see [`assertHttpRequest`](#assertHttpRequest).
+If you need to simulate an error, a response with a different status code,
+or a response with response headers,
+see [`simulateHttpResponse`](#simulateHttpResponse).
+
+If you want to check the request headers or request body, use [`assertHttpRequest`](#assertHttpRequest)
+immediately before using `simulateHttpOk`.
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-simulateHttpSuccess : String -> String -> String -> TestContext msg model effect -> TestContext msg model effect
-simulateHttpSuccess method url responseBody =
+simulateHttpOk : String -> String -> String -> TestContext msg model effect -> TestContext msg model effect
+simulateHttpOk method url responseBody =
     simulateHttpResponse method
         url
         (Test.Http.httpResponse
@@ -1062,6 +1069,12 @@ The test will fail if there is no pending request matching the given method and 
 
 You may find it helpful to see the ["Responses" section in `Test.Http`](Test-Http#responses)
 for convenient ways to create `Http.Response` values.
+
+If you are simulating a 200 OK response and don't need to provide response headers,
+you can use the simpler [`simulateHttpOk`](#simulateHttpOk).
+
+If you want to check the request headers or request body, use [`assertHttpRequest`](#assertHttpRequest)
+immediately before using `simulateHttpResponse`.
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 

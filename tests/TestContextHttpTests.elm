@@ -193,7 +193,7 @@ all =
                                     (Json.Decode.list Json.Decode.string)
                             }
                         ]
-                        |> TestContext.simulateHttpSuccess "GET"
+                        |> TestContext.simulateHttpOk "GET"
                             "https://example.com/friends"
                             """["Alex","Kelsey","Sam"]"""
                         |> TestContext.expectModel (Expect.equal """Ok ["Alex","Kelsey","Sam"]""")
@@ -251,13 +251,13 @@ all =
                                 )
                             |> Task.attempt HandleStringResponse
                         ]
-                        |> TestContext.simulateHttpSuccess "GET"
+                        |> TestContext.simulateHttpOk "GET"
                             "https://example.com/A"
                             """{}"""
-                        |> TestContext.simulateHttpSuccess "GET"
+                        |> TestContext.simulateHttpOk "GET"
                             "https://example.com/B/A-return"
                             """{}"""
-                        |> TestContext.simulateHttpSuccess "GET"
+                        |> TestContext.simulateHttpOk "GET"
                             "https://example.com/C/B-return"
                             """{}"""
                         |> TestContext.expectModel (Expect.equal """Ok "C-return\"""")
