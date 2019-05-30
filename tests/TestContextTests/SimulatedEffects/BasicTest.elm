@@ -25,8 +25,12 @@ all =
             \() ->
                 startTask (Task.succeed ())
                     |> TestContext.expectModel (Expect.equal ";Ok ()")
-        , test "simulated Task.fail" <|
+        , test "simulates Task.fail" <|
             \() ->
                 startTask (Task.fail ())
                     |> TestContext.expectModel (Expect.equal ";Err ()")
+        , test "simulated Task.andThen" <|
+            \() ->
+                startTask (Task.succeed 5 |> Task.andThen ((+) 10 >> Task.fail))
+                    |> TestContext.expectModel (Expect.equal ";Err 15")
         ]
