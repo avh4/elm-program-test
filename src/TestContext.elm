@@ -107,6 +107,7 @@ import Test.Html.Selector as Selector exposing (Selector)
 import Test.Http
 import Test.Runner
 import Test.Runner.Failure
+import TestContext.EffectSimulation as EffectSimulation exposing (EffectSimulation)
 import Url exposing (Url)
 import Url.Extra
 
@@ -125,25 +126,9 @@ type TestContext msg model effect
         , currentModel : model
         , lastEffect : effect
         , currentLocation : Maybe Url
-        , effectSimulation : Maybe ( effect -> List (SimulatedEffect msg), SimulationState msg )
+        , effectSimulation : Maybe (EffectSimulation msg effect)
         }
     | Finished Failure
-
-
-type alias SimulationState msg =
-    { http : Dict ( String, String ) (SimulatedEffect.HttpRequest msg msg)
-    }
-
-
-type alias HttpRequest =
-    { body : String
-    }
-
-
-emptySimulationState : SimulationState msg
-emptySimulationState =
-    { http = Dict.empty
-    }
 
 
 type alias TestProgram msg model effect =
@@ -193,36 +178,10 @@ createHelper program options =
         , currentModel = newModel
         , lastEffect = newEffect
         , currentLocation = options.baseUrl
-        , effectSimulation =
-            options.deconstructEffect
-                |> Maybe.map (\f -> ( f, emptySimulationState ))
-                |> Maybe.map (applySimulatedEffects newEffect)
+        , effectSimulation = Maybe.map EffectSimulation.init options.deconstructEffect
         }
-
-
-applySimulatedEffects : effect -> ( effect -> List (SimulatedEffect msg), SimulationState msg ) -> ( effect -> List (SimulatedEffect msg), SimulationState msg )
-applySimulatedEffects effect ( deconstructEffect, simulationState ) =
-    ( deconstructEffect
-    , List.foldl simulateEffect simulationState (deconstructEffect effect)
-    )
-
-
-simulateEffect : SimulatedEffect msg -> SimulationState msg -> SimulationState msg
-simulateEffect simulatedEffect simulationState =
-    case simulatedEffect of
-        SimulatedEffect.Task (SimulatedEffect.Succeed _) ->
-            simulationState
-
-        SimulatedEffect.Task (SimulatedEffect.Fail _) ->
-            simulationState
-
-        SimulatedEffect.Task (SimulatedEffect.HttpTask request) ->
-            { simulationState
-                | http =
-                    Dict.insert ( request.method, request.url )
-                        request
-                        simulationState.http
-            }
+        |> queueEffect newEffect
+        |> drainWorkQueue
 
 
 {-| Creates a `ProgramDefinition` from the parts of a `Browser.sandbox` program.
@@ -449,33 +408,9 @@ update msg testContext =
                 { state
                     | currentModel = newModel
                     , lastEffect = newEffect
-                    , effectSimulation = Maybe.map (applySimulatedEffects newEffect) state.effectSimulation
                 }
-
-
-applyTaskResult : SimulatedTask msg msg -> TestContext msg model effect -> TestContext msg model effect
-applyTaskResult task =
-    case task of
-        SimulatedEffect.Succeed msg ->
-            update msg
-
-        SimulatedEffect.Fail msg ->
-            update msg
-
-        SimulatedEffect.HttpTask request ->
-            \testContext ->
-                case testContext of
-                    Finished err ->
-                        Finished err
-
-                    Active state ->
-                        Active
-                            { state
-                                | effectSimulation =
-                                    Maybe.map
-                                        (Tuple.mapSecond <| simulateEffect (SimulatedEffect.Task task))
-                                        state.effectSimulation
-                            }
+                |> queueEffect newEffect
+                |> drainWorkQueue
 
 
 simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
@@ -970,6 +905,54 @@ within findTarget onScopedTest testContext =
                 |> replaceView state.program.view
 
 
+withSimulation : (EffectSimulation msg effect -> EffectSimulation msg effect) -> TestContext msg model effect -> TestContext msg model effect
+withSimulation f testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            Active
+                { state | effectSimulation = Maybe.map f state.effectSimulation }
+
+
+queueEffect : effect -> TestContext msg model effect -> TestContext msg model effect
+queueEffect effect =
+    withSimulation (EffectSimulation.queueEffect effect)
+
+
+drainWorkQueue : TestContext msg model effect -> TestContext msg model effect
+drainWorkQueue testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    testContext
+
+                Just simulation ->
+                    case EffectSimulation.stepWorkQueue simulation of
+                        Nothing ->
+                            -- work queue is empty
+                            testContext
+
+                        Just ( newSimulation, msg ) ->
+                            let
+                                updateMaybe m tc =
+                                    case m of
+                                        Nothing ->
+                                            tc
+
+                                        Just m_ ->
+                                            update m_ tc
+                            in
+                            Active { state | effectSimulation = Just newSimulation }
+                                |> updateMaybe msg
+                                |> drainWorkQueue
+
+
 {-| A final assertion that checks whether an HTTP request to the specific url and method has been made.
 
 If you want to check the headers or request body, see [`assertHttpRequest`](#assertHttpRequest).
@@ -989,12 +972,12 @@ assertHttpRequestWasMade method url testContext =
                     Nothing ->
                         Finished (EffectSimulationNotConfigured "assertHttpRequestWasMade")
 
-                    Just ( _, simulationState ) ->
-                        if Dict.member ( method, url ) simulationState.http then
+                    Just simulation ->
+                        if Dict.member ( method, url ) simulation.state.http then
                             testContext
 
                         else
-                            Finished (NoMatchingHttpRequest "assertHttpRequestWasMade" { method = method, url = url } (Dict.keys simulationState.http))
+                            Finished (NoMatchingHttpRequest "assertHttpRequestWasMade" { method = method, url = url } (Dict.keys simulation.state.http))
 
 
 {-| Allows you to check the details of a pending HTTP request.
@@ -1027,8 +1010,8 @@ assertHttpRequest method url checkRequest testContext =
                 Nothing ->
                     Finished (EffectSimulationNotConfigured "assertHttpRequest")
 
-                Just ( _, simulationState ) ->
-                    case Dict.get ( method, url ) simulationState.http of
+                Just simulation ->
+                    case Dict.get ( method, url ) simulation.state.http of
                         Just request ->
                             case Test.Runner.getFailureReason (checkRequest request) of
                                 Nothing ->
@@ -1039,7 +1022,7 @@ assertHttpRequest method url checkRequest testContext =
                                     Finished (ExpectFailed "assertHttpRequest" reason.description reason.reason)
 
                         Nothing ->
-                            Finished (NoMatchingHttpRequest "assertHttpRequest" { method = method, url = url } (Dict.keys simulationState.http))
+                            Finished (NoMatchingHttpRequest "assertHttpRequest" { method = method, url = url } (Dict.keys simulation.state.http))
 
 
 {-| Simulates an HTTP 200 response to a pending request with the given method and url.
@@ -1098,15 +1081,16 @@ simulateHttpResponse method url response testContext =
                 Nothing ->
                     Finished (EffectSimulationNotConfigured "simulateHttpResponse")
 
-                Just ( _, simulationState ) ->
-                    case Dict.get ( method, url ) simulationState.http of
+                Just simulation ->
+                    case Dict.get ( method, url ) simulation.state.http of
                         Nothing ->
-                            Finished (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulationState.http))
+                            Finished (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulation.state.http))
 
                         Just actualRequest ->
-                            applyTaskResult
-                                (actualRequest.onRequestComplete response)
+                            withSimulation
+                                (EffectSimulation.queueTask (actualRequest.onRequestComplete response))
                                 testContext
+                                |> drainWorkQueue
 
 
 replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect
