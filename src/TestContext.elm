@@ -2,7 +2,7 @@ module TestContext exposing
     ( TestContext, start
     , createSandbox, createElement, createDocument, createApplication
     , ProgramDefinition, withBaseUrl, withJsonStringFlags
-    , SimulatedEffect, withSimulatedEffects
+    , SimulatedEffect, SimulatedTask, withSimulatedEffects
     , clickButton, clickLink
     , fillIn, fillInTextarea
     , check, selectOption
@@ -35,7 +35,7 @@ module TestContext exposing
 
 ### Simulated effects
 
-@docs SimulatedEffect, withSimulatedEffects
+@docs SimulatedEffect, SimulatedTask, withSimulatedEffects
 
 
 ## Simulating user input
@@ -401,29 +401,37 @@ createApplication program =
 
 
 {-| This represents an effect that elm-program-test is able to simulate.
-When using `withSimulatedEffects` you will provide a function that can translate
-your programs' effects into `SimulatedEffect`s.
+When using [`withSimulatedEffects`](#withSimulatedEffects) you will provide a function that can translate
+your program's effects into `SimulatedEffect`s.
 (If you do not use `withSimulatedEffects`,
-then `TestContext` will not simulate any HTTP effects for you.)
+then `TestContext` will not simulate any effects for you.)
 
-See the `SimulatedEffect.Http` module for functions that make it easier to create `SimulatedEffect` values.
+You can create `SimulatedEffect`s using the the following modules,
+which parallel the modules your real program would use to create `Cmd`s and `Task`s:
+
+  - [`SimulatedEffect.Http`](SimulatedEffect-Http) (parallels `Http` from `elm/http`)
+  - [`SimulatedEffect.Task`](SimulatedEffect-Task) (parallels `Task` from `elm/core`)
 
 -}
 type alias SimulatedEffect msg =
     SimulatedEffect.SimulatedEffect msg
 
 
-{-| Advances the state of the `TestContext`'s program by using the `TestContext`'s program's update function
-with the given `msg`.
+{-| -}
+type alias SimulatedTask x a =
+    SimulatedEffect.SimulatedTask x a
+
+
+{-| Advances the state of the `TestContext`'s by applying the given `msg` to your program's update function
+(provided when you created the `TestContext`).
 
 This can be used to simulate events that can only be triggered by [commands (`Cmd`) and subscriptions (`Sub`)](https://guide.elm-lang.org/architecture/effects/)
 (i.e., that cannot be triggered by user interaction with the view).
 
 NOTE: When possible, you should prefer [Simulating user input](#simulating-user-input),
+[Simulating HTTP responses](#simulating-http-responses),
+or (if neither of those support what you need) [`simulateLastEffect`](#simulateLastEffect),
 as doing so will make your tests more robust to changes in your program's implementation details.
-
-NOTE: If you cannot replace a call to `TestContext.upate` with simulating user input,
-when possible you should prefer to use [`simulateLastEffect`](#simulateLastEffect).
 
 -}
 update : msg -> TestContext msg model effect -> TestContext msg model effect
@@ -1162,13 +1170,14 @@ expectModel assertion testContext =
 
 
 {-| Simulate the outcome of the last effect produced by the program being tested
-by providing a function that can convert the last effect into msgs.
+by providing a function that can convert the last effect into `msg`s.
 
-The function you provide will be called with the effect that was returned by the most recent call to `update` or `init` in the TestContext.
+The function you provide will be called with the effect that was returned by the most recent call to `update` or `init` in the `TestContext`.
 
-If the function returns `Err`, then that will cause the `TestContext` to enter a failure state with the provided message.
+  - If it returns `Err`, then that will cause the `TestContext` to enter a failure state with the provided message.
+  - If it returns `Ok`, then the list of `msg`s will be applied in order via `TestContext.update`.
 
-If the fuction returns `Ok`, then the list of msgs will be applied in order via `TestContext.update`.
+NOTE: If you are simulating HTTP response, you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
 
 -}
 simulateLastEffect : (effect -> Result String (List msg)) -> TestContext msg model effect -> TestContext msg model effect
@@ -1202,6 +1211,10 @@ expectLastEffectHelper functionName assertion testContext =
 
 
 {-| Validates the last effect produced by a `TestContext`'s program without ending the `TestContext`.
+
+NOTE: If you are assert about HTTP requests being made,
+you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
+
 -}
 shouldHaveLastEffect : (effect -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
 shouldHaveLastEffect assertion testContext =
@@ -1209,6 +1222,10 @@ shouldHaveLastEffect assertion testContext =
 
 
 {-| Makes an assertion about the last effect produced by a `TestContext`'s program.
+
+NOTE: If you are assert about HTTP requests being made,
+you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
+
 -}
 expectLastEffect : (effect -> Expectation) -> TestContext msg model effect -> Expectation
 expectLastEffect assertion testContext =

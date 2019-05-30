@@ -1,5 +1,5 @@
 module SimulatedEffect.Task exposing
-    ( Task, perform, attempt
+    ( perform, attempt
     , andThen, succeed, fail
     , map
     , mapError
@@ -10,12 +10,12 @@ PRs are welcome to add any functions that are missing.
 
 The functions here produce `SimulatedTasks`s instead of `Tasks`s
 and `SimulatedEffect`s instead of `Cmd`s, which are meant to be used
-to help you implement the function to provide when using `TestContext.withSimulatedEffects`.
+to help you implement the function to provide when using [`TestContext.withSimulatedEffects`](TestContext#withSimulatedEffects).
 
 
 # Tasks
 
-@docs Task, perform, attempt
+@docs perform, attempt
 
 
 # Chains
@@ -34,16 +34,11 @@ to help you implement the function to provide when using `TestContext.withSimula
 
 -}
 
-import SimulatedEffect exposing (SimulatedEffect)
+import SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
 
 
 {-| -}
-type alias Task x a =
-    SimulatedEffect.SimulatedTask x a
-
-
-{-| -}
-perform : (a -> msg) -> Task Never a -> SimulatedEffect msg
+perform : (a -> msg) -> SimulatedTask Never a -> SimulatedEffect msg
 perform f task =
     task
         |> map f
@@ -53,7 +48,7 @@ perform f task =
 
 {-| This is very similar to [`perform`](#perform) except it can handle failures!
 -}
-attempt : (Result x a -> msg) -> Task x a -> SimulatedEffect msg
+attempt : (Result x a -> msg) -> SimulatedTask x a -> SimulatedEffect msg
 attempt f task =
     task
         |> map (Ok >> f)
@@ -63,7 +58,7 @@ attempt f task =
 
 {-| Chain together a task and a callback.
 -}
-andThen : (a -> Task x b) -> Task x a -> Task x b
+andThen : (a -> SimulatedTask x b) -> SimulatedTask x a -> SimulatedTask x b
 andThen f task =
     case task of
         SimulatedEffect.Succeed a ->
@@ -84,28 +79,28 @@ andThen f task =
 
 {-| A task that succeeds immediately when run.
 -}
-succeed : a -> Task x a
+succeed : a -> SimulatedTask x a
 succeed =
     SimulatedEffect.Succeed
 
 
 {-| A task that fails immediately when run.
 -}
-fail : x -> Task x a
+fail : x -> SimulatedTask x a
 fail =
     SimulatedEffect.Fail
 
 
 {-| Transform a task.
 -}
-map : (a -> b) -> Task x a -> Task x b
+map : (a -> b) -> SimulatedTask x a -> SimulatedTask x b
 map f =
     andThen (f >> SimulatedEffect.Succeed)
 
 
 {-| Transform the error value.
 -}
-mapError : (x -> y) -> Task x a -> Task y a
+mapError : (x -> y) -> SimulatedTask x a -> SimulatedTask y a
 mapError f task =
     case task of
         SimulatedEffect.Succeed a ->
