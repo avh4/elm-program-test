@@ -200,10 +200,8 @@ all =
             , test "simulate error response" <|
                 \() ->
                     start [ Http.get { url = "https://example.com/friends", expect = Http.expectString HandleStringResponse } ]
-                        |> TestContext.simulateHttpResponse
-                            { method = "GET"
-                            , url = "https://example.com/friends"
-                            }
+                        |> TestContext.simulateHttpResponse "GET"
+                            "https://example.com/friends"
                             { statusCode = 500
                             , body = ""
                             }

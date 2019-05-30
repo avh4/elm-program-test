@@ -1046,10 +1046,8 @@ NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you ca
 -}
 simulateHttpSuccess : String -> String -> String -> TestContext msg model effect -> TestContext msg model effect
 simulateHttpSuccess method url responseBody =
-    simulateHttpResponse
-        { method = method
-        , url = url
-        }
+    simulateHttpResponse method
+        url
         { statusCode = 200
         , body = responseBody
         }
@@ -1061,8 +1059,8 @@ The test will fail if there is no pending request matching the given method and 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-simulateHttpResponse : { method : String, url : String } -> { statusCode : Int, body : String } -> TestContext msg model effect -> TestContext msg model effect
-simulateHttpResponse expectedRequest response testContext =
+simulateHttpResponse : String -> String -> { statusCode : Int, body : String } -> TestContext msg model effect -> TestContext msg model effect
+simulateHttpResponse method url response testContext =
     case testContext of
         Finished err ->
             Finished err
@@ -1073,16 +1071,16 @@ simulateHttpResponse expectedRequest response testContext =
                     Finished (EffectSimulationNotConfigured "simulateHttpResponse")
 
                 Just ( _, simulationState ) ->
-                    case Dict.get ( expectedRequest.method, expectedRequest.url ) simulationState.http of
+                    case Dict.get ( method, url ) simulationState.http of
                         Nothing ->
-                            Finished (NoMatchingHttpRequest "simulateHttpResponse" expectedRequest (Dict.keys simulationState.http))
+                            Finished (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulationState.http))
 
                         Just actualRequest ->
                             let
                                 responseValue =
                                     if response.statusCode >= 200 && response.statusCode < 300 then
                                         Http.GoodStatus_
-                                            { url = expectedRequest.url
+                                            { url = url
                                             , statusCode = response.statusCode
                                             , statusText = ""
                                             , headers = Dict.empty
@@ -1091,7 +1089,7 @@ simulateHttpResponse expectedRequest response testContext =
 
                                     else
                                         Http.BadStatus_
-                                            { url = expectedRequest.url
+                                            { url = url
                                             , statusCode = response.statusCode
                                             , statusText = ""
                                             , headers = Dict.empty
