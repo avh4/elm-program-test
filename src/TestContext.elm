@@ -1,8 +1,9 @@
 module TestContext exposing
     ( TestContext, start
     , createSandbox, createElement, createDocument, createApplication
-    , ProgramDefinition, withBaseUrl, withJsonStringFlags
-    , SimulatedEffect, SimulatedTask, withSimulatedEffects
+    , ProgramDefinition
+    , withBaseUrl, withJsonStringFlags
+    , withSimulatedEffects, SimulatedEffect, SimulatedTask
     , clickButton, clickLink
     , fillIn, fillInTextarea
     , check, selectOption
@@ -23,23 +24,46 @@ module TestContext exposing
     , fail, createFailed
     )
 
-{-| A `TestContext` simulates the execution of an Elm program.
+{-| A `TestContext` simulates the execution of an Elm program
+enabling you write high-level tests for your program.
+(High-level tests are valuable in that they provide extremely robust test coverage
+in the case of drastic refactorings of your application architecture,
+and writing high-level tests helps you focus on the needs an behaviors of your end-users.)
+
+This module allows you to interact with your program by simulating
+DOM events (see ["Simulating user input"](#simulating-user-input)) and
+external events (see ["Simulating HTTP responses"](#simulating-http-responses) and ["Simulating time"](#simulating-time)).
+
+After simulating a series of events, you can then check assertions about
+the currently rendered state of your program (see ["Final assertions"](#final-assertions).
 
 
-## Creating
+# Creating
 
 @docs TestContext, start
 
+
+## Creating program definitions
+
+A `ProgramDefinition` (required to create a `TextContext` with [`start`](#start))
+can be created with one of the following functions that parallel
+the functions in `elm/browser`'s `Browser` module.
+
 @docs createSandbox, createElement, createDocument, createApplication
-@docs ProgramDefinition, withBaseUrl, withJsonStringFlags
+@docs ProgramDefinition
 
 
-### Simulated effects
+## Options
 
-@docs SimulatedEffect, SimulatedTask, withSimulatedEffects
+The following functions allow you to configure your
+`ProgramDefinition` before starting it with [`start`](#start).
+
+@docs withBaseUrl, withJsonStringFlags
+
+@docs withSimulatedEffects, SimulatedEffect, SimulatedTask
 
 
-## Simulating user input
+# Simulating user input
 
 @docs clickButton, clickLink
 @docs fillIn, fillInTextarea
@@ -53,6 +77,9 @@ module TestContext exposing
 @docs within
 
 
+# Simulating external events
+
+
 ## Simulating HTTP responses
 
 @docs assertHttpRequestWasMade, assertHttpRequest
@@ -64,20 +91,20 @@ module TestContext exposing
 @docs advanceTime
 
 
-## Directly sending Msgs
+# Directly sending Msgs
 
 @docs update
 @docs simulateLastEffect
 
 
-## Final assertions
+# Final assertions
 
 @docs expectViewHas, expectView
 @docs expectLastEffect, expectModel
 @docs expectPageChange
 
 
-## Intermediate assertions
+# Intermediate assertions
 
 These functions can be used to make assertions on a `TestContext` without ending the test.
 
@@ -89,7 +116,7 @@ To end a `TestContext` without using a [final assertion](#final-assertions), use
 @docs done
 
 
-## Custom assertions
+# Custom assertions
 
 These functions may be useful if you are writing your own custom assertion functions.
 
@@ -269,7 +296,8 @@ start flags (ProgramDefinition options program) =
 {-| Sets the initial browser URL
 
 You must set this when using `createApplication`,
-or when testing clicking links with relative URLs with [`clickLink`](#clickLink) and [`expectPageChange`](#expectPageChange).
+or when using [`clickLink`](#clickLink) and [`expectPageChange`](#expectPageChange)
+to simulate a user clicking a link with relative URL.
 
 -}
 withBaseUrl : String -> ProgramDefinition flags msg model effect -> ProgramDefinition flags msg model effect
@@ -389,7 +417,8 @@ type alias SimulatedEffect msg =
     SimulatedEffect.SimulatedEffect msg
 
 
-{-| -}
+{-| Similar to `SimulatedEffect`, but represents a `Task` instead of a `Cmd`.
+-}
 type alias SimulatedTask x a =
     SimulatedEffect.SimulatedTask x a
 
@@ -569,11 +598,16 @@ clickButton buttonText testContext =
 
 {-| Simulates clicking a `<a href="...">` link.
 
-NOTE: Currently, this function requires that you also provide the expected href.
-After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
-a future release of this package will remove the `href` parameter.
+The parameters are:
 
-Note for testing single-page apps,
+1.  The text of the `<a>` tag (which is the link text visible to the user).
+
+2.  The `href` of the `<a>` tag.
+
+    NOTE: After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+    a future release of this package will remove the `href` parameter.
+
+Note for testing single-page apps:
 if the target `<a>` tag has an `onClick` handler,
 then the message produced by the handler will be processed
 and the `href` will not be followed.
@@ -697,17 +731,17 @@ followLink functionDescription href testContext =
 
 {-| Simulates replacing the text in an input field labeled with the given label.
 
-  - `fieldId`: the field id
+1.  The id of the input field
     (which must match both the `id` attribute of the target `input` element,
     and the `for` attribute of the `label` element),
     or `""` if the `<input>` is a descendant of the `<label>`.
 
     NOTE: After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
-    a future release of this package will remove the `fieldId` parameter.
+    a future release of this package will remove this parameter.
 
-  - `label`: the label text of the input field
+2.  The label text of the input field.
 
-  - `text`: the text that will be used to trigger the `onInput` event of the input field
+3.  The text that will entered into the input field.
 
 There are a few different ways to accessibly label your input fields so that `fillIn` will find them:
 
@@ -773,6 +807,20 @@ fillInTextarea newContent testContext =
 
 {-| Simulates setting the value of a checkbox labeled with the given label.
 
+The parameters are:
+
+1.  The id of the input field
+    (which must match both the `id` attribute of the target `input` element,
+    and the `for` attribute of the `label` element),
+    or `""` if the `<input>` is a descendant of the `<label>`.
+
+    NOTE: After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+    a future release of this package will remove this parameter.
+
+2.  The label text of the input field
+
+3.  A `Bool` indicating whether to check (`True`) or uncheck (`False`) the checkbox.
+
 NOTE: Currently, this function requires that you also provide the field id
 (which must match both the `id` attribute of the target `input` element,
 and the `for` attribute of the `label` element).
@@ -780,7 +828,7 @@ After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/5
 a future release of this package will remove the `fieldId` parameter.
 
 NOTE: In the future, this will be generalized to work with
-aria accessiblity attributes in addition to working with standard HTML label elements.
+aria accessibility attributes in addition to working with standard HTML label elements.
 
 If you need more control over the finding the target element or creating the simulated event,
 see [`simulate`](#simulate).
@@ -799,29 +847,43 @@ check fieldId label willBecomeChecked testContext =
 
 {-| Simulates choosing an option with the given text in a select with a given label
 
+The parameters are:
+
+1.  The id of the `<select>`
+    (which must match both the `id` attribute of the target `select` element,
+    and the `for` attribute of the `label` element),
+    or `""` if the `<select>` is a descendant of the `<label>`.
+
+    NOTE: After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+    a future release of this package will remove this parameter.
+
+2.  The label text of the select.
+
+3.  The `value` of the `<option>` that will be chosen.
+
+    NOTE: After [eeue56/elm-html-test#51](https://github.com/eeue56/elm-html-test/issues/51) is resolved,
+    a future release of this package will remove this parameter.
+
+4.  The user-visible text of the `<option>` that will be chosen.
+
 Example: If you have a view like the following,
 
     import Html
     import Html.Attributes exposing (for, id, value)
-    import Html.Events exposing (on)
+    import Html.Events exposing (on, targetValue)
 
     Html.div []
         [ Html.label [ for "pet-select" ] [ Html.text "Choose a pet" ]
-        , Html.select [ id "on "change" targetValue ]
-             [ Html.option [ value "dog" ] [ Html.text "Dog" ]
-             , Html.option [ value "hamster" ] [ Html.text "Hamster" ]
-             ]
+        , Html.select
+            [ id "pet-select", on "change" targetValue ]
+            [ Html.option [ value "dog" ] [ Html.text "Dog" ]
+            , Html.option [ value "hamster" ] [ Html.text "Hamster" ]
+            ]
         ]
 
 you can simulate selecting an option like this:
 
     TestContext.selectOption "pet-select" "Choose a pet" "dog" "Dog"
-
-NOTE: Currently, this function requires that you also provide the field id
-(which must match both the `id` attribute of the target `select` element,
-and the `for` attribute of the `label` element) and the value of the option that you are
-selecting. After [eeue56/elm-html-test#51](https://github.com/eeue56/elm-html-test/issues/51) is resolved,
-a future release of this package will remove the `fieldId` and `optionValue` parameters.
 
 If you need more control over the finding the target element or creating the simulated event,
 see [`simulate`](#simulate).
@@ -1224,7 +1286,11 @@ replaceView newView testContext =
                 }
 
 
-{-| `url` may be an absolute URL or relative URL
+{-| Simulates a route change event (which would happen when your program is
+a `Browser.application` and the user changes the URL in the browser's URL bar.
+
+The parameter may be an absolute URL or relative URL.
+
 -}
 routeChange : String -> TestContext msg model effect -> TestContext msg model effect
 routeChange url testContext =
@@ -1511,7 +1577,36 @@ fail assertionName failureMessage testContext =
 
 {-| `createFailed` can be used to report custom errors if you are writing your own convenience functions to **create** test contexts.
 
-NOTE: if you are writing a convenience function that takes a `TestContext` as input, you should use [`fail`](#fail) instead, as it provides more context in the test failure message.
+The parameters are:
+
+1.  The name of your helper function (displayed in failure messages)
+2.  The failure message (also included in the failure message)
+
+NOTE: if you are writing a convenience function that takes a `TestContext` as input, you should use [`fail`](#fail) instead,
+as it provides more context in the test failure message.
+
+    -- JsonSchema and MyProgram are imaginary modules for this example
+
+
+    import JsonSchema exposing (Schema, validateJsonSchema)
+    import MyProgram exposing (Model, Msg)
+    import TextContext exposing (TestContext)
+
+    createWithValidatedJson : Schema -> String -> TestContext Msg Model (Cmd Msg)
+    createWithValidatedJson schema json =
+        case validateJsonSchema schema json of
+            Err message ->
+                TestContext.createFailed
+                    "createWithValidatedJson"
+                    ("JSON schema validation failed:\n" ++ message)
+
+            Ok () ->
+                TestContext.createElement
+                    { init = MyProgram.init
+                    , update = MyProgram.update
+                    , view = MyProgram.view
+                    }
+                    |> TestContext.start json
 
 -}
 createFailed : String -> String -> TestContext msg model effect
