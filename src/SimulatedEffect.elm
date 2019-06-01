@@ -1,6 +1,7 @@
-module SimulatedEffect exposing (HttpRequest, SimulatedEffect(..), SimulatedTask(..))
+module SimulatedEffect exposing (HttpRequest, SimulatedEffect(..), SimulatedSub(..), SimulatedTask(..))
 
 import Http
+import Json.Decode
 import Json.Encode
 
 
@@ -23,3 +24,7 @@ type alias HttpRequest x a =
     , headers : List ( String, String )
     , onRequestComplete : Http.Response String -> SimulatedTask x a
     }
+
+
+type SimulatedSub msg
+    = PortSub String (Json.Decode.Decoder msg)

@@ -1,4 +1,4 @@
-module TestingProgram exposing (Model, Msg(..), TestContext, start)
+module TestingProgram exposing (Model, Msg(..), TestContext, start, update)
 
 {-| This is a generic program for use in tests for many elm-program-test modules.
 -}
