@@ -318,7 +318,7 @@ to simulate a user clicking a link with relative URL.
 -}
 withBaseUrl : String -> ProgramDefinition flags msg model effect -> ProgramDefinition flags msg model effect
 withBaseUrl baseUrl (ProgramDefinition options program) =
-    case Url.Extra.locationFromString baseUrl of
+    case Url.fromString baseUrl of
         Nothing ->
             ProgramDefinition options (\_ _ _ -> Finished (InvalidLocationUrl "startWithBaseUrl" baseUrl))
 
@@ -780,7 +780,7 @@ followLink functionDescription href testContext =
                     Finished (ChangedPage functionDescription (Url.Extra.resolve location href))
 
                 Nothing ->
-                    case Url.Extra.locationFromString href of
+                    case Url.fromString href of
                         Nothing ->
                             Finished (NoBaseUrl "clickLink" href)
 

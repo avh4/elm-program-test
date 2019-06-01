@@ -14,7 +14,7 @@ all =
                 check base relative expected =
                     test ("resolve " ++ base ++ " " ++ relative) <|
                         \() ->
-                            case Url.Extra.locationFromString base of
+                            case Url.fromString base of
                                 Nothing ->
                                     Expect.fail ("Unable to parse base url: " ++ base)
 
