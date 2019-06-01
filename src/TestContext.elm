@@ -1050,8 +1050,52 @@ withSimulation f testContext =
 
 
 queueEffect : effect -> TestContext msg model effect -> TestContext msg model effect
-queueEffect effect =
-    withSimulation (EffectSimulation.queueEffect effect)
+queueEffect effect testContext =
+    case testContext of
+        Finished _ ->
+            testContext
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    testContext
+
+                Just simulation ->
+                    List.foldl queueSimulatedEffect testContext (simulation.deconstructEffect effect)
+
+
+queueSimulatedEffect : SimulatedEffect msg -> TestContext msg model effect -> TestContext msg model effect
+queueSimulatedEffect effect testContext =
+    case testContext of
+        Finished _ ->
+            testContext
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    testContext
+
+                Just simulation ->
+                    case effect of
+                        SimulatedEffect.Task t ->
+                            Active
+                                { state
+                                    | effectSimulation =
+                                        Just (EffectSimulation.queueTask t simulation)
+                                }
+
+                        SimulatedEffect.PortEffect portName value ->
+                            Active
+                                { state
+                                    | effectSimulation =
+                                        Just
+                                            { simulation
+                                                | outgoingPortValues =
+                                                    Dict.update portName
+                                                        (Maybe.withDefault [] >> (::) value >> Just)
+                                                        simulation.outgoingPortValues
+                                            }
+                                }
 
 
 drain : TestContext msg model effect -> TestContext msg model effect
@@ -1310,8 +1354,7 @@ advanceTo end testContext =
                                                         }
                                                 }
                                     }
-                                    |> withSimulation
-                                        (EffectSimulation.queueTask (task ()))
+                                    |> withSimulation (EffectSimulation.queueTask (task ()))
                                     |> drain
                                     |> advanceTo end
 

@@ -5,7 +5,6 @@ module TestContext.EffectSimulation exposing
     , emptySimulationState
     , init
     , outgoingPortValues
-    , queueEffect
     , queueTask
     , stepWorkQueue
     )
@@ -46,30 +45,6 @@ emptySimulationState =
     { http = Dict.empty
     , futureTasks = PairingHeap.empty
     , nowMs = 0
-    }
-
-
-queueEffect : effect -> EffectSimulation msg effect -> EffectSimulation msg effect
-queueEffect effect simulation =
-    let
-        step e ( queue, outgoing ) =
-            case e of
-                SimulatedEffect.Task t ->
-                    ( Fifo.insert t queue
-                    , outgoing
-                    )
-
-                SimulatedEffect.PortEffect portName value ->
-                    ( queue
-                    , Dict.update portName (Maybe.withDefault [] >> (::) value >> Just) outgoing
-                    )
-
-        ( newQueue, newOutgoing ) =
-            List.foldl step ( simulation.workQueue, simulation.outgoingPortValues ) (simulation.deconstructEffect effect)
-    in
-    { simulation
-        | workQueue = newQueue
-        , outgoingPortValues = newOutgoing
     }
 
 
