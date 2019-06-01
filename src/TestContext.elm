@@ -1102,6 +1102,10 @@ queueSimulatedEffect effect testContext =
                             testContext
                                 |> routeChange url
 
+                        SimulatedEffect.ReplaceUrl url ->
+                            testContext
+                                |> routeChange url
+
 
 drain : TestContext msg model effect -> TestContext msg model effect
 drain =

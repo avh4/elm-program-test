@@ -30,3 +30,6 @@ map f effect =
 
         SimulatedEffect.PushUrl url ->
             SimulatedEffect.PushUrl url
+
+        SimulatedEffect.ReplaceUrl url ->
+            SimulatedEffect.ReplaceUrl url

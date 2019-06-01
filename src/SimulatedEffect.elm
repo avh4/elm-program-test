@@ -9,6 +9,7 @@ type SimulatedEffect msg
     = Task (SimulatedTask msg msg)
     | PortEffect String Json.Encode.Value
     | PushUrl String
+    | ReplaceUrl String
 
 
 type SimulatedTask x a
