@@ -1,10 +1,11 @@
-module TestingProgram exposing (Model, Msg(..), TestContext, start, update)
+module TestingProgram exposing (Model, Msg(..), TestContext, application, start, update)
 
 {-| This is a generic program for use in tests for many elm-program-test modules.
 -}
 
 import Html
 import TestContext exposing (SimulatedEffect)
+import Url
 
 
 type alias TestContext =
@@ -19,6 +20,23 @@ start initialEffects =
         , view = \_ -> Html.text ""
         }
         |> TestContext.withSimulatedEffects identity
+        |> TestContext.start ()
+
+
+application : List (SimulatedEffect Msg) -> TestContext
+application initialEffects =
+    TestContext.createApplication
+        { onUrlChange = \location -> Log (Url.toString location)
+        , onUrlRequest = \_ -> Debug.todo "TestContextTests-2:onUrlRequest"
+        , init = \() location key -> ( [], initialEffects )
+        , update = update
+        , view =
+            \_ ->
+                { title = "page title"
+                , body = []
+                }
+        }
+        |> TestContext.withBaseUrl "https://example.com/path"
         |> TestContext.start ()
 
 
