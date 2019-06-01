@@ -1,10 +1,12 @@
 module SimulatedEffect exposing (HttpRequest, SimulatedEffect(..), SimulatedTask(..))
 
 import Http
+import Json.Encode
 
 
 type SimulatedEffect msg
     = Task (SimulatedTask msg msg)
+    | PortEffect String Json.Encode.Value
 
 
 type SimulatedTask x a

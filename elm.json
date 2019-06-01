@@ -6,8 +6,10 @@
     "version": "2.3.0",
     "exposed-modules": [
         "TestContext",
+        "SimulatedEffect.Cmd",
         "SimulatedEffect.Http",
         "SimulatedEffect.Task",
+        "SimulatedEffect.Port",
         "SimulatedEffect.Process",
         "Test.Http"
     ],

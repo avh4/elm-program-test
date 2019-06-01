@@ -13,6 +13,7 @@ module TestContext exposing
     , assertHttpRequestWasMade, assertHttpRequest
     , simulateHttpOk, simulateHttpResponse
     , advanceTime
+    , checkAndClearOutgoingPort
     , update
     , simulateLastEffect
     , expectViewHas, expectView
@@ -32,10 +33,12 @@ and writing high-level tests helps you focus on the needs an behaviors of your e
 
 This module allows you to interact with your program by simulating
 DOM events (see ["Simulating user input"](#simulating-user-input)) and
-external events (see ["Simulating HTTP responses"](#simulating-http-responses) and ["Simulating time"](#simulating-time)).
+external events (see ["Simulating HTTP responses"](#simulating-http-responses),
+["Simulating time"](#simulating-time),
+and ["Simulating ports"](#simulating-ports)).
 
 After simulating a series of events, you can then check assertions about
-the currently rendered state of your program (see ["Final assertions"](#final-assertions).
+the currently rendered state of your program (see ["Final assertions"](#final-assertions)).
 
 
 # Creating
@@ -89,6 +92,11 @@ The following functions allow you to configure your
 ## Simulating time
 
 @docs advanceTime
+
+
+## Simulating ports
+
+@docs checkAndClearOutgoingPort
 
 
 # Directly sending Msgs
@@ -409,8 +417,10 @@ You can create `SimulatedEffect`s using the the following modules,
 which parallel the modules your real program would use to create `Cmd`s and `Task`s:
 
   - [`SimulatedEffect.Http`](SimulatedEffect-Http) (parallels `Http` from `elm/http`)
+  - [`SimulatedEffect.Cmd`](SimulatedEffect-Cmd) (parallels `Platform.Cmd` from `elm/core`)
   - [`SimulatedEffect.Task`](SimulatedEffect-Task) (parallels `Task` from `elm/core`)
   - [`SimulatedEffect.Process`](SimulatedEffect-Process) (parallels `Process` from `elm/core`)
+  - [`SimulatedEffect.Port`](SimulatedEffect-Port) (parallels the `port` keyword)
 
 -}
 type alias SimulatedEffect msg =
@@ -1267,6 +1277,67 @@ advanceTo end testContext =
                                                     | state = { ss | nowMs = end }
                                                 }
                                     }
+
+
+{-| Lets you assert on the values that have been sent to an outgoing port.
+
+NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
+
+-}
+checkAndClearOutgoingPort : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
+checkAndClearOutgoingPort portName decoder checkValues testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    Finished (EffectSimulationNotConfigured "checkAndClearOutgoingPort")
+
+                Just simulation ->
+                    case allOk <| List.map (Json.Decode.decodeValue decoder) <| EffectSimulation.outgoingPortValues portName simulation of
+                        Err errs ->
+                            Finished (CustomFailure "checkAndClearOutgoingPort: failed to decode port values" (List.map Json.Decode.errorToString errs |> String.join "\n"))
+
+                        Ok values ->
+                            case Test.Runner.getFailureReason (checkValues values) of
+                                Nothing ->
+                                    -- the check passed
+                                    Active
+                                        { state
+                                            | effectSimulation =
+                                                Just (EffectSimulation.clearOutgoingPortValues portName simulation)
+                                        }
+
+                                Just reason ->
+                                    Finished
+                                        (ExpectFailed ("checkAndClearOutgoingPort: values sent to port \"" ++ portName ++ "\" did not match")
+                                            reason.description
+                                            reason.reason
+                                        )
+
+
+allOk : List (Result x a) -> Result (List x) (List a)
+allOk results =
+    let
+        step next acc =
+            case ( next, acc ) of
+                ( Ok n, Ok a ) ->
+                    Ok (n :: a)
+
+                ( Ok _, Err x ) ->
+                    Err x
+
+                ( Err n, Ok _ ) ->
+                    Err [ n ]
+
+                ( Err n, Err x ) ->
+                    Err (n :: x)
+    in
+    List.foldl step (Ok []) results
+        |> Result.map List.reverse
+        |> Result.mapError List.reverse
 
 
 replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect

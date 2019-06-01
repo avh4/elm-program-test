@@ -1,8 +1,10 @@
 module TestContext.EffectSimulation exposing
     ( EffectSimulation
     , SimulationState
+    , clearOutgoingPortValues
     , emptySimulationState
     , init
+    , outgoingPortValues
     , queueEffect
     , queueTask
     , stepWorkQueue
@@ -10,6 +12,7 @@ module TestContext.EffectSimulation exposing
 
 import Dict exposing (Dict)
 import Fifo exposing (Fifo)
+import Json.Encode
 import PairingHeap exposing (PairingHeap)
 import SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
 
@@ -18,6 +21,7 @@ type alias EffectSimulation msg effect =
     { deconstructEffect : effect -> List (SimulatedEffect msg)
     , workQueue : Fifo (SimulatedTask msg msg)
     , state : SimulationState msg
+    , outgoingPortValues : Dict String (List Json.Encode.Value)
     }
 
 
@@ -26,6 +30,7 @@ init f =
     { deconstructEffect = f
     , workQueue = Fifo.empty
     , state = emptySimulationState
+    , outgoingPortValues = Dict.empty
     }
 
 
@@ -47,13 +52,24 @@ emptySimulationState =
 queueEffect : effect -> EffectSimulation msg effect -> EffectSimulation msg effect
 queueEffect effect simulation =
     let
-        step e queue =
+        step e ( queue, outgoing ) =
             case e of
                 SimulatedEffect.Task t ->
-                    Fifo.insert t queue
+                    ( Fifo.insert t queue
+                    , outgoing
+                    )
+
+                SimulatedEffect.PortEffect portName value ->
+                    ( queue
+                    , Dict.update portName (Maybe.withDefault [] >> (::) value >> Just) outgoing
+                    )
+
+        ( newQueue, newOutgoing ) =
+            List.foldl step ( simulation.workQueue, simulation.outgoingPortValues ) (simulation.deconstructEffect effect)
     in
     { simulation
-        | workQueue = List.foldl step simulation.workQueue (simulation.deconstructEffect effect)
+        | workQueue = newQueue
+        , outgoingPortValues = newOutgoing
     }
 
 
@@ -110,3 +126,15 @@ simulateTask task simulationState =
               }
             , Nothing
             )
+
+
+outgoingPortValues : String -> EffectSimulation msg effect -> List Json.Encode.Value
+outgoingPortValues portName simulation =
+    Dict.get portName simulation.outgoingPortValues
+        |> Maybe.withDefault []
+        |> List.reverse
+
+
+clearOutgoingPortValues : String -> EffectSimulation msg effect -> EffectSimulation msg effect
+clearOutgoingPortValues portName simulation =
+    { simulation | outgoingPortValues = Dict.remove portName simulation.outgoingPortValues }
