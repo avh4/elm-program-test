@@ -75,7 +75,7 @@ all =
                     startSub (\_ -> [ SimulatedEffect.Ports.subscribe "int" Decode.int (Debug.toString >> Log) ])
                         |> TestContext.simulateIncomingPort "int" (Json.int 7)
                         |> TestContext.expectModel (Expect.equal [ "7" ])
-            , test "shows useful error the port is not subscribed to" <|
+            , test "shows useful error when the port is not subscribed to" <|
                 \() ->
                     startSub (\_ -> [])
                         |> TestContext.simulateIncomingPort "int" (Json.int 7)
@@ -88,7 +88,6 @@ all =
                         , update = TestingProgram.update
                         , view = \_ -> Html.text ""
                         }
-                        |> TestContext.withSimulatedEffects identity
                         |> TestContext.start ()
                         |> TestContext.simulateIncomingPort "int" (Json.int 7)
                         |> TestContext.done
