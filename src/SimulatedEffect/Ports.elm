@@ -1,4 +1,4 @@
-module SimulatedEffect.Port exposing (send, subscribe)
+module SimulatedEffect.Ports exposing (send, subscribe)
 
 {-| This module provides functions that allow you to create `SimulatedEffect`s
 that parallel [Elm ports](https://guide.elm-lang.org/interop/ports.html) used in your real program.
@@ -26,7 +26,7 @@ For example, if your production code uses a port like this:
 
 Then the corresponding `SimulatedEffect` would be:
 
-    SimulatedEffect.Port.send "logMessage" (Json.Encode.string "hello")
+    SimulatedEffect.Ports.send "logMessage" (Json.Encode.string "hello")
 
 -}
 send : String -> Json.Encode.Value -> SimulatedEffect msg
@@ -48,7 +48,7 @@ Then the corresponding `SimulatedSub` would be:
 
     simulatedSubscriptions : Model -> SimulatedSub Msg
     simulatedSubscriptions model =
-        SimulatedEffect.Port.subscribe
+        SimulatedEffect.Ports.subscribe
             "activeUsers"
             (Json.Decode.list Json.Decode.string)
             OnActiveUsersLoaded

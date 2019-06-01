@@ -452,7 +452,7 @@ which parallel the modules your real program would use to create `Cmd`s and `Tas
   - [`SimulatedEffect.Cmd`](SimulatedEffect-Cmd) (parallels `Platform.Cmd` from `elm/core`)
   - [`SimulatedEffect.Task`](SimulatedEffect-Task) (parallels `Task` from `elm/core`)
   - [`SimulatedEffect.Process`](SimulatedEffect-Process) (parallels `Process` from `elm/core`)
-  - [`SimulatedEffect.Port`](SimulatedEffect-Port) (parallels the `port` keyword)
+  - [`SimulatedEffect.Ports`](SimulatedEffect-Ports) (parallels the `port` keyword)
 
 -}
 type alias SimulatedEffect msg =
@@ -474,7 +474,7 @@ then `TestContext` will not simulate any subscriptions for you.)
 
 You can create `SimulatedSub`s using the the following modules:
 
-  - [`SimulatedEffect.Port`](SimulatedEffect-Port) (parallels the `port` keyword)
+  - [`SimulatedEffect.Ports`](SimulatedEffect-Ports) (parallels the `port` keyword)
 
 -}
 type alias SimulatedSub msg =

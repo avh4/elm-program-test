@@ -4,7 +4,7 @@ import Expect exposing (Expectation)
 import Html
 import Json.Decode as Decode
 import Json.Encode as Json
-import SimulatedEffect.Port
+import SimulatedEffect.Ports
 import Test exposing (..)
 import Test.Runner
 import TestContext exposing (SimulatedEffect, SimulatedTask, TestContext)
@@ -17,12 +17,12 @@ all =
         [ describe "outgoing ports"
             [ test "can check sent values" <|
                 \() ->
-                    start [ SimulatedEffect.Port.send "unit" Json.null ]
+                    start [ SimulatedEffect.Ports.send "unit" Json.null ]
                         |> TestContext.checkAndClearOutgoingPort "unit" (Decode.null ()) (Expect.equal [ () ])
                         |> TestContext.done
             , test "gives error if checked values don't match" <|
                 \() ->
-                    start [ SimulatedEffect.Port.send "unit" Json.null ]
+                    start [ SimulatedEffect.Ports.send "unit" Json.null ]
                         |> TestContext.checkAndClearOutgoingPort "other" (Decode.null ()) (Expect.equal [ () ])
                         |> TestContext.done
                         |> expectFailure
@@ -35,19 +35,19 @@ all =
                             ]
             , test "clears values after checking" <|
                 \() ->
-                    start [ SimulatedEffect.Port.send "unit" Json.null ]
+                    start [ SimulatedEffect.Ports.send "unit" Json.null ]
                         |> TestContext.checkAndClearOutgoingPort "unit" (Decode.null ()) (Expect.equal [ () ])
                         |> TestContext.checkAndClearOutgoingPort "unit" (Decode.null ()) (Expect.equal [])
                         |> TestContext.done
             , test "records values in correct order" <|
                 \() ->
-                    start [ SimulatedEffect.Port.send "int" (Json.int 5) ]
-                        |> TestContext.update (ProduceEffects [ SimulatedEffect.Port.send "int" (Json.int 7) ])
+                    start [ SimulatedEffect.Ports.send "int" (Json.int 5) ]
+                        |> TestContext.update (ProduceEffects [ SimulatedEffect.Ports.send "int" (Json.int 7) ])
                         |> TestContext.checkAndClearOutgoingPort "int" Decode.int (Expect.equal [ 5, 7 ])
                         |> TestContext.done
             , test "shows useful error when decoding fails" <|
                 \() ->
-                    start [ SimulatedEffect.Port.send "int" (Json.int 5) ]
+                    start [ SimulatedEffect.Ports.send "int" (Json.int 5) ]
                         |> TestContext.checkAndClearOutgoingPort "int" Decode.string (Expect.equal [])
                         |> TestContext.done
                         |> expectFailure
@@ -72,7 +72,7 @@ all =
             in
             [ test "simulates incoming ports" <|
                 \() ->
-                    startSub (\_ -> [ SimulatedEffect.Port.subscribe "int" Decode.int (Debug.toString >> Log) ])
+                    startSub (\_ -> [ SimulatedEffect.Ports.subscribe "int" Decode.int (Debug.toString >> Log) ])
                         |> TestContext.simulateIncomingPort "int" (Json.int 7)
                         |> TestContext.expectModel (Expect.equal [ "7" ])
             , test "shows useful error the port is not subscribed to" <|
@@ -95,7 +95,7 @@ all =
                         |> expectFailure [ "simulateIncomingPort \"int\": you MUST use TestContext.withSimulatedSubscriptions to be able to use simulateIncomingPort" ]
             , test "shows useful error when decoder fails" <|
                 \() ->
-                    startSub (\_ -> [ SimulatedEffect.Port.subscribe "int" Decode.int (Debug.toString >> Log) ])
+                    startSub (\_ -> [ SimulatedEffect.Ports.subscribe "int" Decode.int (Debug.toString >> Log) ])
                         |> TestContext.simulateIncomingPort "int" (Json.object [])
                         |> TestContext.done
                         |> expectFailure
