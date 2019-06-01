@@ -1318,11 +1318,11 @@ advanceTime delta testContext =
                     Finished (EffectSimulationNotConfigured "advanceTime")
 
                 Just simulation ->
-                    advanceTo (simulation.state.nowMs + delta) testContext
+                    advanceTo "advanceTime" (simulation.state.nowMs + delta) testContext
 
 
-advanceTo : Int -> TestContext msg model effect -> TestContext msg model effect
-advanceTo end testContext =
+advanceTo : String -> Int -> TestContext msg model effect -> TestContext msg model effect
+advanceTo functionName end testContext =
     case testContext of
         Finished err ->
             Finished err
@@ -1330,7 +1330,7 @@ advanceTo end testContext =
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished (EffectSimulationNotConfigured "advanceTo")
+                    Finished (EffectSimulationNotConfigured functionName)
 
                 Just simulation ->
                     let
@@ -1365,7 +1365,7 @@ advanceTo end testContext =
                                     }
                                     |> withSimulation (EffectSimulation.queueTask (task ()))
                                     |> drain
-                                    |> advanceTo end
+                                    |> advanceTo functionName end
 
                             else
                                 -- next task is further in the future than we are advancing
