@@ -9,6 +9,7 @@
         "SimulatedEffect.Cmd",
         "SimulatedEffect.Http",
         "SimulatedEffect.Task",
+        "SimulatedEffect.Navigation",
         "SimulatedEffect.Ports",
         "SimulatedEffect.Process",
         "Test.Http"

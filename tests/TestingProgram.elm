@@ -36,6 +36,7 @@ application initialEffects =
                 , body = []
                 }
         }
+        |> TestContext.withSimulatedEffects identity
         |> TestContext.withBaseUrl "https://example.com/path"
         |> TestContext.start ()
 

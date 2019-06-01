@@ -27,3 +27,6 @@ map f effect =
 
         SimulatedEffect.PortEffect portName value ->
             SimulatedEffect.PortEffect portName value
+
+        SimulatedEffect.PushUrl url ->
+            SimulatedEffect.PushUrl url

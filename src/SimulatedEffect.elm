@@ -8,6 +8,7 @@ import Json.Encode
 type SimulatedEffect msg
     = Task (SimulatedTask msg msg)
     | PortEffect String Json.Encode.Value
+    | PushUrl String
 
 
 type SimulatedTask x a

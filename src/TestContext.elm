@@ -450,9 +450,10 @@ which parallel the modules your real program would use to create `Cmd`s and `Tas
 
   - [`SimulatedEffect.Http`](SimulatedEffect-Http) (parallels `Http` from `elm/http`)
   - [`SimulatedEffect.Cmd`](SimulatedEffect-Cmd) (parallels `Platform.Cmd` from `elm/core`)
+  - [`SimulatedEffect.Navigation`](SimulatedEffect-Navigation) (parallels `Browser.Navigation` from `elm/browser`)
+  - [`SimulatedEffect.Ports`](SimulatedEffect-Ports) (parallels the `port` keyword)
   - [`SimulatedEffect.Task`](SimulatedEffect-Task) (parallels `Task` from `elm/core`)
   - [`SimulatedEffect.Process`](SimulatedEffect-Process) (parallels `Process` from `elm/core`)
-  - [`SimulatedEffect.Ports`](SimulatedEffect-Ports) (parallels the `port` keyword)
 
 -}
 type alias SimulatedEffect msg =
@@ -1096,6 +1097,10 @@ queueSimulatedEffect effect testContext =
                                                         simulation.outgoingPortValues
                                             }
                                 }
+
+                        SimulatedEffect.PushUrl url ->
+                            testContext
+                                |> routeChange url
 
 
 drain : TestContext msg model effect -> TestContext msg model effect
