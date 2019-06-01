@@ -278,7 +278,7 @@ emptyOptions =
 
 See other `create*` functions below if the program you want to test does not use `Browser.element`.
 
-If you program has subscriptions that you want to simulate, see [`withSimulatedSubscriptions`](#withSimulatedSubscriptions).
+If your program has subscriptions that you want to simulate, see [`withSimulatedSubscriptions`](#withSimulatedSubscriptions).
 
 -}
 createElement :
@@ -388,7 +388,7 @@ withSimulatedSubscriptions fn (ProgramDefinition options program) =
 
 See other `create*` functions if the program you want to test does not use `Browser.document`.
 
-If you program has subscriptions that you want to simulate, see [`withSimulatedSubscriptions`](#withSimulatedSubscriptions).
+If your program has subscriptions that you want to simulate, see [`withSimulatedSubscriptions`](#withSimulatedSubscriptions).
 
 -}
 createDocument :
@@ -412,7 +412,7 @@ createDocument program =
 
 See other `create*` functions if the program you want to test does not use `Browser.application`.
 
-If you program has subscriptions that you want to simulate, see [`withSimulatedSubscriptions`](#withSimulatedSubscriptions).
+If your program has subscriptions that you want to simulate, see [`withSimulatedSubscriptions`](#withSimulatedSubscriptions).
 
 -}
 createApplication :
