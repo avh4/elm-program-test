@@ -90,7 +90,6 @@ These functions may be useful if you are writing your own custom assertion funct
 -}
 
 import Browser
-import Browser.Navigation
 import Dict exposing (Dict)
 import Expect exposing (Expectation)
 import Html exposing (Html)
@@ -556,13 +555,43 @@ matching the given `buttonText`.
 clickButton : String -> TestContext msg model effect -> TestContext msg model effect
 clickButton buttonText testContext =
     simulateHelper ("clickButton " ++ escapeString buttonText)
-        (Query.find
-            [ Selector.tag "button"
-            , Selector.containing [ Selector.text buttonText ]
+        (Query.Extra.oneOf
+            [ findNotDisabled
+                [ Selector.tag "button"
+                , Selector.containing [ Selector.text buttonText ]
+                ]
+            , findNotDisabled
+                [ Selector.attribute (Html.Attributes.attribute "role" "button")
+                , Selector.containing [ Selector.text buttonText ]
+                ]
             ]
         )
         Test.Html.Event.click
         testContext
+
+
+findNotDisabled : List Selector -> Query.Single msg -> Query.Single msg
+findNotDisabled selectors source =
+    -- This is tricky because Test.Html doesn't provide a way to search for an attribute being *not* present.
+    -- So we have to check if "disabled=True" *is* present, and manually force a failure if it is.
+    -- (We can't just search for "disabled=False" because we need to allow elements that don't specify "disabled" at all.)
+    Query.find selectors source
+        |> (\found ->
+                let
+                    isDisabled =
+                        Query.has [ Selector.disabled True ] found
+                in
+                case Test.Runner.getFailureReason isDisabled of
+                    Nothing ->
+                        -- the element is disabled; produce a Query that will fail that will show a reasonable failure message
+                        Query.find
+                            (Selector.disabled False :: selectors)
+                            source
+
+                    Just _ ->
+                        -- the element we found is not disabled; return it
+                        found
+           )
 
 
 {-| Simulates clicking a `<a href="...">` link.

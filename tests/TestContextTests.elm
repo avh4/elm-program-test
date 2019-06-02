@@ -100,11 +100,6 @@ all =
                 testContext
                     |> TestContext.update "A"
                     |> TestContext.expectModel (Expect.equal "<INIT>;A")
-        , test "can click a button" <|
-            \() ->
-                testContext
-                    |> TestContext.clickButton "Click Me"
-                    |> TestContext.expectModel (Expect.equal "<INIT>;CLICK")
         , test "can create with flags" <|
             \() ->
                 TestContext.createElement
