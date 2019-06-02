@@ -3,6 +3,7 @@
 New features:
 
   - `clickButton` now works with non-`<button>` elements having `role="button"`
+  - `clickButton` now fails if the button is disabled
 
 
 ## 2.3.0

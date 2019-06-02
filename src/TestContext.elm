@@ -634,10 +634,26 @@ clickButton : String -> TestContext msg model effect -> TestContext msg model ef
 clickButton buttonText testContext =
     simulateHelper ("clickButton " ++ escapeString buttonText)
         (Query.Extra.oneOf
-            [ Query.find
-                [ Selector.tag "button"
-                , Selector.containing [ Selector.text buttonText ]
-                ]
+            [ \y ->
+                y
+                    |> Query.find
+                        [ Selector.tag "button"
+                        , Selector.containing [ Selector.text buttonText ]
+                        ]
+                    |> (\x ->
+                            case Query.has [ Selector.disabled True ] x |> Test.Runner.getFailureReason of
+                                Nothing ->
+                                    -- the button is disabled
+                                    Query.find
+                                        [ Selector.tag "button"
+                                        , Selector.containing [ Selector.text buttonText ]
+                                        , Selector.disabled False
+                                        ]
+                                        y
+
+                                Just _ ->
+                                    x
+                       )
             , Query.find
                 [ Selector.attribute (Html.Attributes.attribute "role" "button")
                 , Selector.containing [ Selector.text buttonText ]
