@@ -90,8 +90,6 @@ These functions may be useful if you are writing your own custom assertion funct
 
 -}
 
-import Browser
-import Browser.Navigation
 import Dict exposing (Dict)
 import Expect exposing (Expectation)
 import Html exposing (Html)
@@ -635,9 +633,15 @@ matching the given `buttonText`.
 clickButton : String -> TestContext msg model effect -> TestContext msg model effect
 clickButton buttonText testContext =
     simulateHelper ("clickButton " ++ escapeString buttonText)
-        (Query.find
-            [ Selector.tag "button"
-            , Selector.containing [ Selector.text buttonText ]
+        (Query.Extra.oneOf
+            [ Query.find
+                [ Selector.tag "button"
+                , Selector.containing [ Selector.text buttonText ]
+                ]
+            , Query.find
+                [ Selector.attribute (Html.Attributes.attribute "role" "button")
+                , Selector.containing [ Selector.text buttonText ]
+                ]
             ]
         )
         Test.Html.Event.click
