@@ -1,4 +1,4 @@
-## next patch release
+## 2.3.1
 
 New features:
 
