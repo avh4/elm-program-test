@@ -422,7 +422,7 @@ type alias SimulatedTask x a =
     SimulatedEffect.SimulatedTask x a
 
 
-{-| Advances the state of the `TestContext`'s by applying the given `msg` to your program's update function
+{-| Advances the state of the `TestContext` by applying the given `msg` to your program's update function
 (provided when you created the `TestContext`).
 
 This can be used to simulate events that can only be triggered by [commands (`Cmd`) and subscriptions (`Sub`)](https://guide.elm-lang.org/architecture/effects/)
@@ -1212,7 +1212,7 @@ expectLastEffectHelper functionName assertion testContext =
 
 {-| Validates the last effect produced by a `TestContext`'s program without ending the `TestContext`.
 
-NOTE: If you are assert about HTTP requests being made,
+NOTE: If you are asserting about HTTP requests being made,
 you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
 
 -}
@@ -1223,7 +1223,7 @@ shouldHaveLastEffect assertion testContext =
 
 {-| Makes an assertion about the last effect produced by a `TestContext`'s program.
 
-NOTE: If you are assert about HTTP requests being made,
+NOTE: If you are asserting about HTTP requests being made,
 you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
 
 -}
