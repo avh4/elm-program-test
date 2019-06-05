@@ -8,10 +8,10 @@ import TestContext exposing (SimulatedEffect)
 
 
 type alias TestContext =
-    TestContext.TestContext Msg Model (List SimulatedEffect)
+    TestContext.TestContext Msg Model (List (SimulatedEffect Msg))
 
 
-startEffects : List SimulatedEffect -> TestContext
+startEffects : List (SimulatedEffect Msg) -> TestContext
 startEffects initialEffects =
     start initialEffects (Html.text "")
 
@@ -21,7 +21,7 @@ startView =
     start []
 
 
-start : List SimulatedEffect -> Html Msg -> TestContext
+start : List (SimulatedEffect Msg) -> Html Msg -> TestContext
 start initialEffects html =
     TestContext.createElement
         { init = \() -> ( [], initialEffects )
@@ -39,10 +39,10 @@ type alias Model =
 type Msg
     = Clear
     | Log String
-    | ProduceEffects (List SimulatedEffect)
+    | ProduceEffects (List (SimulatedEffect Msg))
 
 
-update : Msg -> Model -> ( Model, List SimulatedEffect )
+update : Msg -> Model -> ( Model, List (SimulatedEffect Msg) )
 update msg model =
     case msg of
         Clear ->
