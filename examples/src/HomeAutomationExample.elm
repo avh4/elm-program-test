@@ -1,4 +1,4 @@
-module HomeAutomationExample exposing (Model, Msg(..), init, main, subscriptions, update, view)
+module HomeAutomationExample exposing (Effect(..), Model, Msg(..), init, main, subscriptions, update, view)
 
 import Browser
 import Dict exposing (Dict)
@@ -69,16 +69,27 @@ type LightState
     | Dimmable Float
 
 
-main : Program () Model Msg
+type alias Flags =
+    ()
+
+
+main : Program Flags Model Msg
 main =
     Browser.document
-        { init = init
-        , update = update
+        { init =
+            \flags ->
+                init flags
+                    |> Tuple.mapSecond perform
+        , update =
+            \msg model ->
+                update msg model
+                    |> Tuple.mapSecond perform
         , subscriptions = subscriptions
         , view = view
         }
 
 
+init : Flags -> ( Model, Effect )
 init () =
     ( initialModel, loadDeviceList )
 
@@ -88,39 +99,60 @@ subscriptions _ =
 
 
 type Effect
-    = GetDeviceList String (Result Http.Error (List Light) -> Msg) (Json.Decode.Decoder (List Light))
+    = NoEffect
+    | GetDeviceList String (Result Http.Error (List Light) -> Msg) (Json.Decode.Decoder (List Light))
+    | ChangeLight String (Result Http.Error Light -> Msg) (Json.Decode.Decoder Light) Json.Encode.Value
 
 
-loadDeviceList : Cmd Msg
+perform : Effect -> Cmd Msg
+perform effect =
+    case effect of
+        NoEffect ->
+            Cmd.none
+
+        GetDeviceList url onResult decoder ->
+            Http.get
+                { url = url
+                , expect = Http.expectJson onResult decoder
+                }
+
+        ChangeLight url onResult decoder body ->
+            Http.post
+                { url = url
+                , body = Http.jsonBody body
+                , expect = Http.expectJson onResult decoder
+                }
+
+
+loadDeviceList : Effect
 loadDeviceList =
     -- TODO: add auth token
-    Http.get
-        { url = apiBase ++ "/devices"
-        , expect = Http.expectJson DeviceListLoaded (Json.Decode.list lightDecoder)
-        }
+    GetDeviceList
+        (apiBase ++ "/devices")
+        DeviceListLoaded
+        (Json.Decode.list lightDecoder)
 
 
-changeLight : String -> LightState -> Cmd Msg
+changeLight : String -> LightState -> Effect
 changeLight id newState =
-    Http.post
-        { url = apiBase ++ "/devices/" ++ id
-        , body =
-            Http.jsonBody <|
-                Json.Encode.object
-                    [ ( "value"
-                      , case newState of
-                            OnOff True ->
-                                Json.Encode.float 1.0
+    ChangeLight
+        (apiBase ++ "/devices/" ++ id)
+        (LightStateChanged id)
+        lightDecoder
+    <|
+        Json.Encode.object
+            [ ( "value"
+              , case newState of
+                    OnOff True ->
+                        Json.Encode.float 1.0
 
-                            OnOff False ->
-                                Json.Encode.float 0.0
+                    OnOff False ->
+                        Json.Encode.float 0.0
 
-                            Dimmable value ->
-                                Json.Encode.float value
-                      )
-                    ]
-        , expect = Http.expectJson (LightStateChanged id) lightDecoder
-        }
+                    Dimmable value ->
+                        Json.Encode.float value
+              )
+            ]
 
 
 lightDecoder : Json.Decode.Decoder Light
@@ -149,17 +181,17 @@ lightDecoder =
         stateDecoder
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg -> Model -> ( Model, Effect )
 update msg model =
     case msg of
         DeviceListLoaded (Err err) ->
             ( { model | lights = Error err }
-            , Cmd.none
+            , NoEffect
             )
 
         DeviceListLoaded (Ok lights) ->
             ( { model | lights = Loaded lights }
-            , Cmd.none
+            , NoEffect
             )
 
         Set id newState ->
@@ -169,7 +201,7 @@ update msg model =
 
         LightStateChanged id (Err err) ->
             ( { model | pending = Dict.insert id (Failed err) model.pending }
-            , Cmd.none
+            , NoEffect
             )
 
         LightStateChanged id (Ok light) ->
@@ -188,7 +220,7 @@ update msg model =
                         model.lights
                 , pending = Dict.remove light.id model.pending
               }
-            , Cmd.none
+            , NoEffect
             )
 
 
