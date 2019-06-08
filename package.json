@@ -8,9 +8,12 @@
     "elm-test": "^0.19.0"
   },
   "scripts": {
-    "test": "elm-test && elm make --docs docs.json && elm-format --validate . && elm diff",
+    "test": "elm-test && npm run-script build-examples && elm make --docs docs.json && elm-format --validate . && elm diff",
+    "build-examples": "(cd examples && elm make src/*.elm && elm-test)",
+    "run-examples": "(cd examples && elm reactor --port 8002)",
+    "run-examples-backend": "(cd examples && PORT=8003 ./node_modules/.bin/nodemon server.js)",
     "watch": "chokidar --initial elm.json 'src/**/*.elm' 'tests/**/*.elm' -c 'npm test'",
     "run-doc-preview": "elm-doc-preview -p 8001",
-    "start": "concurrently --kill-others npm:watch npm:run-doc-preview"
+    "start": "concurrently --kill-others npm:watch npm:run-doc-preview npm:run-examples npm:run-examples-backend"
   }
 }
