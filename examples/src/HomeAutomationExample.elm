@@ -1,4 +1,4 @@
-module HomeAutomationExample exposing (Model, Msg(..), main)
+module HomeAutomationExample exposing (Model, Msg(..), init, main, subscriptions, update, view)
 
 import Browser
 import Dict exposing (Dict)
@@ -72,15 +72,23 @@ type LightState
 main : Program () Model Msg
 main =
     Browser.document
-        { init = \() -> ( initialModel, loadDeviceList )
+        { init = init
         , update = update
-        , subscriptions = \_ -> Sub.none
-        , view =
-            \model ->
-                { title = "Lighting control"
-                , body = [ view model ]
-                }
+        , subscriptions = subscriptions
+        , view = view
         }
+
+
+init () =
+    ( initialModel, loadDeviceList )
+
+
+subscriptions _ =
+    Sub.none
+
+
+type Effect
+    = GetDeviceList String (Result Http.Error (List Light) -> Msg) (Json.Decode.Decoder (List Light))
 
 
 loadDeviceList : Cmd Msg
@@ -184,8 +192,14 @@ update msg model =
             )
 
 
-view : Model -> Html Msg
 view model =
+    { title = "Lighting control"
+    , body = [ viewBody model ]
+    }
+
+
+viewBody : Model -> Html Msg
+viewBody model =
     case model.lights of
         Loading ->
             Html.text "Loading..."
