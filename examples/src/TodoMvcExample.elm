@@ -253,8 +253,10 @@ viewInput task =
         , input
             [ class "new-todo"
             , placeholder "What needs to be done?"
+            , attribute "aria-label" "What needs to be done?"
             , autofocus True
             , value task
+            , id "newTodo"
             , name "newTodo"
             , onInput UpdateField
             , onEnter Add
