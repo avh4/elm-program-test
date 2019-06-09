@@ -18,16 +18,21 @@ The rest of this page walks through an example of how to do that.
 The rest of this section will be working with an example program
 that interacts with a fictional API for controlling the lights in your house.
 
-%%% TODO: diagram
+This diagram shows the architecture of the example application.
+The Elm code makes HTTP requests to two different endpoints:
+`/v1/devices` to get a list of all the lights that can be controlled,
+and `/v1/devices/:id` to change the setting of a specific light.
+
+![architecture diagram described in the preceding paragraph](./HomeAutomationExample.svg)
 
 
-## Goal: the target test
+## Goal: the ideal test
 
-Here's the test that we want to get working:
+The test we want to write represents the following scenario:
 
 1. The user loads the main page
-1. The page fetches the list of lights
-1. We simulate a response from the server
+1. The page requests the list of lights
+1. The server responds with the list of lights and their current states
 1. The user clicks "Turn on" for the kitchen lights
 1. We expect that the page sends a request to the server with the correct values.
 
