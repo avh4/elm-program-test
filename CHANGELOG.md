@@ -1,3 +1,8 @@
+## 2.3.2
+
+  - dependency on `elm/json` is relaxed to `1.0.0 <= v < 2.0.0` 
+
+
 ## 2.3.1
 
 New features:
