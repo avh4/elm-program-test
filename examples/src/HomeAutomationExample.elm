@@ -100,8 +100,17 @@ subscriptions _ =
 
 type Effect
     = NoEffect
-    | GetDeviceList String (Result Http.Error (List Light) -> Msg) (Json.Decode.Decoder (List Light))
-    | ChangeLight String (Result Http.Error Light -> Msg) (Json.Decode.Decoder Light) Json.Encode.Value
+    | GetDeviceList
+        { url : String
+        , decoder : Json.Decode.Decoder (List Light)
+        , onResult : Result Http.Error (List Light) -> Msg
+        }
+    | ChangeLight
+        { url : String
+        , body : Json.Encode.Value
+        , decoder : Json.Decode.Decoder Light
+        , onResult : Result Http.Error Light -> Msg
+        }
 
 
 perform : Effect -> Cmd Msg
@@ -110,13 +119,13 @@ perform effect =
         NoEffect ->
             Cmd.none
 
-        GetDeviceList url onResult decoder ->
+        GetDeviceList { url, onResult, decoder } ->
             Http.get
                 { url = url
                 , expect = Http.expectJson onResult decoder
                 }
 
-        ChangeLight url onResult decoder body ->
+        ChangeLight { url, onResult, decoder, body } ->
             Http.post
                 { url = url
                 , body = Http.jsonBody body
@@ -128,31 +137,33 @@ loadDeviceList : Effect
 loadDeviceList =
     -- TODO: add auth token
     GetDeviceList
-        (apiBase ++ "/devices")
-        DeviceListLoaded
-        (Json.Decode.list lightDecoder)
+        { url = apiBase ++ "/devices"
+        , decoder = Json.Decode.list lightDecoder
+        , onResult = DeviceListLoaded
+        }
 
 
 changeLight : String -> LightState -> Effect
 changeLight id newState =
     ChangeLight
-        (apiBase ++ "/devices/" ++ id)
-        (LightStateChanged id)
-        lightDecoder
-    <|
-        Json.Encode.object
-            [ ( "value"
-              , case newState of
-                    OnOff True ->
-                        Json.Encode.float 1.0
+        { url = apiBase ++ "/devices/" ++ id
+        , body =
+            Json.Encode.object
+                [ ( "value"
+                  , case newState of
+                        OnOff True ->
+                            Json.Encode.float 1.0
 
-                    OnOff False ->
-                        Json.Encode.float 0.0
+                        OnOff False ->
+                            Json.Encode.float 0.0
 
-                    Dimmable value ->
-                        Json.Encode.float value
-              )
-            ]
+                        Dimmable value ->
+                            Json.Encode.float value
+                  )
+                ]
+        , decoder = lightDecoder
+        , onResult = LightStateChanged id
+        }
 
 
 lightDecoder : Json.Decode.Decoder Light

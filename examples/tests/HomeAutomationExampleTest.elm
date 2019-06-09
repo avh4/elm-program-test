@@ -43,14 +43,14 @@ simulateEffects effect =
         Main.NoEffect ->
             []
 
-        Main.GetDeviceList url onResult decoder ->
+        Main.GetDeviceList { url, onResult, decoder } ->
             [ SimulatedEffect.Http.get
                 { url = url
                 , expect = SimulatedEffect.Http.expectJson onResult decoder
                 }
             ]
 
-        Main.ChangeLight url onResult decoder body ->
+        Main.ChangeLight { url, onResult, decoder, body } ->
             [ SimulatedEffect.Http.post
                 { url = url
                 , body = SimulatedEffect.Http.jsonBody body
