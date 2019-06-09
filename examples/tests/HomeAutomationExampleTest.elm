@@ -4,7 +4,18 @@ import Expect
 import HomeAutomationExample as Main
 import SimulatedEffect.Http
 import Test exposing (..)
-import TestContext
+import TestContext exposing (TestContext)
+
+
+start : TestContext Main.Msg Main.Model Main.Effect
+start =
+    TestContext.createDocument
+        { init = Main.init
+        , update = Main.update
+        , view = Main.view
+        }
+        |> TestContext.withSimulatedEffects simulateEffects
+        |> TestContext.start ()
 
 
 all : Test
@@ -12,13 +23,7 @@ all =
     describe "HomeAutomationExample"
         [ test "controlling a light" <|
             \() ->
-                TestContext.createDocument
-                    { init = Main.init
-                    , update = Main.update
-                    , view = Main.view
-                    }
-                    |> TestContext.withSimulatedEffects simulateEffects
-                    |> TestContext.start ()
+                start
                     |> TestContext.simulateHttpOk
                         "GET"
                         "http://localhost:8003/lighting_service/v1/devices"

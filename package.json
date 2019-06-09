@@ -5,7 +5,8 @@
     "elm": "^0.19.0-no-deps",
     "elm-doc-preview": "^2.0.3",
     "elm-format": "^0.8.1",
-    "elm-test": "^0.19.0-rev6"
+    "elm-test": "^0.19.0-rev6",
+    "vuepress": "^1.0.0"
   },
   "scripts": {
     "test": "elm-test && npm run-script build-examples && elm make --docs docs.json && elm-format --validate . && elm diff",
@@ -14,7 +15,7 @@
     "run-examples-backend": "(cd examples && PORT=8003 ./node_modules/.bin/nodemon server.js)",
     "watch": "chokidar --initial elm.json 'src/**/*.elm' 'tests/**/*.elm' 'examples/**/*.elm' -i '**/elm-stuff/**' -i '**/node_modules/**' -c 'npm test'",
     "run-doc-preview": "elm-doc-preview -p 8001",
-    "run-guide": "hugo server -p 8004",
+    "run-guide": "vuepress dev docs --no-clear-screen -p 8004",
     "start": "concurrently --kill-others npm:watch npm:run-doc-preview npm:run-examples npm:run-examples-backend npm:run-guide"
   }
 }
