@@ -213,6 +213,9 @@ simulateEffect simulatedEffect simulationState =
         SimulatedEffect.None ->
             simulationState
 
+        SimulatedEffect.Batch effects ->
+            List.foldl simulateEffect simulationState effects
+
         SimulatedEffect.Task (SimulatedEffect.Succeed _) ->
             simulationState
 

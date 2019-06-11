@@ -20,6 +20,7 @@ then `TestContext` will not simulate any HTTP effects for you.)
 -}
 type SimulatedEffect msg
     = None
+    | Batch (List (SimulatedEffect msg))
     | Task (SimulatedTask msg msg)
 
 
