@@ -7,7 +7,7 @@ sidebar: auto
 # Testing programs with Cmds
 
 `elm-program-test` allows you to test and simulate responses to
-`Cmd`s produces by your Elm program.
+`Cmd`s produced by your Elm program.
 However, Elm does not currently provide a way to inspect `Cmd` values,
 so you must define your own "effect" type to be able to test your program in this way.
 The rest of this page walks through an example of how to do that.
@@ -34,7 +34,7 @@ The test we want to write represents the following scenario:
 1. The page requests the list of lights
 1. The server responds with the list of lights and their current states
 1. The user clicks "Turn on" for the kitchen lights
-1. We expect that the page sends a request to the server with the correct values.
+1. We expect the page to send a request to the server with the correct values
 
 Here's what that test will look like in code:
 
@@ -77,7 +77,7 @@ But in order to call `withSimulatedEffects`,
 we have to provide a function of type `effect -> List TestContext.SimulatedEffect`.
 But the effect type of our program
 (the type that `init` and `update` return as the second item in the tuple)
-is currently `Cmd Msg` -- which is a type that is not possible toinspect the values of.
+is currently `Cmd Msg` -- which is a type that is not possible to inspect the values of.
 So first we'll need to make a new type which can represent all the effects
 our program can produce, then we can implement the required function,
 and then we'll be able to inspect and simulate those effects in our tests. 
@@ -96,7 +96,7 @@ Our `init` and `update` functions will change to use this new type,
 and we'll also need to define a function that can turn this new type
 into `Cmd`s for when our program is compiled for production.
 
-So in our main module:
+So in our existing main module:
 
 ```elm
 init : Flags -> ( Model, Cmd Msg )
@@ -234,6 +234,6 @@ start =
         |> TestContext.start ()
 ```
 
-Now that we've enabled effects simulation, [our original test](#goal-the-target-test)
+Now that we've enabled effects simulation, [our original test](#goal-the-ideal-test)
 will successfully run!
 
