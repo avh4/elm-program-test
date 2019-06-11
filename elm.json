@@ -6,6 +6,7 @@
     "version": "2.3.1",
     "exposed-modules": [
         "TestContext",
+        "SimulatedEffect.Cmd",
         "SimulatedEffect.Http",
         "SimulatedEffect.Task",
         "Test.Http"

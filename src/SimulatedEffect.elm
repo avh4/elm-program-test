@@ -19,7 +19,8 @@ your programs' effects into `SimulatedEffect`s.
 then `TestContext` will not simulate any HTTP effects for you.)
 -}
 type SimulatedEffect msg
-    = Task (SimulatedTask msg msg)
+    = None
+    | Task (SimulatedTask msg msg)
 
 
 type SimulatedTask x a

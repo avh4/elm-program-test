@@ -2,6 +2,7 @@ module HomeAutomationExampleTest exposing (all)
 
 import Expect
 import HomeAutomationExample as Main
+import SimulatedEffect.Cmd
 import SimulatedEffect.Http
 import Test exposing (..)
 import TestContext exposing (TestContext)
@@ -37,23 +38,21 @@ all =
         ]
 
 
-simulateEffects : Main.Effect -> List (TestContext.SimulatedEffect Main.Msg)
+simulateEffects : Main.Effect -> TestContext.SimulatedEffect Main.Msg
 simulateEffects effect =
     case effect of
         Main.NoEffect ->
-            []
+            SimulatedEffect.Cmd.none
 
         Main.GetDeviceList { url, onResult, decoder } ->
-            [ SimulatedEffect.Http.get
+            SimulatedEffect.Http.get
                 { url = url
                 , expect = SimulatedEffect.Http.expectJson onResult decoder
                 }
-            ]
 
         Main.ChangeLight { url, onResult, decoder, body } ->
-            [ SimulatedEffect.Http.post
+            SimulatedEffect.Http.post
                 { url = url
                 , body = SimulatedEffect.Http.jsonBody body
                 , expect = SimulatedEffect.Http.expectJson onResult decoder
                 }
-            ]

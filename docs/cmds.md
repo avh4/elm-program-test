@@ -195,28 +195,27 @@ that can convert our new `Effect` type into simulated effects that
 `elm-program-test` can understand:
 
 ```elm
+import SimulatedEffect.Cmd
 import SimulatedEffect.Http
 
-simulateEffects : Main.Effect -> List (TestContext.SimulatedEffect Main.Msg)
+simulateEffects : Main.Effect -> TestContext.SimulatedEffect Main.Msg
 simulateEffects effect =
     case effect of
         Main.NoEffect ->
-            []
+            SimulatedEffect.Cmd.none
 
         Main.GetDeviceList { url, onResult, decoder } ->
-            [ SimulatedEffect.Http.get
+            SimulatedEffect.Http.get
                 { url = url
                 , expect = SimulatedEffect.Http.expectJson onResult decoder
                 }
-            ]
 
         Main.ChangeLight { url, onResult, decoder, body } ->
-            [ SimulatedEffect.Http.post
+            SimulatedEffect.Http.post
                 { url = url
                 , body = SimulatedEffect.Http.jsonBody body
                 , expect = SimulatedEffect.Http.expectJson onResult decoder
                 }
-            ]
 ```
 
 And now that we have a function of the required type,
