@@ -8,14 +8,43 @@ sidebar: auto
 
 `elm-program-test` allows you to test and simulate responses to
 `Cmd`s produced by your Elm program.
-However, Elm does not currently provide a way to inspect `Cmd` values,
-so you must define your own "effect" type to be able to test your program in this way.
-The rest of this page walks through an example of how to do that.
+(The rest of this page walks through an example of how to do that.)
+Testing your program in this way gives a few notable benefits:
+
+Your tests will
+**more clearly describe how your app interacts with other systems**.
+Steps in your test will read like
+"then the pending HTTP request to `example.com` fails with a network error"
+instead of
+"then the update function gets called with the `FetchResponse (Err NetworkError)` message".
+
+Your tests will be **more robust to refactoring of your implementation code**.
+Because your tests don't need to directly refer to the internals of your program,
+your tests will still be valid even if you make drastic changes to the architecture of your code
+(like extracting new modules, renaming types or variants,
+or entirely reworking the flow of messages within your program). 
+
+::: warning NOTE
+
+`elm-program-test`'s features for testing effects depend on
+being able to know what a given effect value represents.
+In the [Elm architecture](https://guide.elm-lang.org/effects/),
+effects are normally represented by the `Cmd msg` type.
+Unfortunately, Elm does not currently provide a way to 
+inspect `Cmd` values to see which commands they represent.
+There's some extra work required to get around this current limitation,
+which the rest of this page will walk you through.
+
+Hopefully you'll agree that the benefits (listed above) of testing your program in this way
+will be worth the extra effort!
+But be aware of this trade-off when considering whether this type of testing is right for your program.
+ 
+:::
 
 
 ## Introducing the example program
 
-The rest of this section will be working with an example program
+The rest of this page will be working with an example program
 that interacts with a fictional API for controlling the lights in your house.
 
 This diagram shows the architecture of the example application.
@@ -73,15 +102,16 @@ TEST RUN FAILED
 
 As the error explains, we must use `TestContext.withSimulatedEffects`
 before the test will work.
-But in order to call `withSimulatedEffects`,
-we have to provide a function of type `effect -> List TestContext.SimulatedEffect`.
-But the effect type of our program
+But using it requires us to provide a function of type `effect -> TestContext.SimulatedEffect`.
+Because the effect type of our program
 (the type that `init` and `update` return as the second item in the tuple)
-is currently `Cmd Msg` -- which is a type that is not possible to inspect the values of.
-So first we'll need to make a new type which can represent all the effects
-our program can produce, then we can implement the required function,
-and then we'll be able to inspect and simulate those effects in our tests. 
- 
+is currently `Cmd Msg` (which Elm does not currently allow us to inspect the values of),
+we'll need to do the following before the test will work:
+
+1. make a new type which can represent all the effects our program can produce
+1. implement the required `effect -> TestContext.SimulatedEffect` function
+1. use `withSimulatedEffects` to set up the test
+1. ✅ watch the test pass! 
 
 
 ## Making it work
@@ -89,7 +119,8 @@ and then we'll be able to inspect and simulate those effects in our tests.
 
 ### Planning the change
 
-The first thing we need to do is define an inspectable type
+Since Elm does not currently allow us to inspect `Cmd` values,
+the first thing we need to do is define a new type that we *can* inspect
 that can represent all the effects that our `update` and `init` functions
 want to produce.
 Our `init` and `update` functions will change to use this new type,
@@ -118,7 +149,8 @@ perform : Effect -> Cmd Msg
 ### Defining an "Effect" type
 
 Taking a look through the `init` and `update` functions,
-the following `Cmd`s are being produced --
+<!-- TODO: link to original code -->
+the following `Cmd`s are being produced &mdash;
 the new type we make will need to have a variant for each one:
 
 - `Cmd.none`
@@ -128,7 +160,7 @@ the new type we make will need to have a variant for each one:
 Each variant we create should contain just enough information to
 call the functions necessary to create the corresponding `Cmd`.
 Following that guideline, we'll end up with an `Effect` type like this
-and the corresponding `perform` function:
+and a corresponding `perform` function:
 
 ```elm
 type Effect
@@ -169,7 +201,7 @@ After changing `update` and `init` to return the corresponding `Effect` instead 
 the final change to make the program compile again is to update our `main`
 to make use of the `perform` function:
 
-```elm
+```elm{4-11}
 main : Program Flags Model Msg
 main =
     Browser.document
@@ -218,10 +250,14 @@ simulateEffects effect =
                 }
 ```
 
-And now that we have a function of the required type,
+You may notice that this looks *extremely* similar to the `perform` function we wrote earlier.
+The `SimulatedEffect.*` modules are designed to parallel the core Elm modules that produce `Cmd`s
+so that writing your `simulateEffects` function is as straightforward as possible.
+
+One last step!  Now that we have a function of the required type,
 we can use it to enable effect simulation in our tests:
 
-```elm
+```elm{8}
 start : TestContext Main.Msg Main.Model Main.Effect
 start =
     TestContext.createDocument
@@ -235,4 +271,20 @@ start =
 
 Now that we've enabled effects simulation, [our original test](#goal-the-ideal-test)
 will successfully run!
+
+You may have noticed that the test itself never directly refers
+to the effect values (`GetDeviceList` and `ChangeLight`) that we defined.
+`elm-program-test` handles that for you &mdash;
+when a `TestContext` receives an effect from your `init` or `update` functions,
+it will use the `simulateEffects` function we provided to understand what the effect means
+and update the state of the test accordingly.
+You don't need to worry about the details of how this works &mdash;
+just know that as long as you provide a `simulateEffects` function
+you'll be able to use the full API provided by `TestContext` for testing HTTP requests.
+
+
+## Try it out
+
+> TODO: once `elm-program-test` 3.0.0 is published,
+> a link to a live-editable version of this example will be added here
 
