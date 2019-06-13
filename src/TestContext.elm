@@ -1134,7 +1134,7 @@ simulateHttpResponse method url response testContext =
                 Nothing ->
                     Finished (EffectSimulationNotConfigured "simulateHttpResponse")
 
-                Just ( _, simulationState ) ->
+                Just ( deconstructEffect, simulationState ) ->
                     case Dict.get ( method, url ) simulationState.http of
                         Nothing ->
                             Finished (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulationState.http))
@@ -1142,7 +1142,17 @@ simulateHttpResponse method url response testContext =
                         Just actualRequest ->
                             applyTaskResult
                                 (actualRequest.onRequestComplete response)
-                                testContext
+                                (Active
+                                    { state
+                                        | effectSimulation =
+                                            Just
+                                                ( deconstructEffect
+                                                , { simulationState
+                                                    | http = Dict.remove ( method, url ) simulationState.http
+                                                  }
+                                                )
+                                    }
+                                )
 
 
 replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect

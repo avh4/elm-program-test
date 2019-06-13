@@ -262,6 +262,22 @@ all =
                             "https://example.com/C/B-return"
                             """{}"""
                         |> TestContext.expectModel (Expect.equal """Ok "C-return\"""")
+            , test "a request can only be resolved once" <|
+                \() ->
+                    start
+                        (Http.get
+                            { url = "https://example.com/"
+                            , expect = Http.expectString HandleStringResponse
+                            }
+                        )
+                        |> TestContext.simulateHttpOk "GET" "https://example.com/" """{}"""
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> expectFailure
+                            (String.join "\n"
+                                [ "assertHttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
+                                , "    No requests were made."
+                                ]
+                            )
             ]
         ]
 
