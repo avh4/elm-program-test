@@ -4,7 +4,9 @@ import Http
 
 
 type SimulatedEffect msg
-    = Task (SimulatedTask msg msg)
+    = None
+    | Batch (List (SimulatedEffect msg))
+    | Task (SimulatedTask msg msg)
 
 
 type SimulatedTask x a

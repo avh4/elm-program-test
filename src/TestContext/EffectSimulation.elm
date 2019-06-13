@@ -15,13 +15,13 @@ import SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
 
 
 type alias EffectSimulation msg effect =
-    { deconstructEffect : effect -> List (SimulatedEffect msg)
+    { deconstructEffect : effect -> SimulatedEffect msg
     , workQueue : Fifo (SimulatedTask msg msg)
     , state : SimulationState msg
     }
 
 
-init : (effect -> List (SimulatedEffect msg)) -> EffectSimulation msg effect
+init : (effect -> SimulatedEffect msg) -> EffectSimulation msg effect
 init f =
     { deconstructEffect = f
     , workQueue = Fifo.empty
@@ -49,11 +49,17 @@ queueEffect effect simulation =
     let
         step e queue =
             case e of
+                SimulatedEffect.None ->
+                    queue
+
+                SimulatedEffect.Batch effects ->
+                    List.foldl step queue effects
+
                 SimulatedEffect.Task t ->
                     Fifo.insert t queue
     in
     { simulation
-        | workQueue = List.foldl step simulation.workQueue (simulation.deconstructEffect effect)
+        | workQueue = step (simulation.deconstructEffect effect) simulation.workQueue
     }
 
 

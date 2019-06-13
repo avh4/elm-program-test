@@ -9,7 +9,7 @@ import Url exposing (Url)
 
 {-| Returns `Nothing` if the given string is not a valid absolute URL.
 (An "absolute URL" means one starting with "<scheme>://<host>" (all other components are optional).
-NOTE: the behavior of when `Nothing` is returned may change when the correct implementation from
+NOTE: the behavior when `Nothing` is returned may change when the correct implementation from
 <https://url.spec.whatwg.org/> is implemented.)
 -}
 locationFromString : String -> Maybe Url

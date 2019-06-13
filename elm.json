@@ -3,9 +3,10 @@
     "name": "avh4/elm-program-test",
     "summary": "Test Elm programs",
     "license": "MIT",
-    "version": "2.3.0",
+    "version": "2.3.1",
     "exposed-modules": [
         "TestContext",
+        "SimulatedEffect.Cmd",
         "SimulatedEffect.Http",
         "SimulatedEffect.Task",
         "SimulatedEffect.Process",
