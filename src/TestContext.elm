@@ -337,7 +337,7 @@ You only need to use this if you need to [simulate HTTP requests](#simulating-ht
 or the [passing of time](#simulating-time).
 
 See the `SimulatedEffect.*` modules in this package for functions that you can use to implement
-the required `effect -> List (SimulatedEffect msg)` function for your `effect` type.
+the required `effect -> SimulatedEffect msg` function for your `effect` type.
 
 -}
 withSimulatedEffects :
