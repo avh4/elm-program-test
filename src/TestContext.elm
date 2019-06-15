@@ -261,7 +261,7 @@ type ProgramDefinition flags msg model effect
 
 type alias ProgramOptions msg model effect =
     { baseUrl : Maybe Url
-    , deconstructEffect : Maybe (effect -> List (SimulatedEffect msg))
+    , deconstructEffect : Maybe (effect -> SimulatedEffect msg)
     , subscriptions : Maybe (model -> List (SimulatedSub msg))
     }
 
@@ -353,11 +353,11 @@ You only need to use this if you need to [simulate HTTP requests](#simulating-ht
 or the [passing of time](#simulating-time).
 
 See the `SimulatedEffect.*` modules in this package for functions that you can use to implement
-the required `effect -> List (SimulatedEffect msg)` function for your `effect` type.
+the required `effect -> SimulatedEffect msg` function for your `effect` type.
 
 -}
 withSimulatedEffects :
-    (effect -> List (SimulatedEffect msg))
+    (effect -> SimulatedEffect msg)
     -> ProgramDefinition flags msg model effect
     -> ProgramDefinition flags msg model effect
 withSimulatedEffects fn (ProgramDefinition options program) =
@@ -482,7 +482,7 @@ type alias SimulatedSub msg =
     SimulatedEffect.SimulatedSub msg
 
 
-{-| Advances the state of the `TestContext`'s by applying the given `msg` to your program's update function
+{-| Advances the state of the `TestContext` by applying the given `msg` to your program's update function
 (provided when you created the `TestContext`).
 
 This can be used to simulate events that can only be triggered by [commands (`Cmd`) and subscriptions (`Sub`)](https://guide.elm-lang.org/architecture/effects/)
@@ -646,13 +646,43 @@ matching the given `buttonText`.
 clickButton : String -> TestContext msg model effect -> TestContext msg model effect
 clickButton buttonText testContext =
     simulateHelper ("clickButton " ++ escapeString buttonText)
-        (Query.find
-            [ Selector.tag "button"
-            , Selector.containing [ Selector.text buttonText ]
+        (Query.Extra.oneOf
+            [ findNotDisabled
+                [ Selector.tag "button"
+                , Selector.containing [ Selector.text buttonText ]
+                ]
+            , findNotDisabled
+                [ Selector.attribute (Html.Attributes.attribute "role" "button")
+                , Selector.containing [ Selector.text buttonText ]
+                ]
             ]
         )
         Test.Html.Event.click
         testContext
+
+
+findNotDisabled : List Selector -> Query.Single msg -> Query.Single msg
+findNotDisabled selectors source =
+    -- This is tricky because Test.Html doesn't provide a way to search for an attribute being *not* present.
+    -- So we have to check if "disabled=True" *is* present, and manually force a failure if it is.
+    -- (We can't just search for "disabled=False" because we need to allow elements that don't specify "disabled" at all.)
+    Query.find selectors source
+        |> (\found ->
+                let
+                    isDisabled =
+                        Query.has [ Selector.disabled True ] found
+                in
+                case Test.Runner.getFailureReason isDisabled of
+                    Nothing ->
+                        -- the element is disabled; produce a Query that will fail that will show a reasonable failure message
+                        Query.find
+                            (Selector.disabled False :: selectors)
+                            source
+
+                    Just _ ->
+                        -- the element we found is not disabled; return it
+                        found
+           )
 
 
 {-| Simulates clicking a `<a href="...">` link.
@@ -1062,7 +1092,7 @@ queueEffect effect testContext =
                     testContext
 
                 Just simulation ->
-                    List.foldl queueSimulatedEffect testContext (simulation.deconstructEffect effect)
+                    queueSimulatedEffect (simulation.deconstructEffect effect) testContext
 
 
 queueSimulatedEffect : SimulatedEffect msg -> TestContext msg model effect -> TestContext msg model effect
@@ -1078,6 +1108,12 @@ queueSimulatedEffect effect testContext =
 
                 Just simulation ->
                     case effect of
+                        SimulatedEffect.None ->
+                            testContext
+
+                        SimulatedEffect.Batch effects ->
+                            List.foldl queueSimulatedEffect testContext effects
+
                         SimulatedEffect.Task t ->
                             Active
                                 { state
@@ -1146,16 +1182,16 @@ drainWorkQueue testContext =
 
                         Just ( newSimulation, msg ) ->
                             let
-                                updateMaybe m tc =
-                                    case m of
+                                updateMaybe tc =
+                                    case msg of
                                         Nothing ->
                                             tc
 
-                                        Just m_ ->
-                                            update m_ tc
+                                        Just m ->
+                                            update m tc
                             in
                             Active { state | effectSimulation = Just newSimulation }
-                                |> updateMaybe msg
+                                |> updateMaybe
                                 |> drain
 
 
@@ -1293,8 +1329,18 @@ simulateHttpResponse method url response testContext =
                             Finished (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulation.state.http))
 
                         Just actualRequest ->
+                            let
+                                resolveHttpRequest sim =
+                                    let
+                                        st =
+                                            sim.state
+                                    in
+                                    { sim | state = { st | http = Dict.remove ( method, url ) st.http } }
+                            in
                             withSimulation
-                                (EffectSimulation.queueTask (actualRequest.onRequestComplete response))
+                                (resolveHttpRequest
+                                    >> EffectSimulation.queueTask (actualRequest.onRequestComplete response)
+                                )
                                 testContext
                                 |> drain
 
@@ -1631,7 +1677,7 @@ expectLastEffectHelper functionName assertion testContext =
 
 {-| Validates the last effect produced by a `TestContext`'s program without ending the `TestContext`.
 
-NOTE: If you are assert about HTTP requests being made,
+NOTE: If you are asserting about HTTP requests being made,
 you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
 
 -}
@@ -1642,7 +1688,7 @@ shouldHaveLastEffect assertion testContext =
 
 {-| Makes an assertion about the last effect produced by a `TestContext`'s program.
 
-NOTE: If you are assert about HTTP requests being made,
+NOTE: If you are asserting about HTTP requests being made,
 you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
 
 -}

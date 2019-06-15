@@ -1,29 +1,40 @@
-module TestingProgram exposing (Model, Msg(..), TestContext, application, start, update)
+module TestingProgram exposing (Model, Msg(..), TestContext, application, startEffects, startView, update)
 
 {-| This is a generic program for use in tests for many elm-program-test modules.
 -}
 
-import Html
+import Html exposing (Html)
+import SimulatedEffect.Cmd
 import TestContext exposing (SimulatedEffect)
 import Url
 
 
 type alias TestContext =
-    TestContext.TestContext Msg Model (List (SimulatedEffect Msg))
+    TestContext.TestContext Msg Model (SimulatedEffect Msg)
 
 
-start : List (SimulatedEffect Msg) -> TestContext
-start initialEffects =
+startEffects : SimulatedEffect Msg -> TestContext
+startEffects initialEffect =
+    start initialEffect (Html.text "")
+
+
+startView : Html Msg -> TestContext
+startView =
+    start SimulatedEffect.Cmd.none
+
+
+start : SimulatedEffect Msg -> Html Msg -> TestContext
+start initialEffect html =
     TestContext.createElement
-        { init = \() -> ( [], initialEffects )
+        { init = \() -> ( [], initialEffect )
         , update = update
-        , view = \_ -> Html.text ""
+        , view = \_ -> Html.node "body" [] [ html ]
         }
         |> TestContext.withSimulatedEffects identity
         |> TestContext.start ()
 
 
-application : List (SimulatedEffect Msg) -> TestContext
+application : SimulatedEffect Msg -> TestContext
 application initialEffects =
     TestContext.createApplication
         { onUrlChange = \location -> Log (Url.toString location)
@@ -48,21 +59,23 @@ type alias Model =
 type Msg
     = Clear
     | Log String
-    | ProduceEffects (List (SimulatedEffect Msg))
+    | ProduceEffects (SimulatedEffect Msg)
 
 
-update : Msg -> Model -> ( Model, List (SimulatedEffect Msg) )
+update : Msg -> Model -> ( Model, SimulatedEffect Msg )
 update msg model =
     case msg of
         Clear ->
-            ( [], [] )
+            ( []
+            , SimulatedEffect.Cmd.none
+            )
 
         Log string ->
             ( model ++ [ string ]
-            , []
+            , SimulatedEffect.Cmd.none
             )
 
-        ProduceEffects effects ->
+        ProduceEffects effect ->
             ( model
-            , effects
+            , effect
             )

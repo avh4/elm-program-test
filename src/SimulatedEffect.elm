@@ -6,7 +6,9 @@ import Json.Encode
 
 
 type SimulatedEffect msg
-    = Task (SimulatedTask msg msg)
+    = None
+    | Batch (List (SimulatedEffect msg))
+    | Task (SimulatedTask msg msg)
     | PortEffect String Json.Encode.Value
     | PushUrl String
     | ReplaceUrl String

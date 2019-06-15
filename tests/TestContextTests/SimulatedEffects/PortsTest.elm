@@ -4,11 +4,16 @@ import Expect exposing (Expectation)
 import Html
 import Json.Decode as Decode
 import Json.Encode as Json
+import SimulatedEffect.Cmd
 import SimulatedEffect.Ports
 import Test exposing (..)
-import Test.Runner
+import Test.Expect exposing (expectFailure)
 import TestContext exposing (SimulatedEffect, SimulatedTask, TestContext)
-import TestingProgram exposing (Msg(..), start)
+import TestingProgram exposing (Msg(..))
+
+
+start =
+    TestingProgram.startEffects
 
 
 all : Test
@@ -17,12 +22,12 @@ all =
         [ describe "outgoing ports"
             [ test "can check sent values" <|
                 \() ->
-                    start [ SimulatedEffect.Ports.send "unit" Json.null ]
+                    start (SimulatedEffect.Ports.send "unit" Json.null)
                         |> TestContext.checkAndClearOutgoingPort "unit" (Decode.null ()) (Expect.equal [ () ])
                         |> TestContext.done
             , test "gives error if checked values don't match" <|
                 \() ->
-                    start [ SimulatedEffect.Ports.send "unit" Json.null ]
+                    start (SimulatedEffect.Ports.send "unit" Json.null)
                         |> TestContext.checkAndClearOutgoingPort "other" (Decode.null ()) (Expect.equal [ () ])
                         |> TestContext.done
                         |> expectFailure
@@ -35,19 +40,19 @@ all =
                             ]
             , test "clears values after checking" <|
                 \() ->
-                    start [ SimulatedEffect.Ports.send "unit" Json.null ]
+                    start (SimulatedEffect.Ports.send "unit" Json.null)
                         |> TestContext.checkAndClearOutgoingPort "unit" (Decode.null ()) (Expect.equal [ () ])
                         |> TestContext.checkAndClearOutgoingPort "unit" (Decode.null ()) (Expect.equal [])
                         |> TestContext.done
             , test "records values in correct order" <|
                 \() ->
-                    start [ SimulatedEffect.Ports.send "int" (Json.int 5) ]
-                        |> TestContext.update (ProduceEffects [ SimulatedEffect.Ports.send "int" (Json.int 7) ])
+                    start (SimulatedEffect.Ports.send "int" (Json.int 5))
+                        |> TestContext.update (ProduceEffects (SimulatedEffect.Ports.send "int" (Json.int 7)))
                         |> TestContext.checkAndClearOutgoingPort "int" Decode.int (Expect.equal [ 5, 7 ])
                         |> TestContext.done
             , test "shows useful error when decoding fails" <|
                 \() ->
-                    start [ SimulatedEffect.Ports.send "int" (Json.int 5) ]
+                    start (SimulatedEffect.Ports.send "int" (Json.int 5))
                         |> TestContext.checkAndClearOutgoingPort "int" Decode.string (Expect.equal [])
                         |> TestContext.done
                         |> expectFailure
@@ -62,7 +67,7 @@ all =
             let
                 startSub f =
                     TestContext.createElement
-                        { init = \() -> ( [], [] )
+                        { init = \() -> ( [], SimulatedEffect.Cmd.none )
                         , update = TestingProgram.update
                         , view = \_ -> Html.text ""
                         }
@@ -84,7 +89,7 @@ all =
             , test "shows useful error when withSimulatedSubscriptions wasn't used" <|
                 \() ->
                     TestContext.createElement
-                        { init = \() -> ( [], [] )
+                        { init = \() -> ( [], SimulatedEffect.Cmd.none )
                         , update = TestingProgram.update
                         , view = \_ -> Html.text ""
                         }
@@ -107,14 +112,3 @@ all =
                             ]
             ]
         ]
-
-
-expectFailure : List String -> Expectation -> Expectation
-expectFailure expectedFailureMessage actualResult =
-    case Test.Runner.getFailureReason actualResult of
-        Nothing ->
-            Expect.fail "Expected a failure, but got a pass"
-
-        Just actualInfo ->
-            actualInfo.description
-                |> Expect.equal (String.join "\n" expectedFailureMessage)

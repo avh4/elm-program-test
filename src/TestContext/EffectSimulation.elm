@@ -17,14 +17,14 @@ import SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
 
 
 type alias EffectSimulation msg effect =
-    { deconstructEffect : effect -> List (SimulatedEffect msg)
+    { deconstructEffect : effect -> SimulatedEffect msg
     , workQueue : Fifo (SimulatedTask msg msg)
     , state : SimulationState msg
     , outgoingPortValues : Dict String (List Json.Encode.Value)
     }
 
 
-init : (effect -> List (SimulatedEffect msg)) -> EffectSimulation msg effect
+init : (effect -> SimulatedEffect msg) -> EffectSimulation msg effect
 init f =
     { deconstructEffect = f
     , workQueue = Fifo.empty

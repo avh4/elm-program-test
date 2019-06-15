@@ -1,5 +1,5 @@
 module Test.Http exposing
-    ( hasHeader
+    ( expectJsonBody, hasHeader
     , timeout, networkError, httpResponse
     )
 
@@ -8,7 +8,7 @@ module Test.Http exposing
 
 ## Expectations
 
-@docs hasHeader
+@docs expectJsonBody, hasHeader
 
 
 ## Responses
@@ -22,7 +22,34 @@ These are ways to easily make `Http.Response` values for use with [`TestContext.
 import Dict exposing (Dict)
 import Expect exposing (Expectation)
 import Http
+import Json.Decode
 import SimulatedEffect
+
+
+{-| A convenient way to check something about the request body of a pending HTTP request.
+
+    ...
+        |> TestContext.assertHttpRequest "POST"
+            "https://example.com/ok"
+            (Test.Http.expectJsonBody
+                (Json.Decode.field "version" Json.Decode.string)
+                (Expect.equal "3.1.5")
+            )
+        |> ...
+
+-}
+expectJsonBody :
+    Json.Decode.Decoder requestBody
+    -> (requestBody -> Expectation)
+    -> SimulatedEffect.HttpRequest x a
+    -> Expectation
+expectJsonBody decoder check request =
+    case Json.Decode.decodeString decoder request.body of
+        Err err ->
+            Expect.fail ("expectJsonBody: Failed to decode HTTP request body: " ++ Json.Decode.errorToString err)
+
+        Ok responseBody ->
+            check responseBody
 
 
 {-| Assert that the given HTTP request has the specified header.

@@ -1,7 +1,6 @@
 module TestContextTests.SimulatedEffects.BasicTest exposing (all)
 
 import Expect
-import Html
 import SimulatedEffect.Task as Task
 import Test exposing (..)
 import TestContext exposing (SimulatedEffect, SimulatedTask, TestContext)
@@ -10,7 +9,8 @@ import TestingProgram exposing (Msg(..))
 
 startTask : SimulatedTask x a -> TestingProgram.TestContext
 startTask initialTask =
-    TestingProgram.start [ Task.attempt (Debug.toString >> Log) initialTask ]
+    TestingProgram.startEffects
+        (Task.attempt (Debug.toString >> Log) initialTask)
 
 
 all : Test
