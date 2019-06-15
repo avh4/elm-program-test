@@ -1065,16 +1065,16 @@ drainWorkQueue testContext =
 
                         Just ( newSimulation, msg ) ->
                             let
-                                updateMaybe m tc =
-                                    case m of
+                                updateMaybe tc =
+                                    case msg of
                                         Nothing ->
                                             tc
 
-                                        Just m_ ->
-                                            update m_ tc
+                                        Just m ->
+                                            update m tc
                             in
                             Active { state | effectSimulation = Just newSimulation }
-                                |> updateMaybe msg
+                                |> updateMaybe
                                 |> drain
 
 
