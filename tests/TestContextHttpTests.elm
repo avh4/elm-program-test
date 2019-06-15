@@ -165,15 +165,13 @@ all =
                         )
                         |> TestContext.assertHttpRequest "POST"
                             "https://example.com/ok"
-                            (Test.Http.hasHeader "Content-Type" "application/json")
+                            (.headers
+                                >> Expect.equal
+                                    [ ( "Content-Type", "text/plain" )
+                                    , ( "X-Elm-Test", "Value 99" )
+                                    ]
+                            )
                         |> TestContext.done
-                        |> expectFailure
-                            [ "assertHttpRequest:"
-                            , "Expected HTTP header Content-Type: application/json"
-                            , "but got headers:"
-                            , "    Content-Type: text/plain"
-                            , "    X-Elm-Test: Value 99"
-                            ]
 
             -- TODO: how to handle multiple requests made to the same method/URL?
             ]
