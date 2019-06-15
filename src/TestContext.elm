@@ -2,14 +2,15 @@ module TestContext exposing
     ( TestContext, start
     , createSandbox, createElement, createDocument, createApplication
     , ProgramDefinition, withBaseUrl, withJsonStringFlags
-    , SimulatedEffect(..), withSimulatedEffects
+    , SimulatedEffect, SimulatedTask, withSimulatedEffects
     , clickButton, clickLink
     , fillIn, fillInTextarea
     , check, selectOption
     , routeChange
     , simulate
     , within
-    , assertHttpRequest
+    , assertHttpRequestWasMade, assertHttpRequest
+    , simulateHttpOk, simulateHttpResponse
     , update
     , simulateLastEffect
     , expectViewHas, expectView
@@ -34,7 +35,7 @@ module TestContext exposing
 
 ### Simulated effects
 
-@docs SimulatedEffect, withSimulatedEffects
+@docs SimulatedEffect, SimulatedTask, withSimulatedEffects
 
 
 ## Simulating user input
@@ -53,7 +54,8 @@ module TestContext exposing
 
 ## Simulating HTTP responses
 
-@docs assertHttpRequest
+@docs assertHttpRequestWasMade, assertHttpRequest
+@docs simulateHttpOk, simulateHttpResponse
 
 
 ## Directly sending Msgs
@@ -94,12 +96,15 @@ import Dict exposing (Dict)
 import Expect exposing (Expectation)
 import Html exposing (Html)
 import Html.Attributes exposing (attribute)
+import Http
 import Json.Decode
 import Json.Encode
 import Query.Extra
+import SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
 import Test.Html.Event
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector exposing (Selector)
+import Test.Http
 import Test.Runner
 import Test.Runner.Failure
 import Url exposing (Url)
@@ -120,17 +125,22 @@ type TestContext msg model effect
         , currentModel : model
         , lastEffect : effect
         , currentLocation : Maybe Url
-        , effectSimulation : Maybe ( effect -> List SimulatedEffect, SimulationState )
+        , effectSimulation : Maybe ( effect -> SimulatedEffect msg, SimulationState msg )
         }
     | Finished Failure
 
 
-type alias SimulationState =
-    { http : Dict ( String, String ) ()
+type alias SimulationState msg =
+    { http : Dict ( String, String ) (SimulatedEffect.HttpRequest msg msg)
     }
 
 
-emptySimulationState : SimulationState
+type alias HttpRequest =
+    { body : String
+    }
+
+
+emptySimulationState : SimulationState msg
 emptySimulationState =
     { http = Dict.empty
     }
@@ -165,7 +175,7 @@ createHelper :
     , view : model -> Html msg
     , onRouteChange : Url -> Maybe msg
     }
-    -> ProgramOptions effect
+    -> ProgramOptions msg effect
     -> TestContext msg model effect
 createHelper program options =
     let
@@ -190,19 +200,34 @@ createHelper program options =
         }
 
 
-applySimulatedEffects : effect -> ( effect -> List SimulatedEffect, SimulationState ) -> ( effect -> List SimulatedEffect, SimulationState )
+applySimulatedEffects : effect -> ( effect -> SimulatedEffect msg, SimulationState msg ) -> ( effect -> SimulatedEffect msg, SimulationState msg )
 applySimulatedEffects effect ( deconstructEffect, simulationState ) =
     ( deconstructEffect
-    , List.foldl simulateEffect simulationState (deconstructEffect effect)
+    , simulateEffect (deconstructEffect effect) simulationState
     )
 
 
-simulateEffect : SimulatedEffect -> SimulationState -> SimulationState
+simulateEffect : SimulatedEffect msg -> SimulationState msg -> SimulationState msg
 simulateEffect simulatedEffect simulationState =
     case simulatedEffect of
-        HttpRequest request ->
+        SimulatedEffect.None ->
+            simulationState
+
+        SimulatedEffect.Batch effects ->
+            List.foldl simulateEffect simulationState effects
+
+        SimulatedEffect.Task (SimulatedEffect.Succeed _) ->
+            simulationState
+
+        SimulatedEffect.Task (SimulatedEffect.Fail _) ->
+            simulationState
+
+        SimulatedEffect.Task (SimulatedEffect.HttpTask request) ->
             { simulationState
-                | http = Dict.insert ( request.method, request.url ) () simulationState.http
+                | http =
+                    Dict.insert ( request.method, request.url )
+                        request
+                        simulationState.http
             }
 
 
@@ -232,16 +257,16 @@ createSandbox program =
 Use [`start`](#start) to start the program being tested.
 -}
 type ProgramDefinition flags msg model effect
-    = ProgramDefinition (ProgramOptions effect) (Maybe Url -> flags -> ProgramOptions effect -> TestContext msg model effect)
+    = ProgramDefinition (ProgramOptions msg effect) (Maybe Url -> flags -> ProgramOptions msg effect -> TestContext msg model effect)
 
 
-type alias ProgramOptions effect =
+type alias ProgramOptions msg effect =
     { baseUrl : Maybe Url
-    , deconstructEffect : Maybe (effect -> List SimulatedEffect)
+    , deconstructEffect : Maybe (effect -> SimulatedEffect msg)
     }
 
 
-emptyOptions : ProgramOptions effect
+emptyOptions : ProgramOptions msg effect
 emptyOptions =
     { baseUrl = Nothing
     , deconstructEffect = Nothing
@@ -323,7 +348,7 @@ You only need to use this if you need to simulate HTTP requests.
 
 -}
 withSimulatedEffects :
-    (effect -> List SimulatedEffect)
+    (effect -> SimulatedEffect msg)
     -> ProgramDefinition flags msg model effect
     -> ProgramDefinition flags msg model effect
 withSimulatedEffects fn (ProgramDefinition options program) =
@@ -382,26 +407,37 @@ createApplication program =
 
 
 {-| This represents an effect that elm-program-test is able to simulate.
-When using `withSimulatedEffects` you will provide a function that can translate
-your programs' effects into `SimulatedEffect`s.
+When using [`withSimulatedEffects`](#withSimulatedEffects) you will provide a function that can translate
+your program's effects into `SimulatedEffect`s.
 (If you do not use `withSimulatedEffects`,
-then `TestContext` will not simulate any HTTP effects for you.)
+then `TestContext` will not simulate any effects for you.)
+
+You can create `SimulatedEffect`s using the the following modules,
+which parallel the modules your real program would use to create `Cmd`s and `Task`s:
+
+  - [`SimulatedEffect.Http`](SimulatedEffect-Http) (parallels `Http` from `elm/http`)
+  - [`SimulatedEffect.Task`](SimulatedEffect-Task) (parallels `Task` from `elm/core`)
+
 -}
-type SimulatedEffect
-    = HttpRequest { method : String, url : String }
+type alias SimulatedEffect msg =
+    SimulatedEffect.SimulatedEffect msg
 
 
-{-| Advances the state of the `TestContext`'s program by using the `TestContext`'s program's update function
-with the given `msg`.
+{-| -}
+type alias SimulatedTask x a =
+    SimulatedEffect.SimulatedTask x a
+
+
+{-| Advances the state of the `TestContext` by applying the given `msg` to your program's update function
+(provided when you created the `TestContext`).
 
 This can be used to simulate events that can only be triggered by [commands (`Cmd`) and subscriptions (`Sub`)](https://guide.elm-lang.org/architecture/effects/)
 (i.e., that cannot be triggered by user interaction with the view).
 
 NOTE: When possible, you should prefer [Simulating user input](#simulating-user-input),
+[Simulating HTTP responses](#simulating-http-responses),
+or (if neither of those support what you need) [`simulateLastEffect`](#simulateLastEffect),
 as doing so will make your tests more robust to changes in your program's implementation details.
-
-NOTE: If you cannot replace a call to `TestContext.upate` with simulating user input,
-when possible you should prefer to use [`simulateLastEffect`](#simulateLastEffect).
 
 -}
 update : msg -> TestContext msg model effect -> TestContext msg model effect
@@ -421,6 +457,31 @@ update msg testContext =
                     , lastEffect = newEffect
                     , effectSimulation = Maybe.map (applySimulatedEffects newEffect) state.effectSimulation
                 }
+
+
+applyTaskResult : SimulatedTask msg msg -> TestContext msg model effect -> TestContext msg model effect
+applyTaskResult task =
+    case task of
+        SimulatedEffect.Succeed msg ->
+            update msg
+
+        SimulatedEffect.Fail msg ->
+            update msg
+
+        SimulatedEffect.HttpTask request ->
+            \testContext ->
+                case testContext of
+                    Finished err ->
+                        Finished err
+
+                    Active state ->
+                        Active
+                            { state
+                                | effectSimulation =
+                                    Maybe.map
+                                        (Tuple.mapSecond <| simulateEffect (SimulatedEffect.Task task))
+                                        state.effectSimulation
+                            }
 
 
 simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
@@ -947,11 +1008,13 @@ within findTarget onScopedTest testContext =
 
 {-| A final assertion that checks whether an HTTP request to the specific url and method has been made.
 
+If you want to check the headers or request body, see [`assertHttpRequest`](#assertHttpRequest).
+
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-assertHttpRequest : { method : String, url : String } -> TestContext msg model effect -> Expectation
-assertHttpRequest request testContext =
+assertHttpRequestWasMade : String -> String -> TestContext msg model effect -> Expectation
+assertHttpRequestWasMade method url testContext =
     done <|
         case testContext of
             Finished err ->
@@ -960,14 +1023,136 @@ assertHttpRequest request testContext =
             Active state ->
                 case state.effectSimulation of
                     Nothing ->
-                        Finished (EffectSimulationNotConfigured "assertHttpRequest")
+                        Finished (EffectSimulationNotConfigured "assertHttpRequestWasMade")
 
                     Just ( _, simulationState ) ->
-                        if Dict.member ( request.method, request.url ) simulationState.http then
+                        if Dict.member ( method, url ) simulationState.http then
                             testContext
 
                         else
-                            Finished (NoMatchingHttpRequest "assertHttpRequest" request (Dict.keys simulationState.http))
+                            Finished (NoMatchingHttpRequest "assertHttpRequestWasMade" { method = method, url = url } (Dict.keys simulationState.http))
+
+
+{-| Allows you to check the details of a pending HTTP request.
+
+See the ["Expectations" section of `Test.Http`](Test-Http#expectations) for functions that might be helpful
+in create an expectation on the request.
+
+If you only care about whether the a request was made to the correct URL, see [`assertHttpRequestWasMade`](#assertHttpRequestWasMade).
+
+    ...
+        |> assertHttpRequest "POST"
+            "https://example.com/save"
+            (.body >> Expect.equal """{"content":"updated!"}""")
+        |> ...
+
+-}
+assertHttpRequest :
+    String
+    -> String
+    -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
+    -> TestContext msg model effect
+    -> TestContext msg model effect
+assertHttpRequest method url checkRequest testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    Finished (EffectSimulationNotConfigured "assertHttpRequest")
+
+                Just ( _, simulationState ) ->
+                    case Dict.get ( method, url ) simulationState.http of
+                        Just request ->
+                            case Test.Runner.getFailureReason (checkRequest request) of
+                                Nothing ->
+                                    -- check succeeded
+                                    testContext
+
+                                Just reason ->
+                                    Finished (ExpectFailed "assertHttpRequest" reason.description reason.reason)
+
+                        Nothing ->
+                            Finished (NoMatchingHttpRequest "assertHttpRequest" { method = method, url = url } (Dict.keys simulationState.http))
+
+
+{-| Simulates an HTTP 200 response to a pending request with the given method and url.
+
+    ...
+        |> simulateHttpOk "GET"
+            "https://example.com/time.json"
+            """{"currentTime":1559013158}"""
+        |> ...
+
+If you need to simulate an error, a response with a different status code,
+or a response with response headers,
+see [`simulateHttpResponse`](#simulateHttpResponse).
+
+If you want to check the request headers or request body, use [`assertHttpRequest`](#assertHttpRequest)
+immediately before using `simulateHttpOk`.
+
+NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
+
+-}
+simulateHttpOk : String -> String -> String -> TestContext msg model effect -> TestContext msg model effect
+simulateHttpOk method url responseBody =
+    simulateHttpResponse method
+        url
+        (Test.Http.httpResponse
+            { statusCode = 200
+            , body = responseBody
+            , headers = []
+            }
+        )
+
+
+{-| Simulates a response to a pending HTTP request.
+The test will fail if there is no pending request matching the given method and url.
+
+You may find it helpful to see the ["Responses" section in `Test.Http`](Test-Http#responses)
+for convenient ways to create `Http.Response` values.
+
+If you are simulating a 200 OK response and don't need to provide response headers,
+you can use the simpler [`simulateHttpOk`](#simulateHttpOk).
+
+If you want to check the request headers or request body, use [`assertHttpRequest`](#assertHttpRequest)
+immediately before using `simulateHttpResponse`.
+
+NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
+
+-}
+simulateHttpResponse : String -> String -> Http.Response String -> TestContext msg model effect -> TestContext msg model effect
+simulateHttpResponse method url response testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    Finished (EffectSimulationNotConfigured "simulateHttpResponse")
+
+                Just ( deconstructEffect, simulationState ) ->
+                    case Dict.get ( method, url ) simulationState.http of
+                        Nothing ->
+                            Finished (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulationState.http))
+
+                        Just actualRequest ->
+                            applyTaskResult
+                                (actualRequest.onRequestComplete response)
+                                (Active
+                                    { state
+                                        | effectSimulation =
+                                            Just
+                                                ( deconstructEffect
+                                                , { simulationState
+                                                    | http = Dict.remove ( method, url ) simulationState.http
+                                                  }
+                                                )
+                                    }
+                                )
 
 
 replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect
@@ -1031,13 +1216,14 @@ expectModel assertion testContext =
 
 
 {-| Simulate the outcome of the last effect produced by the program being tested
-by providing a function that can convert the last effect into msgs.
+by providing a function that can convert the last effect into `msg`s.
 
-The function you provide will be called with the effect that was returned by the most recent call to `update` or `init` in the TestContext.
+The function you provide will be called with the effect that was returned by the most recent call to `update` or `init` in the `TestContext`.
 
-If the function returns `Err`, then that will cause the `TestContext` to enter a failure state with the provided message.
+  - If it returns `Err`, then that will cause the `TestContext` to enter a failure state with the provided message.
+  - If it returns `Ok`, then the list of `msg`s will be applied in order via `TestContext.update`.
 
-If the fuction returns `Ok`, then the list of msgs will be applied in order via `TestContext.update`.
+NOTE: If you are simulating HTTP response, you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
 
 -}
 simulateLastEffect : (effect -> Result String (List msg)) -> TestContext msg model effect -> TestContext msg model effect
@@ -1071,6 +1257,10 @@ expectLastEffectHelper functionName assertion testContext =
 
 
 {-| Validates the last effect produced by a `TestContext`'s program without ending the `TestContext`.
+
+NOTE: If you are asserting about HTTP requests being made,
+you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
+
 -}
 shouldHaveLastEffect : (effect -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
 shouldHaveLastEffect assertion testContext =
@@ -1078,6 +1268,10 @@ shouldHaveLastEffect assertion testContext =
 
 
 {-| Makes an assertion about the last effect produced by a `TestContext`'s program.
+
+NOTE: If you are asserting about HTTP requests being made,
+you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
+
 -}
 expectLastEffect : (effect -> Expectation) -> TestContext msg model effect -> Expectation
 expectLastEffect assertion testContext =

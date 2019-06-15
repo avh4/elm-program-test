@@ -5,7 +5,7 @@ import Html
 import Html.Attributes
 import Html.Events exposing (onClick)
 import Test exposing (..)
-import Test.Runner
+import Test.Expect exposing (expectFailure)
 import TestContext exposing (TestContext)
 import TestingProgram exposing (Msg(..))
 
@@ -43,6 +43,7 @@ all =
                         [ Html.text "Click Me" ]
                     )
                     |> TestContext.clickButton "Click Me"
+                    |> TestContext.done
                     |> expectFailure
                         [ "clickButton \"Click Me\":"
                         , "▼ Query.fromHtml"
@@ -62,14 +63,3 @@ all =
                         , "✗ Query.find always expects to find 1 element, but it found 0 instead."
                         ]
         ]
-
-
-expectFailure : List String -> TestContext msg model effect -> Expectation
-expectFailure expectedFailureMessage testContext =
-    case Test.Runner.getFailureReason (TestContext.done testContext) of
-        Nothing ->
-            Expect.fail "Expected a failure, but got a pass"
-
-        Just actualInfo ->
-            actualInfo.description
-                |> Expect.equal (String.join "\n" expectedFailureMessage)

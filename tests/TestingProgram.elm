@@ -4,27 +4,28 @@ module TestingProgram exposing (Model, Msg(..), TestContext, startEffects, start
 -}
 
 import Html exposing (Html)
+import SimulatedEffect.Cmd
 import TestContext exposing (SimulatedEffect)
 
 
 type alias TestContext =
-    TestContext.TestContext Msg Model (List SimulatedEffect)
+    TestContext.TestContext Msg Model (SimulatedEffect Msg)
 
 
-startEffects : List SimulatedEffect -> TestContext
-startEffects initialEffects =
-    start initialEffects (Html.text "")
+startEffects : SimulatedEffect Msg -> TestContext
+startEffects initialEffect =
+    start initialEffect (Html.text "")
 
 
 startView : Html Msg -> TestContext
 startView =
-    start []
+    start SimulatedEffect.Cmd.none
 
 
-start : List SimulatedEffect -> Html Msg -> TestContext
-start initialEffects html =
+start : SimulatedEffect Msg -> Html Msg -> TestContext
+start initialEffect html =
     TestContext.createElement
-        { init = \() -> ( [], initialEffects )
+        { init = \() -> ( [], initialEffect )
         , update = update
         , view = \_ -> Html.node "body" [] [ html ]
         }
@@ -39,21 +40,23 @@ type alias Model =
 type Msg
     = Clear
     | Log String
-    | ProduceEffects (List SimulatedEffect)
+    | ProduceEffects (SimulatedEffect Msg)
 
 
-update : Msg -> Model -> ( Model, List SimulatedEffect )
+update : Msg -> Model -> ( Model, SimulatedEffect Msg )
 update msg model =
     case msg of
         Clear ->
-            ( [], [] )
+            ( []
+            , SimulatedEffect.Cmd.none
+            )
 
         Log string ->
             ( model ++ [ string ]
-            , []
+            , SimulatedEffect.Cmd.none
             )
 
-        ProduceEffects effects ->
+        ProduceEffects effect ->
             ( model
-            , effects
+            , effect
             )

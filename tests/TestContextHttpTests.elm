@@ -3,119 +3,270 @@ module TestContextHttpTests exposing (all)
 import Expect exposing (Expectation)
 import Html
 import Html.Events exposing (onClick)
+import Json.Decode
+import SimulatedEffect.Cmd
+import SimulatedEffect.Http as Http
+import SimulatedEffect.Task as Task
 import Test exposing (..)
-import Test.Runner
+import Test.Expect exposing (expectFailure, expectSuccess)
+import Test.Http
 import TestContext exposing (TestContext)
 
 
-type TestEffect
-    = NoEffect
-    | HttpGet String
+type alias TestEffect =
+    TestContext.SimulatedEffect TestMsg
 
 
-deconstructEffect : TestEffect -> List TestContext.SimulatedEffect
-deconstructEffect testEffect =
-    case testEffect of
-        NoEffect ->
-            []
-
-        HttpGet url ->
-            [ TestContext.HttpRequest { method = "GET", url = url } ]
+type TestMsg
+    = PassThroughEffect TestEffect
+    | HandleFriendsResponse (Result Http.Error (List String))
+    | HandleStringResponse (Result Http.Error String)
 
 
-type alias TestMsg =
-    TestEffect
+type alias TestModel =
+    String
 
 
-start : TestEffect -> TestContext TestMsg () TestEffect
+start : TestEffect -> TestContext TestMsg TestModel TestEffect
 start initialEffect =
     TestContext.createElement
-        { init = \() -> ( (), initialEffect )
-        , update = \msg () -> ( (), msg )
+        { init = \() -> ( "Init", initialEffect )
+        , update =
+            \msg model ->
+                case msg of
+                    PassThroughEffect effect ->
+                        ( model, effect )
+
+                    HandleFriendsResponse result ->
+                        ( Debug.toString result, SimulatedEffect.Cmd.none )
+
+                    HandleStringResponse result ->
+                        ( Debug.toString result, SimulatedEffect.Cmd.none )
         , view =
-            \() ->
+            \_ ->
                 Html.div []
                     [ Html.button
-                        [ onClick (HttpGet "https://example.com/buttons/get") ]
+                        [ onClick
+                            (PassThroughEffect
+                                (Http.get
+                                    { url = "https://example.com/buttons/get"
+                                    , expect =
+                                        Http.expectJson HandleFriendsResponse
+                                            (Json.Decode.list Json.Decode.string)
+                                    }
+                                )
+                            )
+                        ]
                         [ Html.text "Get" ]
                     ]
         }
-        |> TestContext.withSimulatedEffects deconstructEffect
+        |> TestContext.withSimulatedEffects identity
         |> TestContext.start ()
 
 
 all : Test
 all =
     describe "TestContext (HTTP API)"
-        [ test "can assert that an HTTP request was made from init (failure)" <|
-            \() ->
-                start NoEffect
-                    |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/" }
-                    |> expectFailure
-                        (String.join "\n"
-                            [ "assertHttpRequest: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
+        [ describe "assertHttpRequest"
+            [ test "can assert that an HTTP request was made from init (failure)" <|
+                \() ->
+                    start SimulatedEffect.Cmd.none
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> expectFailure
+                            [ "assertHttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
                             , "    No requests were made."
                             ]
+            , test "can assert that an HTTP request was made from init (success)" <|
+                \() ->
+                    start (Http.get { url = "https://example.com/", expect = Http.expectString HandleStringResponse })
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> expectSuccess
+            , test "can assert that an HTTP request was made via a Task" <|
+                \() ->
+                    start
+                        (Http.task
+                            { method = "GET"
+                            , headers = []
+                            , url = "https://example.com/get"
+                            , body = Http.emptyBody
+                            , resolver = Http.stringResolver (\_ -> Ok "")
+                            , timeout = Nothing
+                            }
+                            |> Task.attempt HandleStringResponse
                         )
-        , test "can assert that an HTTP request was made from init (success)" <|
-            \() ->
-                start (HttpGet "https://example.com/")
-                    |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/" }
-                    |> expectSuccess
-        , test "can assert that an HTTP request was made from update" <|
-            \() ->
-                start NoEffect
-                    |> TestContext.update (HttpGet "https://example.com/from-update")
-                    |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/from-update" }
-                    |> expectSuccess
-        , test "can assert that an HTTP request was made via a user interaction" <|
-            \() ->
-                start NoEffect
-                    |> TestContext.clickButton "Get"
-                    |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/buttons/get" }
-                    |> expectSuccess
-        , test "error message includes list of pending requests" <|
-            \() ->
-                start (HttpGet "https://example.com/actualRequest")
-                    |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/not-made" }
-                    |> expectFailure
-                        (String.join "\n"
-                            [ "assertHttpRequest: Expected HTTP request (GET https://example.com/not-made) to have been made, but it was not."
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/get"
+                        |> expectSuccess
+            , test "can assert that an HTTP request was made from update" <|
+                \() ->
+                    start SimulatedEffect.Cmd.none
+                        |> TestContext.update (PassThroughEffect (Http.get { url = "https://example.com/from-update", expect = Http.expectString HandleStringResponse }))
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/from-update"
+                        |> expectSuccess
+            , test "can assert that an HTTP request was made via a user interaction" <|
+                \() ->
+                    start SimulatedEffect.Cmd.none
+                        |> TestContext.clickButton "Get"
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/buttons/get"
+                        |> expectSuccess
+            , test "error message includes list of pending requests" <|
+                \() ->
+                    start (Http.get { url = "https://example.com/actualRequest", expect = Http.expectString HandleStringResponse })
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/not-made"
+                        |> expectFailure
+                            [ "assertHttpRequestWasMade: Expected HTTP request (GET https://example.com/not-made) to have been made, but it was not."
                             , "    The following requests were made:"
                             , "      - GET https://example.com/actualRequest"
                             ]
+            , test "gives explanatory error when using assertHttpRequest without using withSimulatedEffects" <|
+                \() ->
+                    TestContext.createSandbox
+                        { init = ()
+                        , update = \() () -> ()
+                        , view = \() -> Html.text "[view]"
+                        }
+                        |> TestContext.start ()
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> expectFailure
+                            [ "TEST SETUP ERROR: In order to use assertHttpRequestWasMade, you MUST use TestContext.withSimulatedEffects before calling TestContext.start"
+                            ]
+            , test "can assert on request body" <|
+                \() ->
+                    start
+                        (Http.post
+                            { url = "https://example.com/ok"
+                            , body = Http.stringBody "application/json" """{"ok":true}"""
+                            , expect = Http.expectString HandleStringResponse
+                            }
                         )
-        , test "gives explanatory error when using assertHttpRequest without using withSimulatedEffects" <|
-            \() ->
-                TestContext.createSandbox
-                    { init = ()
-                    , update = \() () -> ()
-                    , view = \() -> Html.text "[view]"
-                    }
-                    |> TestContext.start ()
-                    |> TestContext.assertHttpRequest { method = "GET", url = "https://example.com/" }
-                    |> expectFailure "TEST SETUP ERROR: In order to use assertHttpRequest, you MUST use TestContext.withSimulatedEffects before calling TestContext.start"
+                        |> TestContext.assertHttpRequest "POST"
+                            "https://example.com/ok"
+                            (.body >> Expect.equal """{"ok":900}""")
+                        |> TestContext.done
+                        |> expectFailure
+                            [ "assertHttpRequest:"
+                            , """"{\\"ok\\":true}\""""
+                            , "╵"
+                            , "│ Expect.equal"
+                            , "╷"
+                            , """"{\\"ok\\":900}\""""
+                            ]
+            , test "can assert on request headers" <|
+                \() ->
+                    start
+                        (Http.request
+                            { method = "POST"
+                            , headers = [ Http.header "X-Elm-Test" "Value 99" ]
+                            , url = "https://example.com/ok"
+                            , body = Http.stringBody "text/plain" "##"
+                            , expect = Http.expectString HandleStringResponse
+                            , timeout = Nothing
+                            , tracker = Nothing
+                            }
+                        )
+                        |> TestContext.assertHttpRequest "POST"
+                            "https://example.com/ok"
+                            (.headers
+                                >> Expect.equal
+                                    [ ( "Content-Type", "text/plain" )
+                                    , ( "X-Elm-Test", "Value 99" )
+                                    ]
+                            )
+                        |> TestContext.done
 
-        -- TODO: how to handle multiple requests made to the same method/URL?
+            -- TODO: how to handle multiple requests made to the same method/URL?
+            ]
+        , describe "simulateHttpResponse"
+            [ test "simulate OK response with valid JSON" <|
+                \() ->
+                    start
+                        (Http.get
+                            { url = "https://example.com/friends"
+                            , expect =
+                                Http.expectJson HandleFriendsResponse
+                                    (Json.Decode.list Json.Decode.string)
+                            }
+                        )
+                        |> TestContext.simulateHttpOk "GET"
+                            "https://example.com/friends"
+                            """["Alex","Kelsey","Sam"]"""
+                        |> TestContext.expectModel (Expect.equal """Ok ["Alex","Kelsey","Sam"]""")
+            , test "simulate error response" <|
+                \() ->
+                    start (Http.get { url = "https://example.com/friends", expect = Http.expectString HandleStringResponse })
+                        |> TestContext.simulateHttpResponse "GET"
+                            "https://example.com/friends"
+                            (Test.Http.httpResponse
+                                { statusCode = 500
+                                , headers = []
+                                , body = ""
+                                }
+                            )
+                        |> TestContext.expectModel (Expect.equal """Err (BadStatus 500)""")
+            , test "can simulate network error" <|
+                \() ->
+                    start (Http.get { url = "https://example.com/friends", expect = Http.expectString HandleStringResponse })
+                        |> TestContext.simulateHttpResponse "GET"
+                            "https://example.com/friends"
+                            Test.Http.networkError
+                        |> TestContext.expectModel (Expect.equal """Err NetworkError""")
+            , test "can resolve a chain of requests" <|
+                \() ->
+                    start
+                        (Http.task
+                            { method = "GET"
+                            , headers = []
+                            , url = "https://example.com/A"
+                            , body = Http.emptyBody
+                            , resolver = Http.stringResolver (\_ -> Ok "A-return")
+                            , timeout = Nothing
+                            }
+                            |> Task.andThen
+                                (\aResult ->
+                                    Http.task
+                                        { method = "GET"
+                                        , headers = []
+                                        , url = "https://example.com/B/" ++ aResult
+                                        , body = Http.emptyBody
+                                        , resolver = Http.stringResolver (\_ -> Ok "B-return")
+                                        , timeout = Nothing
+                                        }
+                                )
+                            |> Task.andThen
+                                (\bResult ->
+                                    Http.task
+                                        { method = "GET"
+                                        , headers = []
+                                        , url = "https://example.com/C/" ++ bResult
+                                        , body = Http.emptyBody
+                                        , resolver = Http.stringResolver (\_ -> Ok "C-return")
+                                        , timeout = Nothing
+                                        }
+                                )
+                            |> Task.attempt HandleStringResponse
+                        )
+                        |> TestContext.simulateHttpOk "GET"
+                            "https://example.com/A"
+                            """{}"""
+                        |> TestContext.simulateHttpOk "GET"
+                            "https://example.com/B/A-return"
+                            """{}"""
+                        |> TestContext.simulateHttpOk "GET"
+                            "https://example.com/C/B-return"
+                            """{}"""
+                        |> TestContext.expectModel (Expect.equal """Ok "C-return\"""")
+            , test "a request can only be resolved once" <|
+                \() ->
+                    start
+                        (Http.get
+                            { url = "https://example.com/"
+                            , expect = Http.expectString HandleStringResponse
+                            }
+                        )
+                        |> TestContext.simulateHttpOk "GET" "https://example.com/" """{}"""
+                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> expectFailure
+                            [ "assertHttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
+                            , "    No requests were made."
+                            ]
+            ]
         ]
-
-
-expectSuccess : Expectation -> Expectation
-expectSuccess actualResult =
-    case Test.Runner.getFailureReason actualResult of
-        Nothing ->
-            Expect.pass
-
-        Just actualInfo ->
-            Expect.fail ("Expected a success, but got a failure: " ++ actualInfo.description)
-
-
-expectFailure : String -> Expectation -> Expectation
-expectFailure expectedFailureMessage actualResult =
-    case Test.Runner.getFailureReason actualResult of
-        Nothing ->
-            Expect.fail "Expected a failure, but got a pass"
-
-        Just actualInfo ->
-            actualInfo.description
-                |> Expect.equal expectedFailureMessage

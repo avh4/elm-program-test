@@ -9,7 +9,7 @@ import Url exposing (Url)
 
 {-| Returns `Nothing` if the given string is not a valid absolute URL.
 (An "absolute URL" means one starting with "<scheme>://<host>" (all other components are optional).
-NOTE: the behavior of when `Nothing` is returned may change when the correct implentation from
+NOTE: the behavior when `Nothing` is returned may change when the correct implementation from
 <https://url.spec.whatwg.org/> is implemented.)
 -}
 locationFromString : String -> Maybe Url
@@ -52,7 +52,7 @@ stringToProtocol string =
 resolve : Url -> String -> Url
 resolve base url =
     locationFromString url
-        -- TODO: implment correct logic (current logic is only correct for "authority-relative" URLs without query or fragment strings)
+        -- TODO: implement correct logic (current logic is only correct for "authority-relative" URLs without query or fragment strings)
         |> Maybe.withDefault
             { base
                 | path = url
