@@ -108,10 +108,10 @@ Because the effect type of our program
 is currently `Cmd Msg` (which Elm does not currently allow us to inspect the values of),
 we'll need to do the following before the test will work:
 
-1. make a new type which can represent all the effects our program can produce
-1. implement the required `effect -> TestContext.SimulatedEffect` function
-1. use `withSimulatedEffects` to set up the test
-1. ✅ watch the test pass! 
+1. Make a new type which can represent all the effects our program can produce.
+1. Implement the required `effect -> TestContext.SimulatedEffect` function.
+1. Use `withSimulatedEffects` to set up the test.
+1. ✅ Watch the test pass! 
 
 
 ## Making it work
