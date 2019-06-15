@@ -125,7 +125,7 @@ type TestContext msg model effect
         , currentModel : model
         , lastEffect : effect
         , currentLocation : Maybe Url
-        , effectSimulation : Maybe ( effect -> List (SimulatedEffect msg), SimulationState msg )
+        , effectSimulation : Maybe ( effect -> SimulatedEffect msg, SimulationState msg )
         }
     | Finished Failure
 
@@ -200,16 +200,22 @@ createHelper program options =
         }
 
 
-applySimulatedEffects : effect -> ( effect -> List (SimulatedEffect msg), SimulationState msg ) -> ( effect -> List (SimulatedEffect msg), SimulationState msg )
+applySimulatedEffects : effect -> ( effect -> SimulatedEffect msg, SimulationState msg ) -> ( effect -> SimulatedEffect msg, SimulationState msg )
 applySimulatedEffects effect ( deconstructEffect, simulationState ) =
     ( deconstructEffect
-    , List.foldl simulateEffect simulationState (deconstructEffect effect)
+    , simulateEffect (deconstructEffect effect) simulationState
     )
 
 
 simulateEffect : SimulatedEffect msg -> SimulationState msg -> SimulationState msg
 simulateEffect simulatedEffect simulationState =
     case simulatedEffect of
+        SimulatedEffect.None ->
+            simulationState
+
+        SimulatedEffect.Batch effects ->
+            List.foldl simulateEffect simulationState effects
+
         SimulatedEffect.Task (SimulatedEffect.Succeed _) ->
             simulationState
 
@@ -256,7 +262,7 @@ type ProgramDefinition flags msg model effect
 
 type alias ProgramOptions msg effect =
     { baseUrl : Maybe Url
-    , deconstructEffect : Maybe (effect -> List (SimulatedEffect msg))
+    , deconstructEffect : Maybe (effect -> SimulatedEffect msg)
     }
 
 
@@ -342,7 +348,7 @@ You only need to use this if you need to simulate HTTP requests.
 
 -}
 withSimulatedEffects :
-    (effect -> List (SimulatedEffect msg))
+    (effect -> SimulatedEffect msg)
     -> ProgramDefinition flags msg model effect
     -> ProgramDefinition flags msg model effect
 withSimulatedEffects fn (ProgramDefinition options program) =
@@ -1128,7 +1134,7 @@ simulateHttpResponse method url response testContext =
                 Nothing ->
                     Finished (EffectSimulationNotConfigured "simulateHttpResponse")
 
-                Just ( _, simulationState ) ->
+                Just ( deconstructEffect, simulationState ) ->
                     case Dict.get ( method, url ) simulationState.http of
                         Nothing ->
                             Finished (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulationState.http))
@@ -1136,7 +1142,17 @@ simulateHttpResponse method url response testContext =
                         Just actualRequest ->
                             applyTaskResult
                                 (actualRequest.onRequestComplete response)
-                                testContext
+                                (Active
+                                    { state
+                                        | effectSimulation =
+                                            Just
+                                                ( deconstructEffect
+                                                , { simulationState
+                                                    | http = Dict.remove ( method, url ) simulationState.http
+                                                  }
+                                                )
+                                    }
+                                )
 
 
 replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect
