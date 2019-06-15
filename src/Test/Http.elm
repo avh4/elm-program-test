@@ -39,8 +39,8 @@ import SimulatedEffect
 
 -}
 expectJsonBody :
-    Json.Decode.Decoder responseBody
-    -> (responseBody -> Expectation)
+    Json.Decode.Decoder requestBody
+    -> (requestBody -> Expectation)
     -> SimulatedEffect.HttpRequest x a
     -> Expectation
 expectJsonBody decoder check request =
