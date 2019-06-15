@@ -1,5 +1,8 @@
 module Test.HttpTests exposing (all)
 
+import Expect
+import Json.Decode
+import Json.Encode
 import SimulatedEffect.Http as Http
 import Test exposing (..)
 import Test.Expect exposing (expectFailure)
@@ -38,4 +41,25 @@ all =
                         , "but got headers:"
                         , "    X-Elm-Test: Value 99"
                         ]
+        , test "can assert on JSON body" <|
+            \() ->
+                start
+                    (Http.post
+                        { url = "https://example.com/ok"
+                        , body =
+                            Http.jsonBody
+                                (Json.Encode.object
+                                    [ ( "a", Json.Encode.int 8 )
+                                    ]
+                                )
+                        , expect = Http.expectWhatever (Debug.toString >> Log)
+                        }
+                    )
+                    |> TestContext.assertHttpRequest "POST"
+                        "https://example.com/ok"
+                        (Test.Http.expectJsonBody
+                            (Json.Decode.field "a" Json.Decode.int)
+                            (Expect.equal 8)
+                        )
+                    |> TestContext.done
         ]
