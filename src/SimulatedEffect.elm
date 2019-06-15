@@ -31,4 +31,6 @@ type alias HttpRequest x a =
 
 
 type SimulatedSub msg
-    = PortSub String (Json.Decode.Decoder msg)
+    = NoneSub
+    | BatchSub (List (SimulatedSub msg))
+    | PortSub String (Json.Decode.Decoder msg)

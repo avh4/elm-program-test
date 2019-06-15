@@ -6,6 +6,7 @@ import Json.Decode as Decode
 import Json.Encode as Json
 import SimulatedEffect.Cmd
 import SimulatedEffect.Ports
+import SimulatedEffect.Sub
 import Test exposing (..)
 import Test.Expect exposing (expectFailure)
 import TestContext exposing (SimulatedEffect, SimulatedTask, TestContext)
@@ -77,12 +78,12 @@ all =
             in
             [ test "simulates incoming ports" <|
                 \() ->
-                    startSub (\_ -> [ SimulatedEffect.Ports.subscribe "int" Decode.int (Debug.toString >> Log) ])
+                    startSub (\_ -> SimulatedEffect.Ports.subscribe "int" Decode.int (Debug.toString >> Log))
                         |> TestContext.simulateIncomingPort "int" (Json.int 7)
                         |> TestContext.expectModel (Expect.equal [ "7" ])
             , test "shows useful error when the port is not subscribed to" <|
                 \() ->
-                    startSub (\_ -> [])
+                    startSub (\_ -> SimulatedEffect.Sub.none)
                         |> TestContext.simulateIncomingPort "int" (Json.int 7)
                         |> TestContext.done
                         |> expectFailure [ "simulateIncomingPort \"int\": the program is not currently subscribed to the port" ]
@@ -99,7 +100,7 @@ all =
                         |> expectFailure [ "simulateIncomingPort \"int\": you MUST use TestContext.withSimulatedSubscriptions to be able to use simulateIncomingPort" ]
             , test "shows useful error when decoder fails" <|
                 \() ->
-                    startSub (\_ -> [ SimulatedEffect.Ports.subscribe "int" Decode.int (Debug.toString >> Log) ])
+                    startSub (\_ -> SimulatedEffect.Ports.subscribe "int" Decode.int (Debug.toString >> Log))
                         |> TestContext.simulateIncomingPort "int" (Json.object [])
                         |> TestContext.done
                         |> expectFailure

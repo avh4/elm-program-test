@@ -166,7 +166,7 @@ and a log of any errors that have occurred while simulating interaction with the
 -}
 type TestContext msg model effect
     = Active
-        { program : TestProgram msg model effect (List (SimulatedSub msg))
+        { program : TestProgram msg model effect (SimulatedSub msg)
         , currentModel : model
         , lastEffect : effect
         , currentLocation : Maybe Url
@@ -262,7 +262,7 @@ type ProgramDefinition flags msg model effect
 type alias ProgramOptions msg model effect =
     { baseUrl : Maybe Url
     , deconstructEffect : Maybe (effect -> SimulatedEffect msg)
-    , subscriptions : Maybe (model -> List (SimulatedSub msg))
+    , subscriptions : Maybe (model -> SimulatedSub msg)
     }
 
 
@@ -373,11 +373,11 @@ You only need to use this if you need to simulate subscriptions in your test.
 The function you provide should be similar to your program's `subscriptions` function
 but return `SimulatedSub`s instead of `Sub`s.
 See the `SimulatedEffect.*` modules in this package for functions that you can use to implement
-the required `model -> List (SimulatedSub msg)` function.
+the required `model -> SimulatedSub msg` function.
 
 -}
 withSimulatedSubscriptions :
-    (model -> List (SimulatedSub msg))
+    (model -> SimulatedSub msg)
     -> ProgramDefinition flags msg model effect
     -> ProgramDefinition flags msg model effect
 withSimulatedSubscriptions fn (ProgramDefinition options program) =
@@ -1531,23 +1531,25 @@ simulateIncomingPort portName value testContext =
 
                 Just fn ->
                     let
-                        subs =
-                            fn state.currentModel
-
                         matches =
-                            List.filterMap
-                                (\s ->
-                                    case s of
-                                        SimulatedEffect.PortSub pname decoder ->
-                                            if pname == portName then
-                                                Json.Decode.decodeValue decoder value
-                                                    |> Result.mapError Json.Decode.errorToString
-                                                    |> Just
+                            match (fn state.currentModel)
 
-                                            else
-                                                Nothing
-                                )
-                                subs
+                        match sub =
+                            case sub of
+                                SimulatedEffect.NoneSub ->
+                                    []
+
+                                SimulatedEffect.BatchSub subs_ ->
+                                    List.concatMap match subs_
+
+                                SimulatedEffect.PortSub pname decoder ->
+                                    if pname == portName then
+                                        Json.Decode.decodeValue decoder value
+                                            |> Result.mapError Json.Decode.errorToString
+                                            |> List.singleton
+
+                                    else
+                                        []
 
                         step r tc =
                             case r of
