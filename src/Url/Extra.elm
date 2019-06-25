@@ -16,7 +16,7 @@ resolve base url =
         |> Maybe.withDefault
             { base
                 | path =
-                    if String.left 1 url == "/" then
+                    if String.startsWith "/" url then
                         url
 
                     else
