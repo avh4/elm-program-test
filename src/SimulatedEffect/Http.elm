@@ -116,7 +116,7 @@ request r =
                     r.headers
 
                 StringBody body ->
-                    ( "Content-Type", body.contentType ) :: r.headers
+                    header "Content-Type" body.contentType :: r.headers
         , body =
             case r.body of
                 EmptyBody ->

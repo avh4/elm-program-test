@@ -1,8 +1,9 @@
 module TestContext exposing
     ( TestContext, start
     , createSandbox, createElement, createDocument, createApplication
-    , ProgramDefinition, withBaseUrl, withJsonStringFlags
-    , SimulatedEffect, SimulatedTask, withSimulatedEffects
+    , ProgramDefinition
+    , withBaseUrl, withJsonStringFlags
+    , withSimulatedEffects, SimulatedEffect, SimulatedTask
     , clickButton, clickLink
     , fillIn, fillInTextarea
     , check, selectOption
@@ -11,6 +12,7 @@ module TestContext exposing
     , within
     , assertHttpRequestWasMade, assertHttpRequest
     , simulateHttpOk, simulateHttpResponse
+    , advanceTime
     , update
     , simulateLastEffect
     , expectViewHas, expectView
@@ -22,23 +24,46 @@ module TestContext exposing
     , fail, createFailed
     )
 
-{-| A `TestContext` simulates the execution of an Elm program.
+{-| A `TestContext` simulates the execution of an Elm program
+enabling you write high-level tests for your program.
+(High-level tests are valuable in that they provide extremely robust test coverage
+in the case of drastic refactorings of your application architecture,
+and writing high-level tests helps you focus on the needs and behaviors of your end-users.)
+
+This module allows you to interact with your program by simulating
+DOM events (see ["Simulating user input"](#simulating-user-input)) and
+external events (see ["Simulating HTTP responses"](#simulating-http-responses) and ["Simulating time"](#simulating-time)).
+
+After simulating a series of events, you can then check assertions about
+the currently rendered state of your program (see ["Final assertions"](#final-assertions).
 
 
-## Creating
+# Creating
 
 @docs TestContext, start
 
+
+## Creating program definitions
+
+A `ProgramDefinition` (required to create a `TextContext` with [`start`](#start))
+can be created with one of the following functions that parallel
+the functions in `elm/browser`'s `Browser` module.
+
 @docs createSandbox, createElement, createDocument, createApplication
-@docs ProgramDefinition, withBaseUrl, withJsonStringFlags
+@docs ProgramDefinition
 
 
-### Simulated effects
+## Options
 
-@docs SimulatedEffect, SimulatedTask, withSimulatedEffects
+The following functions allow you to configure your
+`ProgramDefinition` before starting it with [`start`](#start).
+
+@docs withBaseUrl, withJsonStringFlags
+
+@docs withSimulatedEffects, SimulatedEffect, SimulatedTask
 
 
-## Simulating user input
+# Simulating user input
 
 @docs clickButton, clickLink
 @docs fillIn, fillInTextarea
@@ -52,26 +77,34 @@ module TestContext exposing
 @docs within
 
 
+# Simulating external events
+
+
 ## Simulating HTTP responses
 
 @docs assertHttpRequestWasMade, assertHttpRequest
 @docs simulateHttpOk, simulateHttpResponse
 
 
-## Directly sending Msgs
+## Simulating time
+
+@docs advanceTime
+
+
+# Directly sending Msgs
 
 @docs update
 @docs simulateLastEffect
 
 
-## Final assertions
+# Final assertions
 
 @docs expectViewHas, expectView
 @docs expectLastEffect, expectModel
 @docs expectPageChange
 
 
-## Intermediate assertions
+# Intermediate assertions
 
 These functions can be used to make assertions on a `TestContext` without ending the test.
 
@@ -83,7 +116,7 @@ To end a `TestContext` without using a [final assertion](#final-assertions), use
 @docs done
 
 
-## Custom assertions
+# Custom assertions
 
 These functions may be useful if you are writing your own custom assertion functions.
 
@@ -99,6 +132,7 @@ import Html.Attributes exposing (attribute)
 import Http
 import Json.Decode
 import Json.Encode
+import PairingHeap
 import Query.Extra
 import SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
 import Test.Html.Event
@@ -107,6 +141,7 @@ import Test.Html.Selector as Selector exposing (Selector)
 import Test.Http
 import Test.Runner
 import Test.Runner.Failure
+import TestContext.EffectSimulation as EffectSimulation exposing (EffectSimulation)
 import Url exposing (Url)
 import Url.Extra
 
@@ -125,25 +160,9 @@ type TestContext msg model effect
         , currentModel : model
         , lastEffect : effect
         , currentLocation : Maybe Url
-        , effectSimulation : Maybe ( effect -> SimulatedEffect msg, SimulationState msg )
+        , effectSimulation : Maybe (EffectSimulation msg effect)
         }
     | Finished Failure
-
-
-type alias SimulationState msg =
-    { http : Dict ( String, String ) (SimulatedEffect.HttpRequest msg msg)
-    }
-
-
-type alias HttpRequest =
-    { body : String
-    }
-
-
-emptySimulationState : SimulationState msg
-emptySimulationState =
-    { http = Dict.empty
-    }
 
 
 type alias TestProgram msg model effect =
@@ -193,42 +212,10 @@ createHelper program options =
         , currentModel = newModel
         , lastEffect = newEffect
         , currentLocation = options.baseUrl
-        , effectSimulation =
-            options.deconstructEffect
-                |> Maybe.map (\f -> ( f, emptySimulationState ))
-                |> Maybe.map (applySimulatedEffects newEffect)
+        , effectSimulation = Maybe.map EffectSimulation.init options.deconstructEffect
         }
-
-
-applySimulatedEffects : effect -> ( effect -> SimulatedEffect msg, SimulationState msg ) -> ( effect -> SimulatedEffect msg, SimulationState msg )
-applySimulatedEffects effect ( deconstructEffect, simulationState ) =
-    ( deconstructEffect
-    , simulateEffect (deconstructEffect effect) simulationState
-    )
-
-
-simulateEffect : SimulatedEffect msg -> SimulationState msg -> SimulationState msg
-simulateEffect simulatedEffect simulationState =
-    case simulatedEffect of
-        SimulatedEffect.None ->
-            simulationState
-
-        SimulatedEffect.Batch effects ->
-            List.foldl simulateEffect simulationState effects
-
-        SimulatedEffect.Task (SimulatedEffect.Succeed _) ->
-            simulationState
-
-        SimulatedEffect.Task (SimulatedEffect.Fail _) ->
-            simulationState
-
-        SimulatedEffect.Task (SimulatedEffect.HttpTask request) ->
-            { simulationState
-                | http =
-                    Dict.insert ( request.method, request.url )
-                        request
-                        simulationState.http
-            }
+        |> queueEffect newEffect
+        |> drain
 
 
 {-| Creates a `ProgramDefinition` from the parts of a `Browser.sandbox` program.
@@ -309,7 +296,8 @@ start flags (ProgramDefinition options program) =
 {-| Sets the initial browser URL
 
 You must set this when using `createApplication`,
-or when testing clicking links with relative URLs with [`clickLink`](#clickLink) and [`expectPageChange`](#expectPageChange).
+or when using [`clickLink`](#clickLink) and [`expectPageChange`](#expectPageChange)
+to simulate a user clicking a link with relative URL.
 
 -}
 withBaseUrl : String -> ProgramDefinition flags msg model effect -> ProgramDefinition flags msg model effect
@@ -341,10 +329,15 @@ withJsonStringFlags decoder (ProgramDefinition options program) =
                     \_ -> Finished (InvalidFlags "withJsonStringFlags" (Json.Decode.errorToString message))
 
 
-{-| This allows you to provide a function that lets `TestContext` simulate HTTP effects
-(this enables you to use [`assertHttpRequest`](#assertHttpRequest)).
+{-| This allows you to provide a function that lets `TestContext` simulate effects that would become `Cmd`s and `Task`s
+when your app runs in production
+(this enables you to use [`simulateHttpResponse`](#simulateHttpResponse), [`advanceTime`](#advanceTime), etc.).
 
-You only need to use this if you need to simulate HTTP requests.
+You only need to use this if you need to [simulate HTTP requests](#simulating-http-responses)
+or the [passing of time](#simulating-time).
+
+See the `SimulatedEffect.*` modules in this package for functions that you can use to implement
+the required `effect -> SimulatedEffect msg` function for your `effect` type.
 
 -}
 withSimulatedEffects :
@@ -417,13 +410,15 @@ which parallel the modules your real program would use to create `Cmd`s and `Tas
 
   - [`SimulatedEffect.Http`](SimulatedEffect-Http) (parallels `Http` from `elm/http`)
   - [`SimulatedEffect.Task`](SimulatedEffect-Task) (parallels `Task` from `elm/core`)
+  - [`SimulatedEffect.Process`](SimulatedEffect-Process) (parallels `Process` from `elm/core`)
 
 -}
 type alias SimulatedEffect msg =
     SimulatedEffect.SimulatedEffect msg
 
 
-{-| -}
+{-| Similar to `SimulatedEffect`, but represents a `Task` instead of a `Cmd`.
+-}
 type alias SimulatedTask x a =
     SimulatedEffect.SimulatedTask x a
 
@@ -455,33 +450,9 @@ update msg testContext =
                 { state
                     | currentModel = newModel
                     , lastEffect = newEffect
-                    , effectSimulation = Maybe.map (applySimulatedEffects newEffect) state.effectSimulation
                 }
-
-
-applyTaskResult : SimulatedTask msg msg -> TestContext msg model effect -> TestContext msg model effect
-applyTaskResult task =
-    case task of
-        SimulatedEffect.Succeed msg ->
-            update msg
-
-        SimulatedEffect.Fail msg ->
-            update msg
-
-        SimulatedEffect.HttpTask request ->
-            \testContext ->
-                case testContext of
-                    Finished err ->
-                        Finished err
-
-                    Active state ->
-                        Active
-                            { state
-                                | effectSimulation =
-                                    Maybe.map
-                                        (Tuple.mapSecond <| simulateEffect (SimulatedEffect.Task task))
-                                        state.effectSimulation
-                            }
+                |> queueEffect newEffect
+                |> drain
 
 
 simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
@@ -657,11 +628,16 @@ findNotDisabled selectors source =
 
 {-| Simulates clicking a `<a href="...">` link.
 
-NOTE: Currently, this function requires that you also provide the expected href.
-After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
-a future release of this package will remove the `href` parameter.
+The parameters are:
 
-Note for testing single-page apps,
+1.  The text of the `<a>` tag (which is the link text visible to the user).
+
+2.  The `href` of the `<a>` tag.
+
+    NOTE: After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+    a future release of this package will remove the `href` parameter.
+
+Note for testing single-page apps:
 if the target `<a>` tag has an `onClick` handler,
 then the message produced by the handler will be processed
 and the `href` will not be followed.
@@ -785,17 +761,17 @@ followLink functionDescription href testContext =
 
 {-| Simulates replacing the text in an input field labeled with the given label.
 
-  - `fieldId`: the field id
+1.  The id of the input field
     (which must match both the `id` attribute of the target `input` element,
     and the `for` attribute of the `label` element),
     or `""` if the `<input>` is a descendant of the `<label>`.
 
     NOTE: After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
-    a future release of this package will remove the `fieldId` parameter.
+    a future release of this package will remove this parameter.
 
-  - `label`: the label text of the input field
+2.  The label text of the input field.
 
-  - `text`: the text that will be used to trigger the `onInput` event of the input field
+3.  The text that will entered into the input field.
 
 There are a few different ways to accessibly label your input fields so that `fillIn` will find them:
 
@@ -861,6 +837,20 @@ fillInTextarea newContent testContext =
 
 {-| Simulates setting the value of a checkbox labeled with the given label.
 
+The parameters are:
+
+1.  The id of the input field
+    (which must match both the `id` attribute of the target `input` element,
+    and the `for` attribute of the `label` element),
+    or `""` if the `<input>` is a descendant of the `<label>`.
+
+    NOTE: After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+    a future release of this package will remove this parameter.
+
+2.  The label text of the input field
+
+3.  A `Bool` indicating whether to check (`True`) or uncheck (`False`) the checkbox.
+
 NOTE: Currently, this function requires that you also provide the field id
 (which must match both the `id` attribute of the target `input` element,
 and the `for` attribute of the `label` element).
@@ -868,7 +858,7 @@ After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/5
 a future release of this package will remove the `fieldId` parameter.
 
 NOTE: In the future, this will be generalized to work with
-aria accessiblity attributes in addition to working with standard HTML label elements.
+aria accessibility attributes in addition to working with standard HTML label elements.
 
 If you need more control over the finding the target element or creating the simulated event,
 see [`simulate`](#simulate).
@@ -887,29 +877,43 @@ check fieldId label willBecomeChecked testContext =
 
 {-| Simulates choosing an option with the given text in a select with a given label
 
+The parameters are:
+
+1.  The id of the `<select>`
+    (which must match both the `id` attribute of the target `select` element,
+    and the `for` attribute of the `label` element),
+    or `""` if the `<select>` is a descendant of the `<label>`.
+
+    NOTE: After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
+    a future release of this package will remove this parameter.
+
+2.  The label text of the select.
+
+3.  The `value` of the `<option>` that will be chosen.
+
+    NOTE: After [eeue56/elm-html-test#51](https://github.com/eeue56/elm-html-test/issues/51) is resolved,
+    a future release of this package will remove this parameter.
+
+4.  The user-visible text of the `<option>` that will be chosen.
+
 Example: If you have a view like the following,
 
     import Html
     import Html.Attributes exposing (for, id, value)
-    import Html.Events exposing (on)
+    import Html.Events exposing (on, targetValue)
 
     Html.div []
         [ Html.label [ for "pet-select" ] [ Html.text "Choose a pet" ]
-        , Html.select [ id "on "change" targetValue ]
-             [ Html.option [ value "dog" ] [ Html.text "Dog" ]
-             , Html.option [ value "hamster" ] [ Html.text "Hamster" ]
-             ]
+        , Html.select
+            [ id "pet-select", on "change" targetValue ]
+            [ Html.option [ value "dog" ] [ Html.text "Dog" ]
+            , Html.option [ value "hamster" ] [ Html.text "Hamster" ]
+            ]
         ]
 
 you can simulate selecting an option like this:
 
     TestContext.selectOption "pet-select" "Choose a pet" "dog" "Dog"
-
-NOTE: Currently, this function requires that you also provide the field id
-(which must match both the `id` attribute of the target `select` element,
-and the `for` attribute of the `label` element) and the value of the option that you are
-selecting. After [eeue56/elm-html-test#51](https://github.com/eeue56/elm-html-test/issues/51) is resolved,
-a future release of this package will remove the `fieldId` and `optionValue` parameters.
 
 If you need more control over the finding the target element or creating the simulated event,
 see [`simulate`](#simulate).
@@ -1006,6 +1010,74 @@ within findTarget onScopedTest testContext =
                 |> replaceView state.program.view
 
 
+withSimulation : (EffectSimulation msg effect -> EffectSimulation msg effect) -> TestContext msg model effect -> TestContext msg model effect
+withSimulation f testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            Active
+                { state | effectSimulation = Maybe.map f state.effectSimulation }
+
+
+queueEffect : effect -> TestContext msg model effect -> TestContext msg model effect
+queueEffect effect =
+    withSimulation (EffectSimulation.queueEffect effect)
+
+
+drain : TestContext msg model effect -> TestContext msg model effect
+drain =
+    let
+        advanceTimeIfSimulating t testContext =
+            case testContext of
+                Finished _ ->
+                    testContext
+
+                Active state ->
+                    case state.effectSimulation of
+                        Nothing ->
+                            testContext
+
+                        Just _ ->
+                            advanceTime t testContext
+    in
+    advanceTimeIfSimulating 0
+        >> drainWorkQueue
+
+
+drainWorkQueue : TestContext msg model effect -> TestContext msg model effect
+drainWorkQueue testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    testContext
+
+                Just simulation ->
+                    case EffectSimulation.stepWorkQueue simulation of
+                        Nothing ->
+                            -- work queue is empty
+                            testContext
+
+                        Just ( newSimulation, msg ) ->
+                            let
+                                updateMaybe tc =
+                                    case msg of
+                                        Nothing ->
+                                            tc
+
+                                        Just m ->
+                                            update m tc
+                            in
+                            Active { state | effectSimulation = Just newSimulation }
+                                |> updateMaybe
+                                |> drain
+
+
 {-| A final assertion that checks whether an HTTP request to the specific url and method has been made.
 
 If you want to check the headers or request body, see [`assertHttpRequest`](#assertHttpRequest).
@@ -1025,12 +1097,12 @@ assertHttpRequestWasMade method url testContext =
                     Nothing ->
                         Finished (EffectSimulationNotConfigured "assertHttpRequestWasMade")
 
-                    Just ( _, simulationState ) ->
-                        if Dict.member ( method, url ) simulationState.http then
+                    Just simulation ->
+                        if Dict.member ( method, url ) simulation.state.http then
                             testContext
 
                         else
-                            Finished (NoMatchingHttpRequest "assertHttpRequestWasMade" { method = method, url = url } (Dict.keys simulationState.http))
+                            Finished (NoMatchingHttpRequest "assertHttpRequestWasMade" { method = method, url = url } (Dict.keys simulation.state.http))
 
 
 {-| Allows you to check the details of a pending HTTP request.
@@ -1063,8 +1135,8 @@ assertHttpRequest method url checkRequest testContext =
                 Nothing ->
                     Finished (EffectSimulationNotConfigured "assertHttpRequest")
 
-                Just ( _, simulationState ) ->
-                    case Dict.get ( method, url ) simulationState.http of
+                Just simulation ->
+                    case Dict.get ( method, url ) simulation.state.http of
                         Just request ->
                             case Test.Runner.getFailureReason (checkRequest request) of
                                 Nothing ->
@@ -1075,7 +1147,7 @@ assertHttpRequest method url checkRequest testContext =
                                     Finished (ExpectFailed "assertHttpRequest" reason.description reason.reason)
 
                         Nothing ->
-                            Finished (NoMatchingHttpRequest "assertHttpRequest" { method = method, url = url } (Dict.keys simulationState.http))
+                            Finished (NoMatchingHttpRequest "assertHttpRequest" { method = method, url = url } (Dict.keys simulation.state.http))
 
 
 {-| Simulates an HTTP 200 response to a pending request with the given method and url.
@@ -1134,25 +1206,107 @@ simulateHttpResponse method url response testContext =
                 Nothing ->
                     Finished (EffectSimulationNotConfigured "simulateHttpResponse")
 
-                Just ( deconstructEffect, simulationState ) ->
-                    case Dict.get ( method, url ) simulationState.http of
+                Just simulation ->
+                    case Dict.get ( method, url ) simulation.state.http of
                         Nothing ->
-                            Finished (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulationState.http))
+                            Finished (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulation.state.http))
 
                         Just actualRequest ->
-                            applyTaskResult
-                                (actualRequest.onRequestComplete response)
-                                (Active
+                            let
+                                resolveHttpRequest sim =
+                                    let
+                                        st =
+                                            sim.state
+                                    in
+                                    { sim | state = { st | http = Dict.remove ( method, url ) st.http } }
+                            in
+                            withSimulation
+                                (resolveHttpRequest
+                                    >> EffectSimulation.queueTask (actualRequest.onRequestComplete response)
+                                )
+                                testContext
+                                |> drain
+
+
+{-| Simulates the passing of time.
+The `Int` parameter is the number of milliseconds to simulate.
+This will cause any pending `Task.sleep`s to trigger if their delay has elapsed.
+
+NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
+
+-}
+advanceTime : Int -> TestContext msg model effect -> TestContext msg model effect
+advanceTime delta testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    Finished (EffectSimulationNotConfigured "advanceTime")
+
+                Just simulation ->
+                    advanceTo (simulation.state.nowMs + delta) testContext
+
+
+advanceTo : Int -> TestContext msg model effect -> TestContext msg model effect
+advanceTo end testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    Finished (EffectSimulationNotConfigured "advanceTo")
+
+                Just simulation ->
+                    let
+                        ss =
+                            simulation.state
+                    in
+                    case PairingHeap.findMin simulation.state.futureTasks of
+                        Nothing ->
+                            -- No future tasks to check
+                            Active
+                                { state
+                                    | effectSimulation =
+                                        Just
+                                            { simulation
+                                                | state = { ss | nowMs = end }
+                                            }
+                                }
+
+                        Just ( t, task ) ->
+                            if t <= end then
+                                Active
                                     { state
                                         | effectSimulation =
                                             Just
-                                                ( deconstructEffect
-                                                , { simulationState
-                                                    | http = Dict.remove ( method, url ) simulationState.http
-                                                  }
-                                                )
+                                                { simulation
+                                                    | state =
+                                                        { ss
+                                                            | nowMs = t
+                                                            , futureTasks = PairingHeap.deleteMin simulation.state.futureTasks
+                                                        }
+                                                }
                                     }
-                                )
+                                    |> withSimulation
+                                        (EffectSimulation.queueTask (task ()))
+                                    |> drain
+                                    |> advanceTo end
+
+                            else
+                                -- next task is further in the future than we are advancing
+                                Active
+                                    { state
+                                        | effectSimulation =
+                                            Just
+                                                { simulation
+                                                    | state = { ss | nowMs = end }
+                                                }
+                                    }
 
 
 replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect
@@ -1172,7 +1326,11 @@ replaceView newView testContext =
                 }
 
 
-{-| `url` may be an absolute URL or relative URL
+{-| Simulates a route change event (which would happen when your program is
+a `Browser.application` and the user changes the URL in the browser's URL bar.
+
+The parameter may be an absolute URL or relative URL.
+
 -}
 routeChange : String -> TestContext msg model effect -> TestContext msg model effect
 routeChange url testContext =
@@ -1459,7 +1617,36 @@ fail assertionName failureMessage testContext =
 
 {-| `createFailed` can be used to report custom errors if you are writing your own convenience functions to **create** test contexts.
 
-NOTE: if you are writing a convenience function that takes a `TestContext` as input, you should use [`fail`](#fail) instead, as it provides more context in the test failure message.
+The parameters are:
+
+1.  The name of your helper function (displayed in failure messages)
+2.  The failure message (also included in the failure message)
+
+NOTE: if you are writing a convenience function that takes a `TestContext` as input, you should use [`fail`](#fail) instead,
+as it provides more context in the test failure message.
+
+    -- JsonSchema and MyProgram are imaginary modules for this example
+
+
+    import JsonSchema exposing (Schema, validateJsonSchema)
+    import MyProgram exposing (Model, Msg)
+    import TextContext exposing (TestContext)
+
+    createWithValidatedJson : Schema -> String -> TestContext Msg Model (Cmd Msg)
+    createWithValidatedJson schema json =
+        case validateJsonSchema schema json of
+            Err message ->
+                TestContext.createFailed
+                    "createWithValidatedJson"
+                    ("JSON schema validation failed:\n" ++ message)
+
+            Ok () ->
+                TestContext.createElement
+                    { init = MyProgram.init
+                    , update = MyProgram.update
+                    , view = MyProgram.view
+                    }
+                    |> TestContext.start json
 
 -}
 createFailed : String -> String -> TestContext msg model effect
