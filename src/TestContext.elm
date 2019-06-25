@@ -30,7 +30,7 @@ module TestContext exposing
 enabling you write high-level tests for your program.
 (High-level tests are valuable in that they provide extremely robust test coverage
 in the case of drastic refactorings of your application architecture,
-and writing high-level tests helps you focus on the needs an behaviors of your end-users.)
+and writing high-level tests helps you focus on the needs and behaviors of your end-users.)
 
 This module allows you to interact with your program by simulating
 DOM events (see ["Simulating user input"](#simulating-user-input)) and
