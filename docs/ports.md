@@ -20,7 +20,7 @@ The rest of this section will be working with an example program
 that interacts with the fictional "GudWerdz" service for
 checking the grammar and writing style of a text input.
 
-The fictional "GudWerdz" service only provides a javascript SDK,
+The fictional "GudWerdz" service only provides a JavaScript SDK,
 so our app needs to interact with it using [ports](https://guide.elm-lang.org/interop/ports.html).
 
 ![architecture diagram described in the preceding paragraph](./GrammarCheckExample.svg)
@@ -100,7 +100,7 @@ but will return `TestContext.SimulatedSub` instead of the normal `Sub`.
 (This is necessary because, as with `Cmd`s,
 Elm currently provides no way to inspect the value of a `Sub`.)
 
-For reference, here's our program's `subscriptions` functions:
+For reference, here's our program's `subscriptions` function:
 
 ```elm
 port grammarCheckResults : (List String -> msg) -> Sub msg
