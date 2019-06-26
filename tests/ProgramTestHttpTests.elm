@@ -1,20 +1,20 @@
-module TestContextHttpTests exposing (all)
+module ProgramTestHttpTests exposing (all)
 
 import Expect exposing (Expectation)
 import Html
 import Html.Events exposing (onClick)
 import Json.Decode
+import ProgramTest exposing (ProgramTest)
 import SimulatedEffect.Cmd
 import SimulatedEffect.Http as Http
 import SimulatedEffect.Task as Task
 import Test exposing (..)
 import Test.Expect exposing (expectFailure, expectSuccess)
 import Test.Http
-import TestContext exposing (TestContext)
 
 
 type alias TestEffect =
-    TestContext.SimulatedEffect TestMsg
+    ProgramTest.SimulatedEffect TestMsg
 
 
 type TestMsg
@@ -27,9 +27,9 @@ type alias TestModel =
     String
 
 
-start : TestEffect -> TestContext TestMsg TestModel TestEffect
+start : TestEffect -> ProgramTest TestMsg TestModel TestEffect
 start initialEffect =
-    TestContext.createElement
+    ProgramTest.createElement
         { init = \() -> ( "Init", initialEffect )
         , update =
             \msg model ->
@@ -60,18 +60,18 @@ start initialEffect =
                         [ Html.text "Get" ]
                     ]
         }
-        |> TestContext.withSimulatedEffects identity
-        |> TestContext.start ()
+        |> ProgramTest.withSimulatedEffects identity
+        |> ProgramTest.start ()
 
 
 all : Test
 all =
-    describe "TestContext (HTTP API)"
+    describe "ProgramTest (HTTP API)"
         [ describe "assertHttpRequest"
             [ test "can assert that an HTTP request was made from init (failure)" <|
                 \() ->
                     start SimulatedEffect.Cmd.none
-                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectFailure
                             [ "assertHttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
                             , "    No requests were made."
@@ -79,7 +79,7 @@ all =
             , test "can assert that an HTTP request was made from init (success)" <|
                 \() ->
                     start (Http.get { url = "https://example.com/", expect = Http.expectString HandleStringResponse })
-                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectSuccess
             , test "can assert that an HTTP request was made via a Task" <|
                 \() ->
@@ -94,24 +94,24 @@ all =
                             }
                             |> Task.attempt HandleStringResponse
                         )
-                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/get"
+                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/get"
                         |> expectSuccess
             , test "can assert that an HTTP request was made from update" <|
                 \() ->
                     start SimulatedEffect.Cmd.none
-                        |> TestContext.update (PassThroughEffect (Http.get { url = "https://example.com/from-update", expect = Http.expectString HandleStringResponse }))
-                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/from-update"
+                        |> ProgramTest.update (PassThroughEffect (Http.get { url = "https://example.com/from-update", expect = Http.expectString HandleStringResponse }))
+                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/from-update"
                         |> expectSuccess
             , test "can assert that an HTTP request was made via a user interaction" <|
                 \() ->
                     start SimulatedEffect.Cmd.none
-                        |> TestContext.clickButton "Get"
-                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/buttons/get"
+                        |> ProgramTest.clickButton "Get"
+                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/buttons/get"
                         |> expectSuccess
             , test "error message includes list of pending requests" <|
                 \() ->
                     start (Http.get { url = "https://example.com/actualRequest", expect = Http.expectString HandleStringResponse })
-                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/not-made"
+                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/not-made"
                         |> expectFailure
                             [ "assertHttpRequestWasMade: Expected HTTP request (GET https://example.com/not-made) to have been made, but it was not."
                             , "    The following requests were made:"
@@ -119,15 +119,15 @@ all =
                             ]
             , test "gives explanatory error when using assertHttpRequest without using withSimulatedEffects" <|
                 \() ->
-                    TestContext.createSandbox
+                    ProgramTest.createSandbox
                         { init = ()
                         , update = \() () -> ()
                         , view = \() -> Html.text "[view]"
                         }
-                        |> TestContext.start ()
-                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> ProgramTest.start ()
+                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectFailure
-                            [ "TEST SETUP ERROR: In order to use assertHttpRequestWasMade, you MUST use TestContext.withSimulatedEffects before calling TestContext.start"
+                            [ "TEST SETUP ERROR: In order to use assertHttpRequestWasMade, you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start"
                             ]
             , test "can assert on request body" <|
                 \() ->
@@ -138,10 +138,10 @@ all =
                             , expect = Http.expectString HandleStringResponse
                             }
                         )
-                        |> TestContext.assertHttpRequest "POST"
+                        |> ProgramTest.assertHttpRequest "POST"
                             "https://example.com/ok"
                             (.body >> Expect.equal """{"ok":900}""")
-                        |> TestContext.done
+                        |> ProgramTest.done
                         |> expectFailure
                             [ "assertHttpRequest:"
                             , """"{\\"ok\\":true}\""""
@@ -163,7 +163,7 @@ all =
                             , tracker = Nothing
                             }
                         )
-                        |> TestContext.assertHttpRequest "POST"
+                        |> ProgramTest.assertHttpRequest "POST"
                             "https://example.com/ok"
                             (.headers
                                 >> Expect.equal
@@ -171,7 +171,7 @@ all =
                                     , ( "X-Elm-Test", "Value 99" )
                                     ]
                             )
-                        |> TestContext.done
+                        |> ProgramTest.done
 
             -- TODO: how to handle multiple requests made to the same method/URL?
             ]
@@ -186,14 +186,14 @@ all =
                                     (Json.Decode.list Json.Decode.string)
                             }
                         )
-                        |> TestContext.simulateHttpOk "GET"
+                        |> ProgramTest.simulateHttpOk "GET"
                             "https://example.com/friends"
                             """["Alex","Kelsey","Sam"]"""
-                        |> TestContext.expectModel (Expect.equal """Ok ["Alex","Kelsey","Sam"]""")
+                        |> ProgramTest.expectModel (Expect.equal """Ok ["Alex","Kelsey","Sam"]""")
             , test "simulate error response" <|
                 \() ->
                     start (Http.get { url = "https://example.com/friends", expect = Http.expectString HandleStringResponse })
-                        |> TestContext.simulateHttpResponse "GET"
+                        |> ProgramTest.simulateHttpResponse "GET"
                             "https://example.com/friends"
                             (Test.Http.httpResponse
                                 { statusCode = 500
@@ -201,14 +201,14 @@ all =
                                 , body = ""
                                 }
                             )
-                        |> TestContext.expectModel (Expect.equal """Err (BadStatus 500)""")
+                        |> ProgramTest.expectModel (Expect.equal """Err (BadStatus 500)""")
             , test "can simulate network error" <|
                 \() ->
                     start (Http.get { url = "https://example.com/friends", expect = Http.expectString HandleStringResponse })
-                        |> TestContext.simulateHttpResponse "GET"
+                        |> ProgramTest.simulateHttpResponse "GET"
                             "https://example.com/friends"
                             Test.Http.networkError
-                        |> TestContext.expectModel (Expect.equal """Err NetworkError""")
+                        |> ProgramTest.expectModel (Expect.equal """Err NetworkError""")
             , test "can resolve a chain of requests" <|
                 \() ->
                     start
@@ -244,16 +244,16 @@ all =
                                 )
                             |> Task.attempt HandleStringResponse
                         )
-                        |> TestContext.simulateHttpOk "GET"
+                        |> ProgramTest.simulateHttpOk "GET"
                             "https://example.com/A"
                             """{}"""
-                        |> TestContext.simulateHttpOk "GET"
+                        |> ProgramTest.simulateHttpOk "GET"
                             "https://example.com/B/A-return"
                             """{}"""
-                        |> TestContext.simulateHttpOk "GET"
+                        |> ProgramTest.simulateHttpOk "GET"
                             "https://example.com/C/B-return"
                             """{}"""
-                        |> TestContext.expectModel (Expect.equal """Ok "C-return\"""")
+                        |> ProgramTest.expectModel (Expect.equal """Ok "C-return\"""")
             , test "a request can only be resolved once" <|
                 \() ->
                     start
@@ -262,8 +262,8 @@ all =
                             , expect = Http.expectString HandleStringResponse
                             }
                         )
-                        |> TestContext.simulateHttpOk "GET" "https://example.com/" """{}"""
-                        |> TestContext.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> ProgramTest.simulateHttpOk "GET" "https://example.com/" """{}"""
+                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectFailure
                             [ "assertHttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
                             , "    No requests were made."

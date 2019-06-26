@@ -42,26 +42,26 @@ Here's what that test will look like in code:
 import Expect
 import Json.Decode
 import Json.Encode
+import ProgramTest
 import Test exposing (test)
-import TestContext
 
 test "checking grammar" <|
     \() ->
         start
-            |> TestContext.fillIn "main"
+            |> ProgramTest.fillIn "main"
                 "Enter text to check"
                 "The youngest man the boat."
-            |> TestContext.clickButton "Check"
-            |> TestContext.assertAndClearOutgoingPortValues
+            |> ProgramTest.clickButton "Check"
+            |> ProgramTest.assertAndClearOutgoingPortValues
                 "checkGrammar"
                 Json.Decode.string
                 (Expect.equal [ "The youngest man the boat." ])
-            |> TestContext.simulateIncomingPort
+            |> ProgramTest.simulateIncomingPort
                 "grammarCheckResults"
                 (Json.Encode.list Json.Encode.string
                     [ "Garden-path sentences can confuse the reader." ]
                 )
-            |> TestContext.expectViewHas
+            |> ProgramTest.expectViewHas
                 [ text "Garden-path sentences can confuse the reader." ]
 ```
 
@@ -71,7 +71,7 @@ so that the test can simulate the incoming and outgoing ports.
 
 ## Simulating outgoing ports
 
-We'll assume that we already have our test set up with `TestContext.withSimulatedEffects`
+We'll assume that we already have our test set up with `ProgramTest.withSimulatedEffects`
 (if you're not familiar with that,
 you should first follow the ["testing programs that use Cmds" guide](cmds.md)).
 
@@ -82,7 +82,7 @@ in our `simulateEffects` function:
 import Json.Encode
 import SimulatedEffect.Ports
 
-simulateEffects : Main.Effect -> TestContext.SimulatedEffect Main.Msg
+simulateEffects : Main.Effect -> ProgramTest.SimulatedEffect Main.Msg
 simulateEffects effect =
     case effect of
         ...
@@ -96,7 +96,7 @@ simulateEffects effect =
 Similar to how we provided a `simulateEffects` function for testing our Cmds,
 we'll need to provide a `simulateSubscriptions` function for testing our Subs.
 This will parallel the `subscriptions` function in our main program,
-but will return `TestContext.SimulatedSub` instead of the normal `Sub`.
+but will return `ProgramTest.SimulatedSub` instead of the normal `Sub`.
 (This is necessary because, as with `Cmd`s,
 Elm currently provides no way to inspect the value of a `Sub`.)
 
@@ -113,26 +113,26 @@ subscriptions _ =
 And here's the corresponding `simulateSubscriptions` function we'll write for our test setup:
 
 ```elm
-simulateSubscriptions : Main.Model -> TestContext.SimulatedSub Main.Msg
+simulateSubscriptions : Main.Model -> ProgramTest.SimulatedSub Main.Msg
 simulateSubscriptions _ =
     SimulatedEffect.Ports.subscribe "grammarCheckResults"
         (Json.Decode.list Json.Decode.string)
         Main.GrammarCheckResults
 ```
 
-Finally, we configure our `TestContext` with the `simulateSubscriptions` function before starting it:
+Finally, we configure our `ProgramTest` with the `simulateSubscriptions` function before starting it:
 
 ```elm{9}
-start : TestContext Main.Msg Main.Model Main.Effect
+start : ProgramTest Main.Msg Main.Model Main.Effect
 start =
-    TestContext.createDocument
+    ProgramTest.createDocument
         { init = Main.init
         , update = Main.update
         , view = Main.view
         }
-        |> TestContext.withSimulatedEffects simulateEffects
-        |> TestContext.withSimulatedSubscriptions simulateSub
-        |> TestContext.start ()
+        |> ProgramTest.withSimulatedEffects simulateEffects
+        |> ProgramTest.withSimulatedSubscriptions simulateSub
+        |> ProgramTest.start ()
 ```
 
 

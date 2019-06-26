@@ -69,22 +69,22 @@ Here's what that test will look like in code:
 
 ```elm
 import Expect
+import ProgramTest
 import Test exposing (test)
-import TestContext
 
 test "controlling a light" <|
     \() ->
         start
-            |> TestContext.simulateHttpOk
+            |> ProgramTest.simulateHttpOk
                 "GET"
                 "http://localhost:8003/lighting_service/v1/devices"
                 """[{"id":"K001", "name":"Kitchen", "dimmable":false, "value":0}]"""
-            |> TestContext.clickButton "Turn on"
-            |> TestContext.assertHttpRequest
+            |> ProgramTest.clickButton "Turn on"
+            |> ProgramTest.assertHttpRequest
                 "POST"
                 "http://localhost:8003/lighting_service/v1/devices/K001"
                 (.body >> Expect.equal """{"value":1}""")
-            |> TestContext.done
+            |> ProgramTest.done
 ```
 
 However, running this test produces the following failure:
@@ -94,22 +94,22 @@ However, running this test produces the following failure:
 ✗ controlling a light
 
     TEST SETUP ERROR: In order to use simulateHttpResponse,
-    you MUST use TestContext.withSimulatedEffects before calling TestContext.start
+    you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start
 
 
 TEST RUN FAILED
 ```
 
-As the error explains, we must use `TestContext.withSimulatedEffects`
+As the error explains, we must use `ProgramTest.withSimulatedEffects`
 before the test will work.
-But using it requires us to provide a function of type `effect -> TestContext.SimulatedEffect`.
+But using it requires us to provide a function of type `effect -> ProgramTest.SimulatedEffect`.
 Because the effect type of our program
 (the type that `init` and `update` return as the second item in the tuple)
 is currently `Cmd Msg` (which Elm does not currently allow us to inspect the values of),
 we'll need to do the following before the test will work:
 
 1. Make a new type which can represent all the effects our program can produce.
-1. Implement the required `effect -> TestContext.SimulatedEffect` function.
+1. Implement the required `effect -> ProgramTest.SimulatedEffect` function.
 1. Use `withSimulatedEffects` to set up the test.
 1. ✅ Watch the test pass! 
 
@@ -230,7 +230,7 @@ that can convert our new `Effect` type into simulated effects that
 import SimulatedEffect.Cmd
 import SimulatedEffect.Http
 
-simulateEffects : Main.Effect -> TestContext.SimulatedEffect Main.Msg
+simulateEffects : Main.Effect -> ProgramTest.SimulatedEffect Main.Msg
 simulateEffects effect =
     case effect of
         Main.NoEffect ->
@@ -258,15 +258,15 @@ One last step!  Now that we have a function of the required type,
 we can use it to enable effect simulation in our tests:
 
 ```elm{8}
-start : TestContext Main.Msg Main.Model Main.Effect
+start : ProgramTest Main.Msg Main.Model Main.Effect
 start =
-    TestContext.createDocument
+    ProgramTest.createDocument
         { init = Main.init
         , update = Main.update
         , view = Main.view
         }
-        |> TestContext.withSimulatedEffects simulateEffects
-        |> TestContext.start ()
+        |> ProgramTest.withSimulatedEffects simulateEffects
+        |> ProgramTest.start ()
 ```
 
 Now that we've enabled effects simulation, [our original test](#goal-the-ideal-test)
@@ -275,12 +275,12 @@ will successfully run!
 You may have noticed that the test itself never directly refers
 to the effect values (`GetDeviceList` and `ChangeLight`) that we defined.
 `elm-program-test` handles that for you &mdash;
-when a `TestContext` receives an effect from your `init` or `update` functions,
+when a `ProgramTest` receives an effect from your `init` or `update` functions,
 it will use the `simulateEffects` function we provided to understand what the effect means
 and update the state of the test accordingly.
 You don't need to worry about the details of how this works &mdash;
 just know that as long as you provide a `simulateEffects` function
-you'll be able to use the full API provided by `TestContext` for testing HTTP requests.
+you'll be able to use the full API provided by `ProgramTest` for testing HTTP requests.
 
 
 ## Try it out

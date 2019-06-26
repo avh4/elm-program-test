@@ -3,11 +3,11 @@ module Test.HttpTests exposing (all)
 import Expect
 import Json.Decode
 import Json.Encode
+import ProgramTest
 import SimulatedEffect.Http as Http
 import Test exposing (..)
 import Test.Expect exposing (expectFailure)
 import Test.Http
-import TestContext
 import TestingProgram exposing (Msg(..))
 
 
@@ -31,10 +31,10 @@ all =
                         , tracker = Nothing
                         }
                     )
-                    |> TestContext.assertHttpRequest "GET"
+                    |> ProgramTest.assertHttpRequest "GET"
                         "https://example.com/ok"
                         (Test.Http.hasHeader "Content-Type" "application/json")
-                    |> TestContext.done
+                    |> ProgramTest.done
                     |> expectFailure
                         [ "assertHttpRequest:"
                         , "Expected HTTP header Content-Type: application/json"
@@ -55,11 +55,11 @@ all =
                         , expect = Http.expectWhatever (Debug.toString >> Log)
                         }
                     )
-                    |> TestContext.assertHttpRequest "POST"
+                    |> ProgramTest.assertHttpRequest "POST"
                         "https://example.com/ok"
                         (Test.Http.expectJsonBody
                             (Json.Decode.field "a" Json.Decode.int)
                             (Expect.equal 8)
                         )
-                    |> TestContext.done
+                    |> ProgramTest.done
         ]

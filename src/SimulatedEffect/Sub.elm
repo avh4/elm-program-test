@@ -6,7 +6,7 @@ module SimulatedEffect.Sub exposing
 {-| This module parallels [elm/core's `Platform.Sub` module](https://package.elm-lang.org/packages/elm/core/1.0.2/Platform-Sub).
 
 The functions here produce `SimulatedSub`s instead of `Sub`s, which are meant to be used
-to help you implement the function to provide when using [`TestContext.withSimulatedSubscriptions`](TestContext#withSimulatedSubscriptions).
+to help you implement the function to provide when using [`ProgramTest.withSimulatedSubscriptions`](ProgramTest#withSimulatedSubscriptions).
 
 @docs none, batch
 

@@ -2,21 +2,21 @@ module HomeAutomationExampleTest exposing (all)
 
 import Expect
 import HomeAutomationExample as Main
+import ProgramTest exposing (ProgramTest)
 import SimulatedEffect.Cmd
 import SimulatedEffect.Http
 import Test exposing (..)
-import TestContext exposing (TestContext)
 
 
-start : TestContext Main.Msg Main.Model Main.Effect
+start : ProgramTest Main.Msg Main.Model Main.Effect
 start =
-    TestContext.createDocument
+    ProgramTest.createDocument
         { init = Main.init
         , update = Main.update
         , view = Main.view
         }
-        |> TestContext.withSimulatedEffects simulateEffects
-        |> TestContext.start ()
+        |> ProgramTest.withSimulatedEffects simulateEffects
+        |> ProgramTest.start ()
 
 
 all : Test
@@ -25,20 +25,20 @@ all =
         [ test "controlling a light" <|
             \() ->
                 start
-                    |> TestContext.simulateHttpOk
+                    |> ProgramTest.simulateHttpOk
                         "GET"
                         "http://localhost:8003/lighting_service/v1/devices"
                         """[{"id":"K001", "name":"Kitchen", "dimmable":false, "value":0}]"""
-                    |> TestContext.clickButton "Turn on"
-                    |> TestContext.assertHttpRequest
+                    |> ProgramTest.clickButton "Turn on"
+                    |> ProgramTest.assertHttpRequest
                         "POST"
                         "http://localhost:8003/lighting_service/v1/devices/K001"
                         (.body >> Expect.equal """{"value":1}""")
-                    |> TestContext.done
+                    |> ProgramTest.done
         ]
 
 
-simulateEffects : Main.Effect -> TestContext.SimulatedEffect Main.Msg
+simulateEffects : Main.Effect -> ProgramTest.SimulatedEffect Main.Msg
 simulateEffects effect =
     case effect of
         Main.NoEffect ->

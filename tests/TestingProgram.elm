@@ -1,44 +1,44 @@
-module TestingProgram exposing (Model, Msg(..), TestContext, application, startEffects, startView, update)
+module TestingProgram exposing (Model, Msg(..), ProgramTest, application, startEffects, startView, update)
 
 {-| This is a generic program for use in tests for many elm-program-test modules.
 -}
 
 import Html exposing (Html)
+import ProgramTest exposing (SimulatedEffect)
 import SimulatedEffect.Cmd
-import TestContext exposing (SimulatedEffect)
 import Url
 
 
-type alias TestContext =
-    TestContext.TestContext Msg Model (SimulatedEffect Msg)
+type alias ProgramTest =
+    ProgramTest.ProgramTest Msg Model (SimulatedEffect Msg)
 
 
-startEffects : SimulatedEffect Msg -> TestContext
+startEffects : SimulatedEffect Msg -> ProgramTest
 startEffects initialEffect =
     start initialEffect (Html.text "")
 
 
-startView : Html Msg -> TestContext
+startView : Html Msg -> ProgramTest
 startView =
     start SimulatedEffect.Cmd.none
 
 
-start : SimulatedEffect Msg -> Html Msg -> TestContext
+start : SimulatedEffect Msg -> Html Msg -> ProgramTest
 start initialEffect html =
-    TestContext.createElement
+    ProgramTest.createElement
         { init = \() -> ( [], initialEffect )
         , update = update
         , view = \_ -> Html.node "body" [] [ html ]
         }
-        |> TestContext.withSimulatedEffects identity
-        |> TestContext.start ()
+        |> ProgramTest.withSimulatedEffects identity
+        |> ProgramTest.start ()
 
 
-application : SimulatedEffect Msg -> TestContext
+application : SimulatedEffect Msg -> ProgramTest
 application initialEffects =
-    TestContext.createApplication
+    ProgramTest.createApplication
         { onUrlChange = \location -> Log (Url.toString location)
-        , onUrlRequest = \_ -> Debug.todo "TestContextTests-2:onUrlRequest"
+        , onUrlRequest = \_ -> Debug.todo "ProgramTestTests-2:onUrlRequest"
         , init = \() location key -> ( [], initialEffects )
         , update = update
         , view =
@@ -47,9 +47,9 @@ application initialEffects =
                 , body = []
                 }
         }
-        |> TestContext.withSimulatedEffects identity
-        |> TestContext.withBaseUrl "https://example.com/path"
-        |> TestContext.start ()
+        |> ProgramTest.withSimulatedEffects identity
+        |> ProgramTest.withBaseUrl "https://example.com/path"
+        |> ProgramTest.start ()
 
 
 type alias Model =

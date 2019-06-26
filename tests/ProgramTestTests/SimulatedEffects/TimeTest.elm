@@ -1,15 +1,15 @@
-module TestContextTests.SimulatedEffects.TimeTest exposing (all)
+module ProgramTestTests.SimulatedEffects.TimeTest exposing (all)
 
 import Expect
+import ProgramTest exposing (ProgramTest, SimulatedEffect, SimulatedTask)
 import SimulatedEffect.Cmd
 import SimulatedEffect.Process as Process
 import SimulatedEffect.Task as Task
 import Test exposing (..)
-import TestContext exposing (SimulatedEffect, SimulatedTask, TestContext)
 import TestingProgram exposing (Msg(..))
 
 
-startTasks : List (SimulatedTask x a) -> TestingProgram.TestContext
+startTasks : List (SimulatedTask x a) -> TestingProgram.ProgramTest
 startTasks initialTasks =
     TestingProgram.startEffects
         (SimulatedEffect.Cmd.batch
@@ -31,22 +31,22 @@ all =
         [ test "simulates Process.sleep" <|
             \() ->
                 startTasks [ Process.sleep 700 ]
-                    |> TestContext.advanceTime 700
-                    |> TestContext.expectModel (Expect.equal [ "Ok ()" ])
+                    |> ProgramTest.advanceTime 700
+                    |> ProgramTest.expectModel (Expect.equal [ "Ok ()" ])
         , test "sleep does not trigger until the delay has passed" <|
             \() ->
                 startTasks [ Process.sleep 700 ]
-                    |> TestContext.advanceTime 699
-                    |> TestContext.update (Log "*")
-                    |> TestContext.advanceTime 1
-                    |> TestContext.expectModel (Expect.equal [ "*", "Ok ()" ])
+                    |> ProgramTest.advanceTime 699
+                    |> ProgramTest.update (Log "*")
+                    |> ProgramTest.advanceTime 1
+                    |> ProgramTest.expectModel (Expect.equal [ "*", "Ok ()" ])
         , test "can chain multiple sleeps" <|
             \() ->
                 startTasks [ Process.sleep 250 |> Task.andThen (\() -> Process.sleep 25) ]
-                    |> TestContext.advanceTime 274
-                    |> TestContext.update (Log "*")
-                    |> TestContext.advanceTime 1
-                    |> TestContext.expectModel (Expect.equal [ "*", "Ok ()" ])
+                    |> ProgramTest.advanceTime 274
+                    |> ProgramTest.update (Log "*")
+                    |> ProgramTest.advanceTime 1
+                    |> ProgramTest.expectModel (Expect.equal [ "*", "Ok ()" ])
         , test "resolves sleeps in chronological order" <|
             \() ->
                 startTasks
@@ -54,20 +54,20 @@ all =
                     , Task.map (\() -> 900) (Process.sleep 900)
                     , Task.map (\() -> 33) (Process.sleep 33)
                     ]
-                    |> TestContext.advanceTime 1000
-                    |> TestContext.expectModel (Expect.equal [ "Ok 10", "Ok 33", "Ok 900" ])
+                    |> ProgramTest.advanceTime 1000
+                    |> ProgramTest.expectModel (Expect.equal [ "Ok 10", "Ok 33", "Ok 900" ])
         , test "non-future events are immediately triggered" <|
             \() ->
                 startTasks [ Process.sleep 0 ]
-                    |> TestContext.expectModel (Expect.equal [ "Ok ()" ])
+                    |> ProgramTest.expectModel (Expect.equal [ "Ok ()" ])
         , test "sleeps queued after time has advanced are queued at the correct time" <|
             \() ->
                 startTasks []
-                    |> TestContext.advanceTime 100
-                    |> TestContext.update (Log "A")
-                    |> TestContext.update (produceTasks [ Process.sleep 10 ])
-                    |> TestContext.advanceTime 9
-                    |> TestContext.update (Log "B")
-                    |> TestContext.advanceTime 1
-                    |> TestContext.expectModel (Expect.equal [ "A", "B", "Ok ()" ])
+                    |> ProgramTest.advanceTime 100
+                    |> ProgramTest.update (Log "A")
+                    |> ProgramTest.update (produceTasks [ Process.sleep 10 ])
+                    |> ProgramTest.advanceTime 9
+                    |> ProgramTest.update (Log "B")
+                    |> ProgramTest.advanceTime 1
+                    |> ProgramTest.expectModel (Expect.equal [ "A", "B", "Ok ()" ])
         ]

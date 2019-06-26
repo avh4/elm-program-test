@@ -4,23 +4,23 @@ import Expect
 import GrammarCheckingExample as Main
 import Json.Decode
 import Json.Encode
+import ProgramTest exposing (ProgramTest)
 import SimulatedEffect.Cmd
 import SimulatedEffect.Ports
 import Test exposing (..)
 import Test.Html.Selector exposing (text)
-import TestContext exposing (TestContext)
 
 
-start : TestContext Main.Msg Main.Model Main.Effect
+start : ProgramTest Main.Msg Main.Model Main.Effect
 start =
-    TestContext.createDocument
+    ProgramTest.createDocument
         { init = Main.init
         , update = Main.update
         , view = Main.view
         }
-        |> TestContext.withSimulatedEffects simulateEffects
-        |> TestContext.withSimulatedSubscriptions simulateSub
-        |> TestContext.start ()
+        |> ProgramTest.withSimulatedEffects simulateEffects
+        |> ProgramTest.withSimulatedSubscriptions simulateSub
+        |> ProgramTest.start ()
 
 
 all : Test
@@ -29,25 +29,25 @@ all =
         [ test "checking grammar" <|
             \() ->
                 start
-                    |> TestContext.fillIn "main"
+                    |> ProgramTest.fillIn "main"
                         "Enter text to check"
                         "The youngest man the boat."
-                    |> TestContext.clickButton "Check"
-                    |> TestContext.assertAndClearOutgoingPortValues
+                    |> ProgramTest.clickButton "Check"
+                    |> ProgramTest.assertAndClearOutgoingPortValues
                         "checkGrammar"
                         Json.Decode.string
                         (Expect.equal [ "The youngest man the boat." ])
-                    |> TestContext.simulateIncomingPort
+                    |> ProgramTest.simulateIncomingPort
                         "grammarCheckResults"
                         (Json.Encode.list Json.Encode.string
                             [ "Garden-path sentences can confuse the reader." ]
                         )
-                    |> TestContext.expectViewHas
+                    |> ProgramTest.expectViewHas
                         [ text "Garden-path sentences can confuse the reader." ]
         ]
 
 
-simulateEffects : Main.Effect -> TestContext.SimulatedEffect Main.Msg
+simulateEffects : Main.Effect -> ProgramTest.SimulatedEffect Main.Msg
 simulateEffects effect =
     case effect of
         Main.NoEffect ->
@@ -57,7 +57,7 @@ simulateEffects effect =
             SimulatedEffect.Ports.send "checkGrammar" (Json.Encode.string text)
 
 
-simulateSub : Main.Model -> TestContext.SimulatedSub Main.Msg
+simulateSub : Main.Model -> ProgramTest.SimulatedSub Main.Msg
 simulateSub _ =
     SimulatedEffect.Ports.subscribe "grammarCheckResults"
         (Json.Decode.list Json.Decode.string)

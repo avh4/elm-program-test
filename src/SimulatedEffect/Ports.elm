@@ -4,8 +4,8 @@ module SimulatedEffect.Ports exposing (send, subscribe)
 that parallel [Elm ports](https://guide.elm-lang.org/interop/ports.html) used in your real program.
 This is meant to be used
 to help you implement the function to provide when using
-[`TestContext.withSimulatedEffects`](TestContext#withSimulatedEffects)
-and [`TestContext.withSimulatedSubscriptions`](TestContext#withSimulatedSubscriptions).
+[`ProgramTest.withSimulatedEffects`](ProgramTest#withSimulatedEffects)
+and [`ProgramTest.withSimulatedSubscriptions`](ProgramTest#withSimulatedSubscriptions).
 
 @docs send, subscribe
 
