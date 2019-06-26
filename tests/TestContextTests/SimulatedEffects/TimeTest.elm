@@ -1,7 +1,6 @@
 module TestContextTests.SimulatedEffects.TimeTest exposing (all)
 
 import Expect
-import Html
 import SimulatedEffect.Cmd
 import SimulatedEffect.Process as Process
 import SimulatedEffect.Task as Task
@@ -65,10 +64,10 @@ all =
             \() ->
                 startTasks []
                     |> TestContext.advanceTime 100
-                    |> TestContext.update (Log "*")
+                    |> TestContext.update (Log "A")
                     |> TestContext.update (produceTasks [ Process.sleep 10 ])
                     |> TestContext.advanceTime 9
-                    |> TestContext.update (Log "*")
+                    |> TestContext.update (Log "B")
                     |> TestContext.advanceTime 1
-                    |> TestContext.expectModel (Expect.equal [ "*", "*", "Ok ()" ])
+                    |> TestContext.expectModel (Expect.equal [ "A", "B", "Ok ()" ])
         ]

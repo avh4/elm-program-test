@@ -1,12 +1,17 @@
-module SimulatedEffect exposing (HttpRequest, SimulatedEffect(..), SimulatedTask(..))
+module SimulatedEffect exposing (HttpRequest, SimulatedEffect(..), SimulatedSub(..), SimulatedTask(..))
 
 import Http
+import Json.Decode
+import Json.Encode
 
 
 type SimulatedEffect msg
     = None
     | Batch (List (SimulatedEffect msg))
     | Task (SimulatedTask msg msg)
+    | PortEffect String Json.Encode.Value
+    | PushUrl String
+    | ReplaceUrl String
 
 
 type SimulatedTask x a
@@ -23,3 +28,9 @@ type alias HttpRequest x a =
     , headers : List ( String, String )
     , onRequestComplete : Http.Response String -> SimulatedTask x a
     }
+
+
+type SimulatedSub msg
+    = NoneSub
+    | BatchSub (List (SimulatedSub msg))
+    | PortSub String (Json.Decode.Decoder msg)

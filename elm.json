@@ -7,8 +7,11 @@
     "exposed-modules": [
         "TestContext",
         "SimulatedEffect.Cmd",
+        "SimulatedEffect.Sub",
         "SimulatedEffect.Http",
         "SimulatedEffect.Task",
+        "SimulatedEffect.Navigation",
+        "SimulatedEffect.Ports",
         "SimulatedEffect.Process",
         "Test.Http"
     ],

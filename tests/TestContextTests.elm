@@ -135,40 +135,6 @@ all =
                     |> TestContext.withBaseUrl "https://example.com/path"
                     |> TestContext.start ()
                     |> TestContext.expectModel (Expect.equal "<INIT:/path>")
-        , test "can simulate a route change" <|
-            \() ->
-                TestContext.createApplication
-                    { onUrlChange = .path
-                    , onUrlRequest = \_ -> Debug.todo "TestContextTests-2:onUrlRequest"
-                    , init = \() location key -> ( "<INIT:" ++ location.path ++ ">", NoOp )
-                    , update = testUpdate
-                    , view =
-                        \model ->
-                            { title = "page title"
-                            , body = [ testView model ]
-                            }
-                    }
-                    |> TestContext.withBaseUrl "https://example.com/path"
-                    |> TestContext.start ()
-                    |> TestContext.routeChange "https://example.com/new"
-                    |> TestContext.expectModel (Expect.equal "<INIT:/path>;/new")
-        , test "can simulate a route change with a relative URL" <|
-            \() ->
-                TestContext.createApplication
-                    { onUrlChange = .path
-                    , onUrlRequest = \_ -> Debug.todo "TestContextTests-3:onUrlRequest"
-                    , init = \() location key -> ( "<INIT:" ++ location.path ++ ">", NoOp )
-                    , update = testUpdate
-                    , view =
-                        \model ->
-                            { title = "page title"
-                            , body = [ testView model ]
-                            }
-                    }
-                    |> TestContext.withBaseUrl "https://example.com/path"
-                    |> TestContext.start ()
-                    |> TestContext.routeChange "/new"
-                    |> TestContext.expectModel (Expect.equal "<INIT:/path>;/new")
         , test "can create with navigation and flags" <|
             \() ->
                 TestContext.createApplication

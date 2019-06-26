@@ -4,6 +4,7 @@ module TestContext exposing
     , ProgramDefinition
     , withBaseUrl, withJsonStringFlags
     , withSimulatedEffects, SimulatedEffect, SimulatedTask
+    , withSimulatedSubscriptions, SimulatedSub
     , clickButton, clickLink
     , fillIn, fillInTextarea
     , check, selectOption
@@ -13,6 +14,7 @@ module TestContext exposing
     , assertHttpRequestWasMade, assertHttpRequest
     , simulateHttpOk, simulateHttpResponse
     , advanceTime
+    , assertAndClearOutgoingPortValues, simulateIncomingPort
     , update
     , simulateLastEffect
     , expectViewHas, expectView
@@ -32,10 +34,12 @@ and writing high-level tests helps you focus on the needs and behaviors of your 
 
 This module allows you to interact with your program by simulating
 DOM events (see ["Simulating user input"](#simulating-user-input)) and
-external events (see ["Simulating HTTP responses"](#simulating-http-responses) and ["Simulating time"](#simulating-time)).
+external events (see ["Simulating HTTP responses"](#simulating-http-responses),
+["Simulating time"](#simulating-time),
+and ["Simulating ports"](#simulating-ports)).
 
 After simulating a series of events, you can then check assertions about
-the currently rendered state of your program (see ["Final assertions"](#final-assertions).
+the currently rendered state of your program (see ["Final assertions"](#final-assertions)).
 
 
 # Creating
@@ -61,6 +65,7 @@ The following functions allow you to configure your
 @docs withBaseUrl, withJsonStringFlags
 
 @docs withSimulatedEffects, SimulatedEffect, SimulatedTask
+@docs withSimulatedSubscriptions, SimulatedSub
 
 
 # Simulating user input
@@ -89,6 +94,11 @@ The following functions allow you to configure your
 ## Simulating time
 
 @docs advanceTime
+
+
+## Simulating ports
+
+@docs assertAndClearOutgoingPortValues, simulateIncomingPort
 
 
 # Directly sending Msgs
@@ -134,7 +144,7 @@ import Json.Decode
 import Json.Encode
 import PairingHeap
 import Query.Extra
-import SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
+import SimulatedEffect exposing (SimulatedEffect, SimulatedSub, SimulatedTask)
 import Test.Html.Event
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector exposing (Selector)
@@ -156,7 +166,7 @@ and a log of any errors that have occurred while simulating interaction with the
 -}
 type TestContext msg model effect
     = Active
-        { program : TestProgram msg model effect
+        { program : TestProgram msg model effect (SimulatedSub msg)
         , currentModel : model
         , lastEffect : effect
         , currentLocation : Maybe Url
@@ -165,10 +175,11 @@ type TestContext msg model effect
     | Finished Failure
 
 
-type alias TestProgram msg model effect =
+type alias TestProgram msg model effect sub =
     { update : msg -> model -> ( model, effect )
     , view : model -> Query.Single msg
     , onRouteChange : Url -> Maybe msg
+    , subscriptions : Maybe (model -> sub)
     }
 
 
@@ -194,7 +205,7 @@ createHelper :
     , view : model -> Html msg
     , onRouteChange : Url -> Maybe msg
     }
-    -> ProgramOptions msg effect
+    -> ProgramOptions msg model effect
     -> TestContext msg model effect
 createHelper program options =
     let
@@ -202,6 +213,7 @@ createHelper program options =
             { update = program.update
             , view = program.view >> Query.fromHtml
             , onRouteChange = program.onRouteChange
+            , subscriptions = options.subscriptions
             }
 
         ( newModel, newEffect ) =
@@ -244,25 +256,29 @@ createSandbox program =
 Use [`start`](#start) to start the program being tested.
 -}
 type ProgramDefinition flags msg model effect
-    = ProgramDefinition (ProgramOptions msg effect) (Maybe Url -> flags -> ProgramOptions msg effect -> TestContext msg model effect)
+    = ProgramDefinition (ProgramOptions msg model effect) (Maybe Url -> flags -> ProgramOptions msg model effect -> TestContext msg model effect)
 
 
-type alias ProgramOptions msg effect =
+type alias ProgramOptions msg model effect =
     { baseUrl : Maybe Url
     , deconstructEffect : Maybe (effect -> SimulatedEffect msg)
+    , subscriptions : Maybe (model -> SimulatedSub msg)
     }
 
 
-emptyOptions : ProgramOptions msg effect
+emptyOptions : ProgramOptions msg model effect
 emptyOptions =
     { baseUrl = Nothing
     , deconstructEffect = Nothing
+    , subscriptions = Nothing
     }
 
 
 {-| Creates a `TestContext` from the parts of a `Browser.element` program.
 
 See other `create*` functions below if the program you want to test does not use `Browser.element`.
+
+If your program has subscriptions that you want to simulate, see [`withSimulatedSubscriptions`](#withSimulatedSubscriptions).
 
 -}
 createElement :
@@ -302,7 +318,7 @@ to simulate a user clicking a link with relative URL.
 -}
 withBaseUrl : String -> ProgramDefinition flags msg model effect -> ProgramDefinition flags msg model effect
 withBaseUrl baseUrl (ProgramDefinition options program) =
-    case Url.Extra.locationFromString baseUrl of
+    case Url.fromString baseUrl of
         Nothing ->
             ProgramDefinition options (\_ _ _ -> Finished (InvalidLocationUrl "startWithBaseUrl" baseUrl))
 
@@ -348,9 +364,31 @@ withSimulatedEffects fn (ProgramDefinition options program) =
     ProgramDefinition { options | deconstructEffect = Just fn } program
 
 
+{-| This allows you to provide a function that lets `TestContext` simulate subscriptions that would be `Sub`s
+when your app runs in production
+(this enables you to use [`simulateIncomingPort`](#simulateIncomingPort), etc.).
+
+You only need to use this if you need to simulate subscriptions in your test.
+
+The function you provide should be similar to your program's `subscriptions` function
+but return `SimulatedSub`s instead of `Sub`s.
+See the `SimulatedEffect.*` modules in this package for functions that you can use to implement
+the required `model -> SimulatedSub msg` function.
+
+-}
+withSimulatedSubscriptions :
+    (model -> SimulatedSub msg)
+    -> ProgramDefinition flags msg model effect
+    -> ProgramDefinition flags msg model effect
+withSimulatedSubscriptions fn (ProgramDefinition options program) =
+    ProgramDefinition { options | subscriptions = Just fn } program
+
+
 {-| Creates a `TestContext` from the parts of a `Browser.document` program.
 
-See other `create*` functions below if the program you want to test does not use `Browser.document`.
+See other `create*` functions if the program you want to test does not use `Browser.document`.
+
+If your program has subscriptions that you want to simulate, see [`withSimulatedSubscriptions`](#withSimulatedSubscriptions).
 
 -}
 createDocument :
@@ -372,7 +410,9 @@ createDocument program =
 
 {-| Creates a `TestContext` from the parts of a `Browser.application` program.
 
-See other `create*` functions below if the program you want to test does not use `Browser.application`.
+See other `create*` functions if the program you want to test does not use `Browser.application`.
+
+If your program has subscriptions that you want to simulate, see [`withSimulatedSubscriptions`](#withSimulatedSubscriptions).
 
 -}
 createApplication :
@@ -409,6 +449,9 @@ You can create `SimulatedEffect`s using the the following modules,
 which parallel the modules your real program would use to create `Cmd`s and `Task`s:
 
   - [`SimulatedEffect.Http`](SimulatedEffect-Http) (parallels `Http` from `elm/http`)
+  - [`SimulatedEffect.Cmd`](SimulatedEffect-Cmd) (parallels `Platform.Cmd` from `elm/core`)
+  - [`SimulatedEffect.Navigation`](SimulatedEffect-Navigation) (parallels `Browser.Navigation` from `elm/browser`)
+  - [`SimulatedEffect.Ports`](SimulatedEffect-Ports) (parallels the `port` keyword)
   - [`SimulatedEffect.Task`](SimulatedEffect-Task) (parallels `Task` from `elm/core`)
   - [`SimulatedEffect.Process`](SimulatedEffect-Process) (parallels `Process` from `elm/core`)
 
@@ -421,6 +464,22 @@ type alias SimulatedEffect msg =
 -}
 type alias SimulatedTask x a =
     SimulatedEffect.SimulatedTask x a
+
+
+{-| This represents a subscription that elm-program-test is able to simulate.
+When using [`withSimulatedSubscriptions`](#withSimulatedSubscriptions) you will provide
+a function that is similar to your program's `subscriptions` function but that
+returns `SimulatedSub`s instead `Sub`s.
+(If you do not use `withSimulatedSubscriptions`,
+then `TestContext` will not simulate any subscriptions for you.)
+
+You can create `SimulatedSub`s using the the following modules:
+
+  - [`SimulatedEffect.Ports`](SimulatedEffect-Ports) (parallels the `port` keyword)
+
+-}
+type alias SimulatedSub msg =
+    SimulatedEffect.SimulatedSub msg
 
 
 {-| Advances the state of the `TestContext` by applying the given `msg` to your program's update function
@@ -751,7 +810,7 @@ followLink functionDescription href testContext =
                     Finished (ChangedPage functionDescription (Url.Extra.resolve location href))
 
                 Nothing ->
-                    case Url.Extra.locationFromString href of
+                    case Url.fromString href of
                         Nothing ->
                             Finished (NoBaseUrl "clickLink" href)
 
@@ -1022,8 +1081,66 @@ withSimulation f testContext =
 
 
 queueEffect : effect -> TestContext msg model effect -> TestContext msg model effect
-queueEffect effect =
-    withSimulation (EffectSimulation.queueEffect effect)
+queueEffect effect testContext =
+    case testContext of
+        Finished _ ->
+            testContext
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    testContext
+
+                Just simulation ->
+                    queueSimulatedEffect (simulation.deconstructEffect effect) testContext
+
+
+queueSimulatedEffect : SimulatedEffect msg -> TestContext msg model effect -> TestContext msg model effect
+queueSimulatedEffect effect testContext =
+    case testContext of
+        Finished _ ->
+            testContext
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    testContext
+
+                Just simulation ->
+                    case effect of
+                        SimulatedEffect.None ->
+                            testContext
+
+                        SimulatedEffect.Batch effects ->
+                            List.foldl queueSimulatedEffect testContext effects
+
+                        SimulatedEffect.Task t ->
+                            Active
+                                { state
+                                    | effectSimulation =
+                                        Just (EffectSimulation.queueTask t simulation)
+                                }
+
+                        SimulatedEffect.PortEffect portName value ->
+                            Active
+                                { state
+                                    | effectSimulation =
+                                        Just
+                                            { simulation
+                                                | outgoingPortValues =
+                                                    Dict.update portName
+                                                        (Maybe.withDefault [] >> (::) value >> Just)
+                                                        simulation.outgoingPortValues
+                                            }
+                                }
+
+                        SimulatedEffect.PushUrl url ->
+                            testContext
+                                |> routeChange url
+
+                        SimulatedEffect.ReplaceUrl url ->
+                            testContext
+                                |> routeChange url
 
 
 drain : TestContext msg model effect -> TestContext msg model effect
@@ -1247,11 +1364,11 @@ advanceTime delta testContext =
                     Finished (EffectSimulationNotConfigured "advanceTime")
 
                 Just simulation ->
-                    advanceTo (simulation.state.nowMs + delta) testContext
+                    advanceTo "advanceTime" (simulation.state.nowMs + delta) testContext
 
 
-advanceTo : Int -> TestContext msg model effect -> TestContext msg model effect
-advanceTo end testContext =
+advanceTo : String -> Int -> TestContext msg model effect -> TestContext msg model effect
+advanceTo functionName end testContext =
     case testContext of
         Finished err ->
             Finished err
@@ -1259,7 +1376,7 @@ advanceTo end testContext =
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished (EffectSimulationNotConfigured "advanceTo")
+                    Finished (EffectSimulationNotConfigured functionName)
 
                 Just simulation ->
                     let
@@ -1292,10 +1409,9 @@ advanceTo end testContext =
                                                         }
                                                 }
                                     }
-                                    |> withSimulation
-                                        (EffectSimulation.queueTask (task ()))
+                                    |> withSimulation (EffectSimulation.queueTask (task ()))
                                     |> drain
-                                    |> advanceTo end
+                                    |> advanceTo functionName end
 
                             else
                                 -- next task is further in the future than we are advancing
@@ -1307,6 +1423,153 @@ advanceTo end testContext =
                                                     | state = { ss | nowMs = end }
                                                 }
                                     }
+
+
+{-| Lets you assert on the values that have been sent to an outgoing port.
+
+The parameters are:
+
+1.  The name of the port
+2.  A JSON decoder corresponding to the type of the port
+3.  A function that will receive the list of values sent to the port
+    since the last use of `assertAndClearOutgoingPortValues` (or since the start of the test)
+    and returns an `Expectation`
+
+For example:
+
+    ...
+        |> assertAndClearOutgoingPortValues
+            "saveApiTokenToLocalStorage"
+            Json.Decode.string
+            (Expect.equal [ "975774a26612", "920facb1bac0" ])
+        |> ...
+
+NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
+
+-}
+assertAndClearOutgoingPortValues : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
+assertAndClearOutgoingPortValues portName decoder checkValues testContext =
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    Finished (EffectSimulationNotConfigured "assertAndClearOutgoingPortValues")
+
+                Just simulation ->
+                    case allOk <| List.map (Json.Decode.decodeValue decoder) <| EffectSimulation.outgoingPortValues portName simulation of
+                        Err errs ->
+                            Finished (CustomFailure "assertAndClearOutgoingPortValues: failed to decode port values" (List.map Json.Decode.errorToString errs |> String.join "\n"))
+
+                        Ok values ->
+                            case Test.Runner.getFailureReason (checkValues values) of
+                                Nothing ->
+                                    -- the check passed
+                                    Active
+                                        { state
+                                            | effectSimulation =
+                                                Just (EffectSimulation.clearOutgoingPortValues portName simulation)
+                                        }
+
+                                Just reason ->
+                                    Finished
+                                        (ExpectFailed ("assertAndClearOutgoingPortValues: values sent to port \"" ++ portName ++ "\" did not match")
+                                            reason.description
+                                            reason.reason
+                                        )
+
+
+allOk : List (Result x a) -> Result (List x) (List a)
+allOk results =
+    let
+        step next acc =
+            case ( next, acc ) of
+                ( Ok n, Ok a ) ->
+                    Ok (n :: a)
+
+                ( Ok _, Err x ) ->
+                    Err x
+
+                ( Err n, Ok _ ) ->
+                    Err [ n ]
+
+                ( Err n, Err x ) ->
+                    Err (n :: x)
+    in
+    List.foldl step (Ok []) results
+        |> Result.map List.reverse
+        |> Result.mapError List.reverse
+
+
+{-| Lets you simulate a value being received on an incoming port.
+
+The parameters are:
+
+1.  The name of the port
+2.  The JSON representation of the incoming value
+
+NOTE: You must use [`withSimulatedSubscriptions`](#withSimulatedSubscriptions) before you call [`start`](#start) to be able to use this function.
+
+-}
+simulateIncomingPort : String -> Json.Encode.Value -> TestContext msg model effect -> TestContext msg model effect
+simulateIncomingPort portName value testContext =
+    let
+        fail_ =
+            fail ("simulateIncomingPort \"" ++ portName ++ "\"")
+    in
+    case testContext of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            case state.program.subscriptions of
+                Nothing ->
+                    testContext
+                        |> fail_ "you MUST use TestContext.withSimulatedSubscriptions to be able to use simulateIncomingPort"
+
+                Just fn ->
+                    let
+                        matches =
+                            match (fn state.currentModel)
+
+                        match sub =
+                            case sub of
+                                SimulatedEffect.NoneSub ->
+                                    []
+
+                                SimulatedEffect.BatchSub subs_ ->
+                                    List.concatMap match subs_
+
+                                SimulatedEffect.PortSub pname decoder ->
+                                    if pname == portName then
+                                        Json.Decode.decodeValue decoder value
+                                            |> Result.mapError Json.Decode.errorToString
+                                            |> List.singleton
+
+                                    else
+                                        []
+
+                        step r tc =
+                            case r of
+                                Err message ->
+                                    tc
+                                        |> fail_
+                                            ("the value provided does not match the type that the port is expecting:\n"
+                                                ++ message
+                                            )
+
+                                Ok msg ->
+                                    update msg tc
+                    in
+                    if matches == [] then
+                        testContext
+                            |> fail_
+                                "the program is not currently subscribed to the port"
+
+                    else
+                        List.foldl step testContext matches
 
 
 replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect
