@@ -14,7 +14,7 @@ module TestContext exposing
     , assertHttpRequestWasMade, assertHttpRequest
     , simulateHttpOk, simulateHttpResponse
     , advanceTime
-    , checkAndClearOutgoingPort, simulateIncomingPort
+    , assertAndClearOutgoingPortValues, simulateIncomingPort
     , update
     , simulateLastEffect
     , expectViewHas, expectView
@@ -98,7 +98,7 @@ The following functions allow you to configure your
 
 ## Simulating ports
 
-@docs checkAndClearOutgoingPort, simulateIncomingPort
+@docs assertAndClearOutgoingPortValues, simulateIncomingPort
 
 
 # Directly sending Msgs
@@ -1432,13 +1432,13 @@ The parameters are:
 1.  The name of the port
 2.  A JSON decoder corresponding to the type of the port
 3.  A function that will receive the list of values sent to the port
-    since the last use of `checkAndClearOutgoingPort` (or since the start of the test)
+    since the last use of `assertAndClearOutgoingPortValues` (or since the start of the test)
     and returns an `Expectation`
 
 For example:
 
     ...
-        |> checkAndClearOutgoingPort
+        |> assertAndClearOutgoingPortValues
             "saveApiTokenToLocalStorage"
             Json.Decode.string
             (Expect.equal [ "975774a26612", "920facb1bac0" ])
@@ -1447,8 +1447,8 @@ For example:
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-checkAndClearOutgoingPort : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
-checkAndClearOutgoingPort portName decoder checkValues testContext =
+assertAndClearOutgoingPortValues : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
+assertAndClearOutgoingPortValues portName decoder checkValues testContext =
     case testContext of
         Finished err ->
             Finished err
@@ -1456,12 +1456,12 @@ checkAndClearOutgoingPort portName decoder checkValues testContext =
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished (EffectSimulationNotConfigured "checkAndClearOutgoingPort")
+                    Finished (EffectSimulationNotConfigured "assertAndClearOutgoingPortValues")
 
                 Just simulation ->
                     case allOk <| List.map (Json.Decode.decodeValue decoder) <| EffectSimulation.outgoingPortValues portName simulation of
                         Err errs ->
-                            Finished (CustomFailure "checkAndClearOutgoingPort: failed to decode port values" (List.map Json.Decode.errorToString errs |> String.join "\n"))
+                            Finished (CustomFailure "assertAndClearOutgoingPortValues: failed to decode port values" (List.map Json.Decode.errorToString errs |> String.join "\n"))
 
                         Ok values ->
                             case Test.Runner.getFailureReason (checkValues values) of
@@ -1475,7 +1475,7 @@ checkAndClearOutgoingPort portName decoder checkValues testContext =
 
                                 Just reason ->
                                     Finished
-                                        (ExpectFailed ("checkAndClearOutgoingPort: values sent to port \"" ++ portName ++ "\" did not match")
+                                        (ExpectFailed ("assertAndClearOutgoingPortValues: values sent to port \"" ++ portName ++ "\" did not match")
                                             reason.description
                                             reason.reason
                                         )

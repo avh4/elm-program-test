@@ -24,15 +24,15 @@ all =
             [ test "can check sent values" <|
                 \() ->
                     start (SimulatedEffect.Ports.send "unit" Json.null)
-                        |> TestContext.checkAndClearOutgoingPort "unit" (Decode.null ()) (Expect.equal [ () ])
+                        |> TestContext.assertAndClearOutgoingPortValues "unit" (Decode.null ()) (Expect.equal [ () ])
                         |> TestContext.done
             , test "gives error if checked values don't match" <|
                 \() ->
                     start (SimulatedEffect.Ports.send "unit" Json.null)
-                        |> TestContext.checkAndClearOutgoingPort "other" (Decode.null ()) (Expect.equal [ () ])
+                        |> TestContext.assertAndClearOutgoingPortValues "other" (Decode.null ()) (Expect.equal [ () ])
                         |> TestContext.done
                         |> expectFailure
-                            [ "checkAndClearOutgoingPort: values sent to port \"other\" did not match:"
+                            [ "assertAndClearOutgoingPortValues: values sent to port \"other\" did not match:"
                             , "[]"
                             , "╵"
                             , "│ Expect.equal"
@@ -42,22 +42,22 @@ all =
             , test "clears values after checking" <|
                 \() ->
                     start (SimulatedEffect.Ports.send "unit" Json.null)
-                        |> TestContext.checkAndClearOutgoingPort "unit" (Decode.null ()) (Expect.equal [ () ])
-                        |> TestContext.checkAndClearOutgoingPort "unit" (Decode.null ()) (Expect.equal [])
+                        |> TestContext.assertAndClearOutgoingPortValues "unit" (Decode.null ()) (Expect.equal [ () ])
+                        |> TestContext.assertAndClearOutgoingPortValues "unit" (Decode.null ()) (Expect.equal [])
                         |> TestContext.done
             , test "records values in correct order" <|
                 \() ->
                     start (SimulatedEffect.Ports.send "int" (Json.int 5))
                         |> TestContext.update (ProduceEffects (SimulatedEffect.Ports.send "int" (Json.int 7)))
-                        |> TestContext.checkAndClearOutgoingPort "int" Decode.int (Expect.equal [ 5, 7 ])
+                        |> TestContext.assertAndClearOutgoingPortValues "int" Decode.int (Expect.equal [ 5, 7 ])
                         |> TestContext.done
             , test "shows useful error when decoding fails" <|
                 \() ->
                     start (SimulatedEffect.Ports.send "int" (Json.int 5))
-                        |> TestContext.checkAndClearOutgoingPort "int" Decode.string (Expect.equal [])
+                        |> TestContext.assertAndClearOutgoingPortValues "int" Decode.string (Expect.equal [])
                         |> TestContext.done
                         |> expectFailure
-                            [ "checkAndClearOutgoingPort: failed to decode port values: Problem with the given value:"
+                            [ "assertAndClearOutgoingPortValues: failed to decode port values: Problem with the given value:"
                             , ""
                             , "5"
                             , ""

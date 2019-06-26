@@ -52,7 +52,7 @@ test "checking grammar" <|
                 "Enter text to check"
                 "The youngest man the boat."
             |> TestContext.clickButton "Check"
-            |> TestContext.checkAndClearOutgoingPort
+            |> TestContext.assertAndClearOutgoingPortValues
                 "checkGrammar"
                 Json.Decode.string
                 (Expect.equal [ "The youngest man the boat." ])
