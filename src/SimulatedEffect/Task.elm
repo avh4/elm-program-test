@@ -10,7 +10,7 @@ PRs are welcome to add any functions that are missing.
 
 The functions here produce `SimulatedTasks`s instead of `Tasks`s
 and `SimulatedEffect`s instead of `Cmd`s, which are meant to be used
-to help you implement the function to provide when using [`TestContext.withSimulatedEffects`](TestContext#withSimulatedEffects).
+to help you implement the function to provide when using [`ProgramTest.withSimulatedEffects`](ProgramTest#withSimulatedEffects).
 
 
 # Tasks

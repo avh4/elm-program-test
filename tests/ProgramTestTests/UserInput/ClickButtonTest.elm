@@ -1,12 +1,12 @@
-module TestContextTests.UserInput.ClickButtonTest exposing (all)
+module ProgramTestTests.UserInput.ClickButtonTest exposing (all)
 
 import Expect exposing (Expectation)
 import Html
 import Html.Attributes
 import Html.Events exposing (onClick)
+import ProgramTest exposing (ProgramTest)
 import Test exposing (..)
 import Test.Expect exposing (expectFailure)
-import TestContext exposing (TestContext)
 import TestingProgram exposing (Msg(..))
 
 
@@ -20,8 +20,8 @@ all =
                         [ onClick (Log "CLICK") ]
                         [ Html.text "Click Me" ]
                     )
-                    |> TestContext.clickButton "Click Me"
-                    |> TestContext.expectModel (Expect.equal [ "CLICK" ])
+                    |> ProgramTest.clickButton "Click Me"
+                    |> ProgramTest.expectModel (Expect.equal [ "CLICK" ])
         , test "can click an elm-ui button" <|
             \() ->
                 TestingProgram.startView
@@ -31,8 +31,8 @@ all =
                         ]
                         [ Html.text "Click Me" ]
                     )
-                    |> TestContext.clickButton "Click Me"
-                    |> TestContext.expectModel (Expect.equal [ "CLICK" ])
+                    |> ProgramTest.clickButton "Click Me"
+                    |> ProgramTest.expectModel (Expect.equal [ "CLICK" ])
         , test "fails when clicking a disabled button" <|
             \() ->
                 TestingProgram.startView
@@ -42,8 +42,8 @@ all =
                         ]
                         [ Html.text "Click Me" ]
                     )
-                    |> TestContext.clickButton "Click Me"
-                    |> TestContext.done
+                    |> ProgramTest.clickButton "Click Me"
+                    |> ProgramTest.done
                     |> expectFailure
                         [ "clickButton \"Click Me\":"
                         , "▼ Query.fromHtml"

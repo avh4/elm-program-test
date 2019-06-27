@@ -1,5 +1,5 @@
-module TestContext exposing
-    ( TestContext, start
+module ProgramTest exposing
+    ( ProgramTest, start
     , createSandbox, createElement, createDocument, createApplication
     , ProgramDefinition
     , withBaseUrl, withJsonStringFlags
@@ -26,7 +26,7 @@ module TestContext exposing
     , fail, createFailed
     )
 
-{-| A `TestContext` simulates the execution of an Elm program
+{-| A `ProgramTest` simulates the execution of an Elm program
 enabling you write high-level tests for your program.
 (High-level tests are valuable in that they provide extremely robust test coverage
 in the case of drastic refactorings of your application architecture,
@@ -44,12 +44,12 @@ the currently rendered state of your program (see ["Final assertions"](#final-as
 
 # Creating
 
-@docs TestContext, start
+@docs ProgramTest, start
 
 
 ## Creating program definitions
 
-A `ProgramDefinition` (required to create a `TextContext` with [`start`](#start))
+A `ProgramDefinition` (required to create a `ProgramTest` with [`start`](#start))
 can be created with one of the following functions that parallel
 the functions in `elm/browser`'s `Browser` module.
 
@@ -116,12 +116,12 @@ The following functions allow you to configure your
 
 # Intermediate assertions
 
-These functions can be used to make assertions on a `TestContext` without ending the test.
+These functions can be used to make assertions on a `ProgramTest` without ending the test.
 
 @docs shouldHave, shouldNotHave, shouldHaveView
 @docs shouldHaveLastEffect
 
-To end a `TestContext` without using a [final assertion](#final-assertions), use the following function:
+To end a `ProgramTest` without using a [final assertion](#final-assertions), use the following function:
 
 @docs done
 
@@ -143,6 +143,7 @@ import Http
 import Json.Decode
 import Json.Encode
 import PairingHeap
+import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
 import Query.Extra
 import SimulatedEffect exposing (SimulatedEffect, SimulatedSub, SimulatedTask)
 import Test.Html.Event
@@ -151,20 +152,19 @@ import Test.Html.Selector as Selector exposing (Selector)
 import Test.Http
 import Test.Runner
 import Test.Runner.Failure
-import TestContext.EffectSimulation as EffectSimulation exposing (EffectSimulation)
 import Url exposing (Url)
 import Url.Extra
 
 
-{-| A `TestContext` represents an Elm program, a current state for that program,
+{-| A `ProgramTest` represents an Elm program, a current state for that program,
 and a log of any errors that have occurred while simulating interaction with the program.
 
-  - To create a `TestContext`, see the `create*` functions below.
-  - To advance the state of a `TestContext`, see [Simulating user input](#simulating-user-input), and [Directly sending Msgs](#directly-sending-msgs)
-  - To assert on the resulting state of a `TestContext`, see [Final assertions](#final-assertions)
+  - To create a `ProgramTest`, see the `create*` functions below.
+  - To advance the state of a `ProgramTest`, see [Simulating user input](#simulating-user-input), and [Directly sending Msgs](#directly-sending-msgs)
+  - To assert on the resulting state of a `ProgramTest`, see [Final assertions](#final-assertions)
 
 -}
-type TestContext msg model effect
+type ProgramTest msg model effect
     = Active
         { program : TestProgram msg model effect (SimulatedSub msg)
         , currentModel : model
@@ -206,7 +206,7 @@ createHelper :
     , onRouteChange : Url -> Maybe msg
     }
     -> ProgramOptions msg model effect
-    -> TestContext msg model effect
+    -> ProgramTest msg model effect
 createHelper program options =
     let
         program_ =
@@ -252,11 +252,11 @@ createSandbox program =
                 }
 
 
-{-| Represents an unstarted test program.
+{-| Represents an unstarted program test.
 Use [`start`](#start) to start the program being tested.
 -}
 type ProgramDefinition flags msg model effect
-    = ProgramDefinition (ProgramOptions msg model effect) (Maybe Url -> flags -> ProgramOptions msg model effect -> TestContext msg model effect)
+    = ProgramDefinition (ProgramOptions msg model effect) (Maybe Url -> flags -> ProgramOptions msg model effect -> ProgramTest msg model effect)
 
 
 type alias ProgramOptions msg model effect =
@@ -274,7 +274,7 @@ emptyOptions =
     }
 
 
-{-| Creates a `TestContext` from the parts of a `Browser.element` program.
+{-| Creates a `ProgramTest` from the parts of a `Browser.element` program.
 
 See other `create*` functions below if the program you want to test does not use `Browser.element`.
 
@@ -304,7 +304,7 @@ If your program uses `Json.Encode.Value` as its flags type,
 you may find [`withJsonStringFlags`](#withJsonStringFlags) useful.
 
 -}
-start : flags -> ProgramDefinition flags msg model effect -> TestContext msg model effect
+start : flags -> ProgramDefinition flags msg model effect -> ProgramTest msg model effect
 start flags (ProgramDefinition options program) =
     program options.baseUrl flags options
 
@@ -345,7 +345,7 @@ withJsonStringFlags decoder (ProgramDefinition options program) =
                     \_ -> Finished (InvalidFlags "withJsonStringFlags" (Json.Decode.errorToString message))
 
 
-{-| This allows you to provide a function that lets `TestContext` simulate effects that would become `Cmd`s and `Task`s
+{-| This allows you to provide a function that lets `ProgramTest` simulate effects that would become `Cmd`s and `Task`s
 when your app runs in production
 (this enables you to use [`simulateHttpResponse`](#simulateHttpResponse), [`advanceTime`](#advanceTime), etc.).
 
@@ -364,7 +364,7 @@ withSimulatedEffects fn (ProgramDefinition options program) =
     ProgramDefinition { options | deconstructEffect = Just fn } program
 
 
-{-| This allows you to provide a function that lets `TestContext` simulate subscriptions that would be `Sub`s
+{-| This allows you to provide a function that lets `ProgramTest` simulate subscriptions that would be `Sub`s
 when your app runs in production
 (this enables you to use [`simulateIncomingPort`](#simulateIncomingPort), etc.).
 
@@ -384,7 +384,7 @@ withSimulatedSubscriptions fn (ProgramDefinition options program) =
     ProgramDefinition { options | subscriptions = Just fn } program
 
 
-{-| Creates a `TestContext` from the parts of a `Browser.document` program.
+{-| Creates a `ProgramTest` from the parts of a `Browser.document` program.
 
 See other `create*` functions if the program you want to test does not use `Browser.document`.
 
@@ -408,7 +408,7 @@ createDocument program =
                 }
 
 
-{-| Creates a `TestContext` from the parts of a `Browser.application` program.
+{-| Creates a `ProgramTest` from the parts of a `Browser.application` program.
 
 See other `create*` functions if the program you want to test does not use `Browser.application`.
 
@@ -443,7 +443,7 @@ createApplication program =
 When using [`withSimulatedEffects`](#withSimulatedEffects) you will provide a function that can translate
 your program's effects into `SimulatedEffect`s.
 (If you do not use `withSimulatedEffects`,
-then `TestContext` will not simulate any effects for you.)
+then `ProgramTest` will not simulate any effects for you.)
 
 You can create `SimulatedEffect`s using the the following modules,
 which parallel the modules your real program would use to create `Cmd`s and `Task`s:
@@ -471,7 +471,7 @@ When using [`withSimulatedSubscriptions`](#withSimulatedSubscriptions) you will 
 a function that is similar to your program's `subscriptions` function but that
 returns `SimulatedSub`s instead `Sub`s.
 (If you do not use `withSimulatedSubscriptions`,
-then `TestContext` will not simulate any subscriptions for you.)
+then `ProgramTest` will not simulate any subscriptions for you.)
 
 You can create `SimulatedSub`s using the the following modules:
 
@@ -482,8 +482,8 @@ type alias SimulatedSub msg =
     SimulatedEffect.SimulatedSub msg
 
 
-{-| Advances the state of the `TestContext` by applying the given `msg` to your program's update function
-(provided when you created the `TestContext`).
+{-| Advances the state of the `ProgramTest` by applying the given `msg` to your program's update function
+(provided when you created the `ProgramTest`).
 
 This can be used to simulate events that can only be triggered by [commands (`Cmd`) and subscriptions (`Sub`)](https://guide.elm-lang.org/architecture/effects/)
 (i.e., that cannot be triggered by user interaction with the view).
@@ -494,9 +494,9 @@ or (if neither of those support what you need) [`simulateLastEffect`](#simulateL
 as doing so will make your tests more robust to changes in your program's implementation details.
 
 -}
-update : msg -> TestContext msg model effect -> TestContext msg model effect
-update msg testContext =
-    case testContext of
+update : msg -> ProgramTest msg model effect -> ProgramTest msg model effect
+update msg programTest =
+    case programTest of
         Finished err ->
             Finished err
 
@@ -514,9 +514,9 @@ update msg testContext =
                 |> drain
 
 
-simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
-simulateHelper functionDescription findTarget event testContext =
-    case testContext of
+simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> ProgramTest msg model effect -> ProgramTest msg model effect
+simulateHelper functionDescription findTarget event programTest =
+    case programTest of
         Finished err ->
             Finished err
 
@@ -546,7 +546,7 @@ simulateHelper functionDescription findTarget event testContext =
                             Finished (SimulateFailed functionDescription message)
 
                         Ok msg ->
-                            update msg testContext
+                            update msg programTest
 
 
 {-| **PRIVATE** helper for simulating events on input elements with associated labels.
@@ -558,9 +558,9 @@ After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/5
 a future release of this package will remove the `fieldId` parameter.
 
 -}
-simulateLabeledInputHelper : String -> String -> String -> Bool -> List Selector -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
-simulateLabeledInputHelper functionDescription fieldId label allowTextArea additionalInputSelectors event testContext =
-    testContext
+simulateLabeledInputHelper : String -> String -> String -> Bool -> List Selector -> ( String, Json.Encode.Value ) -> ProgramTest msg model effect -> ProgramTest msg model effect
+simulateLabeledInputHelper functionDescription fieldId label allowTextArea additionalInputSelectors event programTest =
+    programTest
         |> (if fieldId == "" then
                 identity
 
@@ -625,9 +625,9 @@ Parameters:
     (see [Test.Html.Event "Event Builders"](http://package.elm-lang.org/packages/eeue56/elm-html-test/latest/Test-Html-Event#event-builders))
 
 -}
-simulate : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> TestContext msg model effect -> TestContext msg model effect
-simulate findTarget ( eventName, eventValue ) testContext =
-    simulateHelper ("simulate " ++ escapeString eventName) findTarget ( eventName, eventValue ) testContext
+simulate : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> ProgramTest msg model effect -> ProgramTest msg model effect
+simulate findTarget ( eventName, eventValue ) programTest =
+    simulateHelper ("simulate " ++ escapeString eventName) findTarget ( eventName, eventValue ) programTest
 
 
 escapeString : String -> String
@@ -643,8 +643,8 @@ NOTE: In the future, this function will be generalized to find buttons with acce
 matching the given `buttonText`.
 
 -}
-clickButton : String -> TestContext msg model effect -> TestContext msg model effect
-clickButton buttonText testContext =
+clickButton : String -> ProgramTest msg model effect -> ProgramTest msg model effect
+clickButton buttonText programTest =
     simulateHelper ("clickButton " ++ escapeString buttonText)
         (Query.Extra.oneOf
             [ findNotDisabled
@@ -658,7 +658,7 @@ clickButton buttonText testContext =
             ]
         )
         Test.Html.Event.click
-        testContext
+        programTest
 
 
 findNotDisabled : List Selector -> Query.Single msg -> Query.Single msg
@@ -705,8 +705,8 @@ sets `preventDefault`, but this will be done in the future after
 <https://github.com/eeue56/elm-html-test/issues/63> is resolved.
 
 -}
-clickLink : String -> String -> TestContext msg model effect -> TestContext msg model effect
-clickLink linkText href testContext =
+clickLink : String -> String -> ProgramTest msg model effect -> ProgramTest msg model effect
+clickLink linkText href programTest =
     let
         functionDescription =
             "clickLink " ++ escapeString linkText
@@ -742,8 +742,8 @@ clickLink linkText href testContext =
                 ]
             )
 
-        tryClicking { otherwise } tryClickingTestContext =
-            case tryClickingTestContext of
+        tryClicking { otherwise } tryClickingProgramTest =
+            case tryClickingProgramTest of
                 Finished err ->
                     Finished err
 
@@ -757,7 +757,7 @@ clickLink linkText href testContext =
                         -- there is a click handler
                         -- first make sure the handler properly respects "Open in new tab", etc
                         if respondsTo ctrlClick link || respondsTo metaClick link then
-                            tryClickingTestContext
+                            tryClickingProgramTest
                                 |> fail functionDescription
                                     (String.concat
                                         [ "Found an `<a href=\"...\">` tag has an onClick handler, "
@@ -771,12 +771,12 @@ clickLink linkText href testContext =
 
                         else
                             -- everything looks good, so simulate that event and ignore the `href`
-                            tryClickingTestContext
+                            tryClickingProgramTest
                                 |> simulateHelper functionDescription findLinkTag normalClick
 
                     else
                         -- the link doesn't have a click handler
-                        tryClickingTestContext |> otherwise
+                        tryClickingProgramTest |> otherwise
 
         respondsTo event single =
             case
@@ -790,7 +790,7 @@ clickLink linkText href testContext =
                 Ok _ ->
                     True
     in
-    testContext
+    programTest
         |> expectViewHelper functionDescription
             (findLinkTag
                 >> Query.has []
@@ -798,9 +798,9 @@ clickLink linkText href testContext =
         |> tryClicking { otherwise = followLink functionDescription href }
 
 
-followLink : String -> String -> TestContext msg model effect -> TestContext msg model effect
-followLink functionDescription href testContext =
-    case testContext of
+followLink : String -> String -> ProgramTest msg model effect -> ProgramTest msg model effect
+followLink functionDescription href programTest =
+    case programTest of
         Finished err ->
             Finished err
 
@@ -863,8 +863,8 @@ If you need more control over the finding the target element or creating the sim
 see [`simulate`](#simulate).
 
 -}
-fillIn : String -> String -> String -> TestContext msg model effect -> TestContext msg model effect
-fillIn fieldId label newContent testContext =
+fillIn : String -> String -> String -> ProgramTest msg model effect -> ProgramTest msg model effect
+fillIn fieldId label newContent programTest =
     simulateLabeledInputHelper ("fillIn " ++ escapeString label)
         fieldId
         label
@@ -872,7 +872,7 @@ fillIn fieldId label newContent testContext =
         [-- TODO: should ensure that known special input types are not set, like `type="checkbox"`, etc?
         ]
         (Test.Html.Event.input newContent)
-        testContext
+        programTest
 
 
 {-| Simulates replacing the text in a `<textarea>`.
@@ -886,12 +886,12 @@ If you need more control over the finding the target element or creating the sim
 see [`simulate`](#simulate).
 
 -}
-fillInTextarea : String -> TestContext msg model effect -> TestContext msg model effect
-fillInTextarea newContent testContext =
+fillInTextarea : String -> ProgramTest msg model effect -> ProgramTest msg model effect
+fillInTextarea newContent programTest =
     simulateHelper "fillInTextarea"
         (Query.find [ Selector.tag "textarea" ])
         (Test.Html.Event.input newContent)
-        testContext
+        programTest
 
 
 {-| Simulates setting the value of a checkbox labeled with the given label.
@@ -923,15 +923,15 @@ If you need more control over the finding the target element or creating the sim
 see [`simulate`](#simulate).
 
 -}
-check : String -> String -> Bool -> TestContext msg model effect -> TestContext msg model effect
-check fieldId label willBecomeChecked testContext =
+check : String -> String -> Bool -> ProgramTest msg model effect -> ProgramTest msg model effect
+check fieldId label willBecomeChecked programTest =
     simulateLabeledInputHelper ("check " ++ escapeString label)
         fieldId
         label
         False
         [ Selector.attribute (Html.Attributes.type_ "checkbox") ]
         (Test.Html.Event.check willBecomeChecked)
-        testContext
+        programTest
 
 
 {-| Simulates choosing an option with the given text in a select with a given label
@@ -972,14 +972,14 @@ Example: If you have a view like the following,
 
 you can simulate selecting an option like this:
 
-    TestContext.selectOption "pet-select" "Choose a pet" "dog" "Dog"
+    ProgramTest.selectOption "pet-select" "Choose a pet" "dog" "Dog"
 
 If you need more control over the finding the target element or creating the simulated event,
 see [`simulate`](#simulate).
 
 -}
-selectOption : String -> String -> String -> String -> TestContext msg model effect -> TestContext msg model effect
-selectOption fieldId label optionValue optionText testContext =
+selectOption : String -> String -> String -> String -> ProgramTest msg model effect -> ProgramTest msg model effect
+selectOption fieldId label optionValue optionText programTest =
     let
         functionDescription =
             String.join " "
@@ -990,7 +990,7 @@ selectOption fieldId label optionValue optionText testContext =
                 , escapeString optionText
                 ]
     in
-    testContext
+    programTest
         |> expectViewHelper functionDescription
             (Query.find
                 [ Selector.tag "label"
@@ -1049,29 +1049,29 @@ then the following will allow you to simulate clicking the "Submit" button in th
     import Test.Html.Query as Query
     import Test.Html.Selector exposing (id)
 
-    testContext
-        |> TestContext.within
+    programTest
+        |> ProgramTest.within
             (Query.find [ id "sidebar" ])
-            (TestContext.clickButton "Submit")
+            (ProgramTest.clickButton "Submit")
         |> ...
 
 -}
-within : (Query.Single msg -> Query.Single msg) -> (TestContext msg model effect -> TestContext msg model effect) -> (TestContext msg model effect -> TestContext msg model effect)
-within findTarget onScopedTest testContext =
-    case testContext of
+within : (Query.Single msg -> Query.Single msg) -> (ProgramTest msg model effect -> ProgramTest msg model effect) -> (ProgramTest msg model effect -> ProgramTest msg model effect)
+within findTarget onScopedTest programTest =
+    case programTest of
         Finished err ->
             Finished err
 
         Active state ->
-            testContext
+            programTest
                 |> replaceView (state.program.view >> findTarget)
                 |> onScopedTest
                 |> replaceView state.program.view
 
 
-withSimulation : (EffectSimulation msg effect -> EffectSimulation msg effect) -> TestContext msg model effect -> TestContext msg model effect
-withSimulation f testContext =
-    case testContext of
+withSimulation : (EffectSimulation msg effect -> EffectSimulation msg effect) -> ProgramTest msg model effect -> ProgramTest msg model effect
+withSimulation f programTest =
+    case programTest of
         Finished err ->
             Finished err
 
@@ -1080,39 +1080,39 @@ withSimulation f testContext =
                 { state | effectSimulation = Maybe.map f state.effectSimulation }
 
 
-queueEffect : effect -> TestContext msg model effect -> TestContext msg model effect
-queueEffect effect testContext =
-    case testContext of
+queueEffect : effect -> ProgramTest msg model effect -> ProgramTest msg model effect
+queueEffect effect programTest =
+    case programTest of
         Finished _ ->
-            testContext
+            programTest
 
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    testContext
+                    programTest
 
                 Just simulation ->
-                    queueSimulatedEffect (simulation.deconstructEffect effect) testContext
+                    queueSimulatedEffect (simulation.deconstructEffect effect) programTest
 
 
-queueSimulatedEffect : SimulatedEffect msg -> TestContext msg model effect -> TestContext msg model effect
-queueSimulatedEffect effect testContext =
-    case testContext of
+queueSimulatedEffect : SimulatedEffect msg -> ProgramTest msg model effect -> ProgramTest msg model effect
+queueSimulatedEffect effect programTest =
+    case programTest of
         Finished _ ->
-            testContext
+            programTest
 
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    testContext
+                    programTest
 
                 Just simulation ->
                     case effect of
                         SimulatedEffect.None ->
-                            testContext
+                            programTest
 
                         SimulatedEffect.Batch effects ->
-                            List.foldl queueSimulatedEffect testContext effects
+                            List.foldl queueSimulatedEffect programTest effects
 
                         SimulatedEffect.Task t ->
                             Active
@@ -1135,50 +1135,50 @@ queueSimulatedEffect effect testContext =
                                 }
 
                         SimulatedEffect.PushUrl url ->
-                            testContext
+                            programTest
                                 |> routeChange url
 
                         SimulatedEffect.ReplaceUrl url ->
-                            testContext
+                            programTest
                                 |> routeChange url
 
 
-drain : TestContext msg model effect -> TestContext msg model effect
+drain : ProgramTest msg model effect -> ProgramTest msg model effect
 drain =
     let
-        advanceTimeIfSimulating t testContext =
-            case testContext of
+        advanceTimeIfSimulating t programTest =
+            case programTest of
                 Finished _ ->
-                    testContext
+                    programTest
 
                 Active state ->
                     case state.effectSimulation of
                         Nothing ->
-                            testContext
+                            programTest
 
                         Just _ ->
-                            advanceTime t testContext
+                            advanceTime t programTest
     in
     advanceTimeIfSimulating 0
         >> drainWorkQueue
 
 
-drainWorkQueue : TestContext msg model effect -> TestContext msg model effect
-drainWorkQueue testContext =
-    case testContext of
+drainWorkQueue : ProgramTest msg model effect -> ProgramTest msg model effect
+drainWorkQueue programTest =
+    case programTest of
         Finished err ->
             Finished err
 
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    testContext
+                    programTest
 
                 Just simulation ->
                     case EffectSimulation.stepWorkQueue simulation of
                         Nothing ->
                             -- work queue is empty
-                            testContext
+                            programTest
 
                         Just ( newSimulation, msg ) ->
                             let
@@ -1202,10 +1202,10 @@ If you want to check the headers or request body, see [`assertHttpRequest`](#ass
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-assertHttpRequestWasMade : String -> String -> TestContext msg model effect -> Expectation
-assertHttpRequestWasMade method url testContext =
+assertHttpRequestWasMade : String -> String -> ProgramTest msg model effect -> Expectation
+assertHttpRequestWasMade method url programTest =
     done <|
-        case testContext of
+        case programTest of
             Finished err ->
                 Finished err
 
@@ -1216,7 +1216,7 @@ assertHttpRequestWasMade method url testContext =
 
                     Just simulation ->
                         if Dict.member ( method, url ) simulation.state.http then
-                            testContext
+                            programTest
 
                         else
                             Finished (NoMatchingHttpRequest "assertHttpRequestWasMade" { method = method, url = url } (Dict.keys simulation.state.http))
@@ -1240,10 +1240,10 @@ assertHttpRequest :
     String
     -> String
     -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
-    -> TestContext msg model effect
-    -> TestContext msg model effect
-assertHttpRequest method url checkRequest testContext =
-    case testContext of
+    -> ProgramTest msg model effect
+    -> ProgramTest msg model effect
+assertHttpRequest method url checkRequest programTest =
+    case programTest of
         Finished err ->
             Finished err
 
@@ -1258,7 +1258,7 @@ assertHttpRequest method url checkRequest testContext =
                             case Test.Runner.getFailureReason (checkRequest request) of
                                 Nothing ->
                                     -- check succeeded
-                                    testContext
+                                    programTest
 
                                 Just reason ->
                                     Finished (ExpectFailed "assertHttpRequest" reason.description reason.reason)
@@ -1285,7 +1285,7 @@ immediately before using `simulateHttpOk`.
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-simulateHttpOk : String -> String -> String -> TestContext msg model effect -> TestContext msg model effect
+simulateHttpOk : String -> String -> String -> ProgramTest msg model effect -> ProgramTest msg model effect
 simulateHttpOk method url responseBody =
     simulateHttpResponse method
         url
@@ -1312,9 +1312,9 @@ immediately before using `simulateHttpResponse`.
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-simulateHttpResponse : String -> String -> Http.Response String -> TestContext msg model effect -> TestContext msg model effect
-simulateHttpResponse method url response testContext =
-    case testContext of
+simulateHttpResponse : String -> String -> Http.Response String -> ProgramTest msg model effect -> ProgramTest msg model effect
+simulateHttpResponse method url response programTest =
+    case programTest of
         Finished err ->
             Finished err
 
@@ -1341,7 +1341,7 @@ simulateHttpResponse method url response testContext =
                                 (resolveHttpRequest
                                     >> EffectSimulation.queueTask (actualRequest.onRequestComplete response)
                                 )
-                                testContext
+                                programTest
                                 |> drain
 
 
@@ -1352,9 +1352,9 @@ This will cause any pending `Task.sleep`s to trigger if their delay has elapsed.
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-advanceTime : Int -> TestContext msg model effect -> TestContext msg model effect
-advanceTime delta testContext =
-    case testContext of
+advanceTime : Int -> ProgramTest msg model effect -> ProgramTest msg model effect
+advanceTime delta programTest =
+    case programTest of
         Finished err ->
             Finished err
 
@@ -1364,12 +1364,12 @@ advanceTime delta testContext =
                     Finished (EffectSimulationNotConfigured "advanceTime")
 
                 Just simulation ->
-                    advanceTo "advanceTime" (simulation.state.nowMs + delta) testContext
+                    advanceTo "advanceTime" (simulation.state.nowMs + delta) programTest
 
 
-advanceTo : String -> Int -> TestContext msg model effect -> TestContext msg model effect
-advanceTo functionName end testContext =
-    case testContext of
+advanceTo : String -> Int -> ProgramTest msg model effect -> ProgramTest msg model effect
+advanceTo functionName end programTest =
+    case programTest of
         Finished err ->
             Finished err
 
@@ -1447,9 +1447,9 @@ For example:
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-assertAndClearOutgoingPortValues : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
-assertAndClearOutgoingPortValues portName decoder checkValues testContext =
-    case testContext of
+assertAndClearOutgoingPortValues : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest msg model effect -> ProgramTest msg model effect
+assertAndClearOutgoingPortValues portName decoder checkValues programTest =
+    case programTest of
         Finished err ->
             Finished err
 
@@ -1513,21 +1513,21 @@ The parameters are:
 NOTE: You must use [`withSimulatedSubscriptions`](#withSimulatedSubscriptions) before you call [`start`](#start) to be able to use this function.
 
 -}
-simulateIncomingPort : String -> Json.Encode.Value -> TestContext msg model effect -> TestContext msg model effect
-simulateIncomingPort portName value testContext =
+simulateIncomingPort : String -> Json.Encode.Value -> ProgramTest msg model effect -> ProgramTest msg model effect
+simulateIncomingPort portName value programTest =
     let
         fail_ =
             fail ("simulateIncomingPort \"" ++ portName ++ "\"")
     in
-    case testContext of
+    case programTest of
         Finished err ->
             Finished err
 
         Active state ->
             case state.program.subscriptions of
                 Nothing ->
-                    testContext
-                        |> fail_ "you MUST use TestContext.withSimulatedSubscriptions to be able to use simulateIncomingPort"
+                    programTest
+                        |> fail_ "you MUST use ProgramTest.withSimulatedSubscriptions to be able to use simulateIncomingPort"
 
                 Just fn ->
                     let
@@ -1564,17 +1564,17 @@ simulateIncomingPort portName value testContext =
                                     update msg tc
                     in
                     if matches == [] then
-                        testContext
+                        programTest
                             |> fail_
                                 "the program is not currently subscribed to the port"
 
                     else
-                        List.foldl step testContext matches
+                        List.foldl step programTest matches
 
 
-replaceView : (model -> Query.Single msg) -> TestContext msg model effect -> TestContext msg model effect
-replaceView newView testContext =
-    case testContext of
+replaceView : (model -> Query.Single msg) -> ProgramTest msg model effect -> ProgramTest msg model effect
+replaceView newView programTest =
+    case programTest of
         Finished err ->
             Finished err
 
@@ -1595,9 +1595,9 @@ a `Browser.application` and the user changes the URL in the browser's URL bar.
 The parameter may be an absolute URL or relative URL.
 
 -}
-routeChange : String -> TestContext msg model effect -> TestContext msg model effect
-routeChange url testContext =
-    case testContext of
+routeChange : String -> ProgramTest msg model effect -> ProgramTest msg model effect
+routeChange url programTest =
+    case programTest of
         Finished err ->
             Finished err
 
@@ -1612,25 +1612,25 @@ routeChange url testContext =
                             |> state.program.onRouteChange
                     of
                         Nothing ->
-                            testContext
+                            programTest
 
                         Just msg ->
-                            update msg testContext
+                            update msg programTest
 
 
-{-| Make an assertion about the current state of a `TestContext`'s model.
+{-| Make an assertion about the current state of a `ProgramTest`'s model.
 -}
-expectModel : (model -> Expectation) -> TestContext msg model effect -> Expectation
-expectModel assertion testContext =
+expectModel : (model -> Expectation) -> ProgramTest msg model effect -> Expectation
+expectModel assertion programTest =
     done <|
-        case testContext of
+        case programTest of
             Finished err ->
                 Finished err
 
             Active state ->
                 case assertion state.currentModel |> Test.Runner.getFailureReason of
                     Nothing ->
-                        testContext
+                        programTest
 
                     Just reason ->
                         Finished (ExpectFailed "expectModel" reason.description reason.reason)
@@ -1639,71 +1639,71 @@ expectModel assertion testContext =
 {-| Simulate the outcome of the last effect produced by the program being tested
 by providing a function that can convert the last effect into `msg`s.
 
-The function you provide will be called with the effect that was returned by the most recent call to `update` or `init` in the `TestContext`.
+The function you provide will be called with the effect that was returned by the most recent call to `update` or `init` in the `ProgramTest`.
 
-  - If it returns `Err`, then that will cause the `TestContext` to enter a failure state with the provided message.
-  - If it returns `Ok`, then the list of `msg`s will be applied in order via `TestContext.update`.
+  - If it returns `Err`, then that will cause the `ProgramTest` to enter a failure state with the provided message.
+  - If it returns `Ok`, then the list of `msg`s will be applied in order via `ProgramTest.update`.
 
 NOTE: If you are simulating HTTP response, you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
 
 -}
-simulateLastEffect : (effect -> Result String (List msg)) -> TestContext msg model effect -> TestContext msg model effect
-simulateLastEffect toMsgs testContext =
-    case testContext of
+simulateLastEffect : (effect -> Result String (List msg)) -> ProgramTest msg model effect -> ProgramTest msg model effect
+simulateLastEffect toMsgs programTest =
+    case programTest of
         Finished err ->
             Finished err
 
         Active state ->
             case toMsgs state.lastEffect of
                 Ok msgs ->
-                    List.foldl update testContext msgs
+                    List.foldl update programTest msgs
 
                 Err message ->
                     Finished (SimulateLastEffectFailed message)
 
 
-expectLastEffectHelper : String -> (effect -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
-expectLastEffectHelper functionName assertion testContext =
-    case testContext of
+expectLastEffectHelper : String -> (effect -> Expectation) -> ProgramTest msg model effect -> ProgramTest msg model effect
+expectLastEffectHelper functionName assertion programTest =
+    case programTest of
         Finished err ->
             Finished err
 
         Active state ->
             case assertion state.lastEffect |> Test.Runner.getFailureReason of
                 Nothing ->
-                    testContext
+                    programTest
 
                 Just reason ->
                     Finished (ExpectFailed functionName reason.description reason.reason)
 
 
-{-| Validates the last effect produced by a `TestContext`'s program without ending the `TestContext`.
+{-| Validates the last effect produced by a `ProgramTest`'s program without ending the `ProgramTest`.
 
 NOTE: If you are asserting about HTTP requests being made,
 you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
 
 -}
-shouldHaveLastEffect : (effect -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
-shouldHaveLastEffect assertion testContext =
-    expectLastEffectHelper "shouldHaveLastEffect" assertion testContext
+shouldHaveLastEffect : (effect -> Expectation) -> ProgramTest msg model effect -> ProgramTest msg model effect
+shouldHaveLastEffect assertion programTest =
+    expectLastEffectHelper "shouldHaveLastEffect" assertion programTest
 
 
-{-| Makes an assertion about the last effect produced by a `TestContext`'s program.
+{-| Makes an assertion about the last effect produced by a `ProgramTest`'s program.
 
 NOTE: If you are asserting about HTTP requests being made,
 you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
 
 -}
-expectLastEffect : (effect -> Expectation) -> TestContext msg model effect -> Expectation
-expectLastEffect assertion testContext =
-    testContext
+expectLastEffect : (effect -> Expectation) -> ProgramTest msg model effect -> Expectation
+expectLastEffect assertion programTest =
+    programTest
         |> expectLastEffectHelper "expectLastEffect" assertion
         |> done
 
 
-expectViewHelper : String -> (Query.Single msg -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
-expectViewHelper functionName assertion testContext =
-    case testContext of
+expectViewHelper : String -> (Query.Single msg -> Expectation) -> ProgramTest msg model effect -> ProgramTest msg model effect
+expectViewHelper functionName assertion programTest =
+    case programTest of
         Finished err ->
             Finished err
 
@@ -1715,63 +1715,63 @@ expectViewHelper functionName assertion testContext =
                     |> Test.Runner.getFailureReason
             of
                 Nothing ->
-                    testContext
+                    programTest
 
                 Just reason ->
                     Finished (ExpectFailed functionName reason.description reason.reason)
 
 
-{-| Validates the the current state of a `TestContext`'s view without ending the `TestContext`.
+{-| Validates the the current state of a `ProgramTest`'s view without ending the `ProgramTest`.
 -}
-shouldHaveView : (Query.Single msg -> Expectation) -> TestContext msg model effect -> TestContext msg model effect
-shouldHaveView assertion testContext =
-    expectViewHelper "shouldHaveView" assertion testContext
+shouldHaveView : (Query.Single msg -> Expectation) -> ProgramTest msg model effect -> ProgramTest msg model effect
+shouldHaveView assertion programTest =
+    expectViewHelper "shouldHaveView" assertion programTest
 
 
 {-| `shouldHave [...selector...]` is equivalent to `shouldHaveView (Test.Html.Query.has [...selector...])`
 -}
-shouldHave : List Selector.Selector -> TestContext msg model effect -> TestContext msg model effect
-shouldHave selector testContext =
-    expectViewHelper "shouldHave" (Query.has selector) testContext
+shouldHave : List Selector.Selector -> ProgramTest msg model effect -> ProgramTest msg model effect
+shouldHave selector programTest =
+    expectViewHelper "shouldHave" (Query.has selector) programTest
 
 
 {-| `shouldNotHave [...selector...]` is equivalent to `shouldHaveView (Test.Html.Query.hasNot [...selector...])`
 -}
-shouldNotHave : List Selector.Selector -> TestContext msg model effect -> TestContext msg model effect
-shouldNotHave selector testContext =
-    expectViewHelper "shouldNotHave" (Query.hasNot selector) testContext
+shouldNotHave : List Selector.Selector -> ProgramTest msg model effect -> ProgramTest msg model effect
+shouldNotHave selector programTest =
+    expectViewHelper "shouldNotHave" (Query.hasNot selector) programTest
 
 
-{-| Makes an assertion about the current state of a `TestContext`'s view.
+{-| Makes an assertion about the current state of a `ProgramTest`'s view.
 -}
-expectView : (Query.Single msg -> Expectation) -> TestContext msg model effect -> Expectation
-expectView assertion testContext =
-    testContext
+expectView : (Query.Single msg -> Expectation) -> ProgramTest msg model effect -> Expectation
+expectView assertion programTest =
+    programTest
         |> expectViewHelper "expectView" assertion
         |> done
 
 
-{-| A simpler way to assert that a `TestContext`'s view matches a given selector.
+{-| A simpler way to assert that a `ProgramTest`'s view matches a given selector.
 
 `expectViewHas [...selector...]` is the same as `expectView (Test.Html.Query.has [...selector...])`.
 
 -}
-expectViewHas : List Selector.Selector -> TestContext msg model effect -> Expectation
-expectViewHas selector testContext =
-    testContext
+expectViewHas : List Selector.Selector -> ProgramTest msg model effect -> Expectation
+expectViewHas selector programTest =
+    programTest
         |> expectViewHelper "expectViewHas" (Query.has selector)
         |> done
 
 
-{-| Ends a `TestContext`, reporting any errors that occurred.
+{-| Ends a `ProgramTest`, reporting any errors that occurred.
 
 NOTE: You should prefer using a [final assertion](#final-assertions) to end your test over using `done`,
 as doing so will [make the intent of your test more clear](https://www.artima.com/weblogs/viewpost.jsp?thread=35578).
 
 -}
-done : TestContext msg model effect -> Expectation
-done testContext =
-    case testContext of
+done : ProgramTest msg model effect -> Expectation
+done programTest =
+    case programTest of
         Active _ ->
             Expect.pass
 
@@ -1797,10 +1797,10 @@ done testContext =
             Expect.fail (functionName ++ ":\n" ++ message)
 
         Finished (ProgramDoesNotSupportNavigation functionName) ->
-            Expect.fail (functionName ++ ": Program does not support navigation.  Use TestContext.application to create a TestContext that supports navigation.")
+            Expect.fail (functionName ++ ": Program does not support navigation.  Use ProgramTest.application to create a ProgramTest that supports navigation.")
 
         Finished (NoBaseUrl functionName relativeUrl) ->
-            Expect.fail (functionName ++ ": The TestContext does not have a base URL and cannot resolve the relative URL " ++ escapeString relativeUrl ++ ".  Use TestContext.startWithBaseUrl to create a TestContext that can resolve relative URLs.")
+            Expect.fail (functionName ++ ": The ProgramTest does not have a base URL and cannot resolve the relative URL " ++ escapeString relativeUrl ++ ".  Use ProgramTest.startWithBaseUrl to create a ProgramTest that can resolve relative URLs.")
 
         Finished (NoMatchingHttpRequest functionName request pendingRequests) ->
             Expect.fail <|
@@ -1825,7 +1825,7 @@ done testContext =
                     ]
 
         Finished (EffectSimulationNotConfigured functionName) ->
-            Expect.fail ("TEST SETUP ERROR: In order to use " ++ functionName ++ ", you MUST use TestContext.withSimulatedEffects before calling TestContext.start")
+            Expect.fail ("TEST SETUP ERROR: In order to use " ++ functionName ++ ", you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start")
 
         Finished (CustomFailure assertionName message) ->
             Expect.fail (assertionName ++ ": " ++ message)
@@ -1833,44 +1833,44 @@ done testContext =
 
 {-| Asserts that the program ended by navigating away to another URL.
 -}
-expectPageChange : String -> TestContext msg model effect -> Expectation
-expectPageChange expectedUrl testContext =
-    case testContext of
+expectPageChange : String -> ProgramTest msg model effect -> Expectation
+expectPageChange expectedUrl programTest =
+    case programTest of
         Finished (ChangedPage cause finalLocation) ->
             Url.toString finalLocation |> Expect.equal expectedUrl
 
         Finished _ ->
-            testContext |> done
+            programTest |> done
 
         Active _ ->
             Expect.fail "expectPageChange: expected to have navigated to a different URL, but no links were clicked"
 
 
-{-| `fail` can be used to report custom errors if you are writing your own convenience functions to deal with test contexts.
+{-| `fail` can be used to report custom errors if you are writing your own convenience functions to deal with program tests.
 
 Example (this is a function that checks for a particular structure in the program's view,
-but will also fail the TestContext if the `expectedCount` parameter is invalid):
+but will also fail the ProgramTest if the `expectedCount` parameter is invalid):
 
-    expectNotificationCount : Int -> TestContext Msg Model effect -> TestContext Msg Model effect
-    expectNotificationCount expectedCount testContext =
+    expectNotificationCount : Int -> ProgramTest Msg Model effect -> ProgramTest Msg Model effect
+    expectNotificationCount expectedCount programTest =
         if expectedCount <= 0 then
-            testContext
-                |> TestContext.fail "expectNotificationCount"
+            programTest
+                |> ProgramTest.fail "expectNotificationCount"
                     ("expectedCount must be positive, but was: " ++ String.fromInt expectedCount)
 
         else
-            testContext
+            programTest
                 |> shouldHave
                     [ Test.Html.Selector.class "notifications"
                     , Test.Html.Selector.text (toString expectedCount)
                     ]
 
-If you are writing a convenience function that is creating a test context, see [`createFailed`](#createFailed).
+If you are writing a convenience function that is creating a program test, see [`createFailed`](#createFailed).
 
 -}
-fail : String -> String -> TestContext msg model effect -> TestContext msg model effect
-fail assertionName failureMessage testContext =
-    case testContext of
+fail : String -> String -> ProgramTest msg model effect -> ProgramTest msg model effect
+fail assertionName failureMessage programTest =
+    case programTest of
         Finished err ->
             Finished err
 
@@ -1878,14 +1878,14 @@ fail assertionName failureMessage testContext =
             Finished (CustomFailure assertionName failureMessage)
 
 
-{-| `createFailed` can be used to report custom errors if you are writing your own convenience functions to **create** test contexts.
+{-| `createFailed` can be used to report custom errors if you are writing your own convenience functions to **create** program tests.
 
 The parameters are:
 
 1.  The name of your helper function (displayed in failure messages)
 2.  The failure message (also included in the failure message)
 
-NOTE: if you are writing a convenience function that takes a `TestContext` as input, you should use [`fail`](#fail) instead,
+NOTE: if you are writing a convenience function that takes a `ProgramTest` as input, you should use [`fail`](#fail) instead,
 as it provides more context in the test failure message.
 
     -- JsonSchema and MyProgram are imaginary modules for this example
@@ -1893,25 +1893,25 @@ as it provides more context in the test failure message.
 
     import JsonSchema exposing (Schema, validateJsonSchema)
     import MyProgram exposing (Model, Msg)
-    import TextContext exposing (TestContext)
+    import ProgramTest exposing (ProgramTest)
 
-    createWithValidatedJson : Schema -> String -> TestContext Msg Model (Cmd Msg)
+    createWithValidatedJson : Schema -> String -> ProgramTest Msg Model (Cmd Msg)
     createWithValidatedJson schema json =
         case validateJsonSchema schema json of
             Err message ->
-                TestContext.createFailed
+                ProgramTest.createFailed
                     "createWithValidatedJson"
                     ("JSON schema validation failed:\n" ++ message)
 
             Ok () ->
-                TestContext.createElement
+                ProgramTest.createElement
                     { init = MyProgram.init
                     , update = MyProgram.update
                     , view = MyProgram.view
                     }
-                    |> TestContext.start json
+                    |> ProgramTest.start json
 
 -}
-createFailed : String -> String -> TestContext msg model effect
+createFailed : String -> String -> ProgramTest msg model effect
 createFailed functionName failureMessage =
     Finished (CustomFailure functionName failureMessage)

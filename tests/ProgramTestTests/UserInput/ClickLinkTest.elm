@@ -1,12 +1,12 @@
-module TestContextTests.UserInput.ClickLinkTest exposing (all)
+module ProgramTestTests.UserInput.ClickLinkTest exposing (all)
 
 import Expect
 import Html exposing (Html)
 import Html.Attributes exposing (href)
 import Html.Events
 import Json.Decode
+import ProgramTest exposing (ProgramTest)
 import Test exposing (..)
-import TestContext exposing (TestContext)
 
 
 type TestEffect
@@ -21,9 +21,9 @@ testUpdate msg model =
     )
 
 
-linkProgram : TestContext String String ()
+linkProgram : ProgramTest String String ()
 linkProgram =
-    TestContext.createSandbox
+    ProgramTest.createSandbox
         { init = "<INIT>"
         , update = \msg model -> model ++ ";" ++ msg
         , view =
@@ -33,26 +33,26 @@ linkProgram =
                     , Html.a [ href "/settings" ] [ Html.text "Relative" ]
                     ]
         }
-        |> TestContext.withBaseUrl "http://localhost:3000/Main.elm"
-        |> TestContext.start ()
+        |> ProgramTest.withBaseUrl "http://localhost:3000/Main.elm"
+        |> ProgramTest.start ()
 
 
 all : Test
 all =
-    describe "TestContext.clickLinks"
+    describe "ProgramTest.clickLinks"
         [ test "can verify an absolute link" <|
             \() ->
                 linkProgram
-                    |> TestContext.clickLink "External" "https://example.com/link"
-                    |> TestContext.expectPageChange "https://example.com/link"
+                    |> ProgramTest.clickLink "External" "https://example.com/link"
+                    |> ProgramTest.expectPageChange "https://example.com/link"
         , test "can verify a relative link" <|
             \() ->
                 linkProgram
-                    |> TestContext.clickLink "Relative" "/settings"
-                    |> TestContext.expectPageChange "http://localhost:3000/settings"
+                    |> ProgramTest.clickLink "Relative" "/settings"
+                    |> ProgramTest.expectPageChange "http://localhost:3000/settings"
         , test "can verify an internal (single-page app) link" <|
             \() ->
-                TestContext.createApplication
+                ProgramTest.createApplication
                     { onUrlChange = .path
                     , onUrlRequest = \_ -> Debug.todo "ClickLinkTest:onUrlRequest"
                     , init = \() location key -> ( "<INIT:" ++ location.path ++ ">", NoOp )
@@ -69,10 +69,10 @@ all =
                                 ]
                             }
                     }
-                    |> TestContext.withBaseUrl "http://localhost:3000/"
-                    |> TestContext.start ()
-                    |> TestContext.clickLink "SPA" "#search"
-                    |> TestContext.expectModel (Expect.equal "<INIT:/>;GoToSearch")
+                    |> ProgramTest.withBaseUrl "http://localhost:3000/"
+                    |> ProgramTest.start ()
+                    |> ProgramTest.clickLink "SPA" "#search"
+                    |> ProgramTest.expectModel (Expect.equal "<INIT:/>;GoToSearch")
         ]
 
 

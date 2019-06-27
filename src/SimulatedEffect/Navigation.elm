@@ -4,7 +4,7 @@ module SimulatedEffect.Navigation exposing (pushUrl, replaceUrl)
 PRs are welcome to add any functions that are missing.
 
 The functions here produce `SimulatedEffect`s instead of `Cmd`s, which are meant to be used
-to help you implement the function to provide when using [`TestContext.withSimulatedEffects`](TestContext#withSimulatedEffects).
+to help you implement the function to provide when using [`ProgramTest.withSimulatedEffects`](ProgramTest#withSimulatedEffects).
 
 
 # Navigate within Page

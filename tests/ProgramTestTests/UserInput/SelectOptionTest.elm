@@ -1,22 +1,22 @@
-module TestContextTests.UserInput.SelectOptionTest exposing (all)
+module ProgramTestTests.UserInput.SelectOptionTest exposing (all)
 
 import Expect exposing (Expectation)
 import Html exposing (Html)
 import Html.Attributes exposing (for, id, value)
 import Html.Events exposing (on)
+import ProgramTest exposing (ProgramTest)
 import Test exposing (..)
 import Test.Runner
-import TestContext exposing (TestContext)
 
 
-testContext : TestContext String String ()
-testContext =
-    TestContext.createSandbox
+start : ProgramTest String String ()
+start =
+    ProgramTest.createSandbox
         { init = "<INIT>"
         , update = \msg model -> model ++ ";" ++ msg
         , view = testView
         }
-        |> TestContext.start ()
+        |> ProgramTest.start ()
 
 
 testView : String -> Html String
@@ -44,17 +44,17 @@ testView model =
 
 all : Test
 all =
-    describe "TestContext.selectionOption"
+    describe "ProgramTest.selectionOption"
         [ test "can select an option" <|
             \() ->
-                testContext
-                    |> TestContext.selectOption "pet-select" "Choose a pet" "hamster-value" "Hamster"
-                    |> TestContext.expectModel (Expect.equal "<INIT>;hamster-value")
+                start
+                    |> ProgramTest.selectOption "pet-select" "Choose a pet" "hamster-value" "Hamster"
+                    |> ProgramTest.expectModel (Expect.equal "<INIT>;hamster-value")
         , test "fails if there is no onChange handler" <|
             \() ->
-                testContext
-                    |> TestContext.selectOption "name-select" "Choose a name" "george-value" "George"
-                    |> TestContext.done
+                start
+                    |> ProgramTest.selectOption "name-select" "Choose a name" "george-value" "George"
+                    |> ProgramTest.done
                     |> Test.Runner.getFailureReason
                     |> Maybe.map .description
                     |> Maybe.withDefault "<Expected selectOption to fail, but it succeeded>"

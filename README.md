@@ -11,7 +11,7 @@ for testing your Elm programs as complete units.
 
 ## Basic example
 
-In this example, `TestContext.create` is used to initiate testing of the imagined `MyProgram` module
+In this example, `ProgramTest.create` is used to initiate testing of the imagined `MyProgram` module
 (which follows the [Elm architecture](https://guide.elm-lang.org/architecture/)).
 Then `clickButton` is used to simulate user interaction with the program,
 and finally `expectViewHas` is used to assert the final state of the program's displayed HTML.
@@ -19,14 +19,14 @@ and finally `expectViewHas` is used to assert the final state of the program's d
 ```elm
 import Test exposing (..)
 import Test.Html.Selector exposing (class, text)
-import TestContext exposing (clickButton, expectViewHas, start)
+import ProgramTest exposing (clickButton, expectViewHas, start)
 import MyProgram -- just an imaginary example
 
 exampleProgramTest : Test
 exampleProgramTest =
     test "cannot publish without a title" <|
         \() ->
-            TestContext.createElement
+            ProgramTest.createElement
                 { init = MyProgram.init
                 , update = MyProgram.update
                 , view = MyProgram.view
@@ -44,25 +44,25 @@ exampleProgramTest =
 ## Testing programs with flags and/or navigation
 
 This example tests a program that requires both [flags](https://guide.elm-lang.org/interop/javascript.html#flags) and [navigation](http://package.elm-lang.org/packages/elm-lang/navigation/latest).
-There are variants of the `TestContext.create*` functions ([see all](TestContext#creating)) for all combinations of
+There are variants of the `ProgramTest.create*` functions ([see all](ProgramTest#creating)) for all combinations of
 flags and/or navigation that a program might required.
 
 ```elm
 import Test exposing (..)
 import Test.Html.Selector exposing (class, text)
-import TestContext exposing (clickButton, expectViewHas)
+import ProgramTest exposing (ProgramTest clickButton, expectViewHas)
 import MyProgram exposing (Flags, Msg, Model) -- just an imaginary example
 
-start : String -> Flags ->  TestContext Msg Model (Cmd Msg)
+start : String -> Flags ->  ProgramTest Msg Model (Cmd Msg)
 start initialUrl flags =
-    TestContext.createApplication
+    ProgramTest.createApplication
         { onUrlChange = MyProgram.OnRouteChange
         , init = MyProgram.init -- the type of MyProgram.init is: MyProgram.Flags -> Navigation.Location -> (MyProgram.Model, Cmd MyProgram.Msg)
         , update = MyProgram.update
         , view = MyProgram.view
         }
-        |> TestContext.withBaseUrl initialUrl
-        |> TestContext.start flags
+        |> ProgramTest.withBaseUrl initialUrl
+        |> ProgramTest.start flags
 
 exampleProgramTest : Test
 exampleProgramTest =
@@ -87,22 +87,22 @@ This example tests a module for a complicated view by making a program with a tr
 import DateTimePicker -- using abadi199/datetimepicker 6.0.0 as an example of a view to test
 import Test exposing (..)
 import Test.Html.Selector exposing (text)
-import TestContext exposing (clickButton, expectViewHas)
+import ProgramTest exposing (clickButton, expectViewHas)
 
 startDatePicker :
-    TestContext
+    ProgramTest
         (DateTimePicker.State, Maybe Date) -- msg: in this trivial program, the msg is simply the new model value
         (DateTimePicker.State, Maybe Date) -- model: simply the state needed by the view being tested
         (Cmd never) -- effect: could use any type here, but Cmd seems least confusing
 startDatePicker =
-    TestContext.element
+    ProgramTest.element
         { init = \() -> ((DateTimePicker.initialState, Nothing), Cmd.none)
         , update = newState model -> (newState, Cmd.none)
         , view =
             \(state, value) ->
                 DateTimePicker.dateTimePicker (,) [] state value
         }
-        |> TestContext.start ()
+        |> ProgramTest.start ()
 
 datePickerTest : Test
 datePickerTest =

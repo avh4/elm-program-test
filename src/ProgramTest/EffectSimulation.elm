@@ -1,4 +1,4 @@
-module TestContext.EffectSimulation exposing
+module ProgramTest.EffectSimulation exposing
     ( EffectSimulation
     , SimulationState
     , clearOutgoingPortValues

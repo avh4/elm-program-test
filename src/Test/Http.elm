@@ -13,7 +13,7 @@ module Test.Http exposing
 
 ## Responses
 
-These are ways to easily make `Http.Response` values for use with [`TestContext.simulateHttpResponse`](TestContext#simulateHttpResponse).
+These are ways to easily make `Http.Response` values for use with [`ProgramTest.simulateHttpResponse`](ProgramTest#simulateHttpResponse).
 
 @docs timeout, networkError, httpResponse
 
@@ -29,7 +29,7 @@ import SimulatedEffect
 {-| A convenient way to check something about the request body of a pending HTTP request.
 
     ...
-        |> TestContext.assertHttpRequest "POST"
+        |> ProgramTest.assertHttpRequest "POST"
             "https://example.com/ok"
             (Test.Http.expectJsonBody
                 (Json.Decode.field "version" Json.Decode.string)
@@ -55,7 +55,7 @@ expectJsonBody decoder check request =
 {-| Assert that the given HTTP request has the specified header.
 
     ...
-        |> TestContext.assertHttpRequest "POST"
+        |> ProgramTest.assertHttpRequest "POST"
             "https://example.com/ok"
             (Test.Http.hasHeader "Content-Type" "application/json")
         |> ...
