@@ -10,7 +10,7 @@ import Url
 
 
 type alias ProgramTest =
-    ProgramTest.ProgramTest Msg Model (SimulatedEffect Msg)
+    ProgramTest.ProgramTest Model Msg (SimulatedEffect Msg)
 
 
 startEffects : SimulatedEffect Msg -> ProgramTest

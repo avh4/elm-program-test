@@ -8,7 +8,7 @@ import SimulatedEffect.Http
 import Test exposing (..)
 
 
-start : ProgramTest Main.Msg Main.Model Main.Effect
+start : ProgramTest Main.Model Main.Msg Main.Effect
 start =
     ProgramTest.createDocument
         { init = Main.init

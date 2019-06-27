@@ -53,7 +53,7 @@ import Test.Html.Selector exposing (class, text)
 import ProgramTest exposing (ProgramTest clickButton, expectViewHas)
 import MyProgram exposing (Flags, Msg, Model) -- just an imaginary example
 
-start : String -> Flags ->  ProgramTest Msg Model (Cmd Msg)
+start : String -> Flags -> ProgramTest Model Msg (Cmd Msg)
 start initialUrl flags =
     ProgramTest.createApplication
         { onUrlChange = MyProgram.OnRouteChange
@@ -91,8 +91,8 @@ import ProgramTest exposing (clickButton, expectViewHas)
 
 startDatePicker :
     ProgramTest
-        (DateTimePicker.State, Maybe Date) -- msg: in this trivial program, the msg is simply the new model value
         (DateTimePicker.State, Maybe Date) -- model: simply the state needed by the view being tested
+        (DateTimePicker.State, Maybe Date) -- msg: in this trivial program, the msg is simply the new model value
         (Cmd never) -- effect: could use any type here, but Cmd seems least confusing
 startDatePicker =
     ProgramTest.element

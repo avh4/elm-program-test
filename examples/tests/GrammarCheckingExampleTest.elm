@@ -11,7 +11,7 @@ import Test exposing (..)
 import Test.Html.Selector exposing (text)
 
 
-start : ProgramTest Main.Msg Main.Model Main.Effect
+start : ProgramTest Main.Model Main.Msg Main.Effect
 start =
     ProgramTest.createDocument
         { init = Main.init

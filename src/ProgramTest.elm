@@ -164,9 +164,9 @@ and a log of any errors that have occurred while simulating interaction with the
   - To assert on the resulting state of a `ProgramTest`, see [Final assertions](#final-assertions)
 
 -}
-type ProgramTest msg model effect
+type ProgramTest model msg effect
     = Active
-        { program : TestProgram msg model effect (SimulatedSub msg)
+        { program : TestProgram model msg effect (SimulatedSub msg)
         , currentModel : model
         , lastEffect : effect
         , currentLocation : Maybe Url
@@ -175,7 +175,7 @@ type ProgramTest msg model effect
     | Finished Failure
 
 
-type alias TestProgram msg model effect sub =
+type alias TestProgram model msg effect sub =
     { update : msg -> model -> ( model, effect )
     , view : model -> Query.Single msg
     , onRouteChange : Url -> Maybe msg
@@ -205,8 +205,8 @@ createHelper :
     , view : model -> Html msg
     , onRouteChange : Url -> Maybe msg
     }
-    -> ProgramOptions msg model effect
-    -> ProgramTest msg model effect
+    -> ProgramOptions model msg effect
+    -> ProgramTest model msg effect
 createHelper program options =
     let
         program_ =
@@ -240,7 +240,7 @@ createSandbox :
     , update : msg -> model -> model
     , view : model -> Html msg
     }
-    -> ProgramDefinition () msg model ()
+    -> ProgramDefinition () model msg ()
 createSandbox program =
     ProgramDefinition emptyOptions <|
         \location () ->
@@ -255,18 +255,18 @@ createSandbox program =
 {-| Represents an unstarted program test.
 Use [`start`](#start) to start the program being tested.
 -}
-type ProgramDefinition flags msg model effect
-    = ProgramDefinition (ProgramOptions msg model effect) (Maybe Url -> flags -> ProgramOptions msg model effect -> ProgramTest msg model effect)
+type ProgramDefinition flags model msg effect
+    = ProgramDefinition (ProgramOptions model msg effect) (Maybe Url -> flags -> ProgramOptions model msg effect -> ProgramTest model msg effect)
 
 
-type alias ProgramOptions msg model effect =
+type alias ProgramOptions model msg effect =
     { baseUrl : Maybe Url
     , deconstructEffect : Maybe (effect -> SimulatedEffect msg)
     , subscriptions : Maybe (model -> SimulatedSub msg)
     }
 
 
-emptyOptions : ProgramOptions msg model effect
+emptyOptions : ProgramOptions model msg effect
 emptyOptions =
     { baseUrl = Nothing
     , deconstructEffect = Nothing
@@ -286,7 +286,7 @@ createElement :
     , view : model -> Html msg
     , update : msg -> model -> ( model, effect )
     }
-    -> ProgramDefinition flags msg model effect
+    -> ProgramDefinition flags model msg effect
 createElement program =
     ProgramDefinition emptyOptions <|
         \location flags ->
@@ -304,7 +304,7 @@ If your program uses `Json.Encode.Value` as its flags type,
 you may find [`withJsonStringFlags`](#withJsonStringFlags) useful.
 
 -}
-start : flags -> ProgramDefinition flags msg model effect -> ProgramTest msg model effect
+start : flags -> ProgramDefinition flags model msg effect -> ProgramTest model msg effect
 start flags (ProgramDefinition options program) =
     program options.baseUrl flags options
 
@@ -316,7 +316,7 @@ or when using [`clickLink`](#clickLink) and [`expectPageChange`](#expectPageChan
 to simulate a user clicking a link with relative URL.
 
 -}
-withBaseUrl : String -> ProgramDefinition flags msg model effect -> ProgramDefinition flags msg model effect
+withBaseUrl : String -> ProgramDefinition flags model msg effect -> ProgramDefinition flags model msg effect
 withBaseUrl baseUrl (ProgramDefinition options program) =
     case Url.fromString baseUrl of
         Nothing ->
@@ -332,8 +332,8 @@ By providing the JSON decoder, you can then provide the flags as a JSON string w
 -}
 withJsonStringFlags :
     Json.Decode.Decoder flags
-    -> ProgramDefinition flags msg model effect
-    -> ProgramDefinition String msg model effect
+    -> ProgramDefinition flags model msg effect
+    -> ProgramDefinition String model msg effect
 withJsonStringFlags decoder (ProgramDefinition options program) =
     ProgramDefinition options <|
         \location json ->
@@ -358,8 +358,8 @@ the required `effect -> SimulatedEffect msg` function for your `effect` type.
 -}
 withSimulatedEffects :
     (effect -> SimulatedEffect msg)
-    -> ProgramDefinition flags msg model effect
-    -> ProgramDefinition flags msg model effect
+    -> ProgramDefinition flags model msg effect
+    -> ProgramDefinition flags model msg effect
 withSimulatedEffects fn (ProgramDefinition options program) =
     ProgramDefinition { options | deconstructEffect = Just fn } program
 
@@ -378,8 +378,8 @@ the required `model -> SimulatedSub msg` function.
 -}
 withSimulatedSubscriptions :
     (model -> SimulatedSub msg)
-    -> ProgramDefinition flags msg model effect
-    -> ProgramDefinition flags msg model effect
+    -> ProgramDefinition flags model msg effect
+    -> ProgramDefinition flags model msg effect
 withSimulatedSubscriptions fn (ProgramDefinition options program) =
     ProgramDefinition { options | subscriptions = Just fn } program
 
@@ -396,7 +396,7 @@ createDocument :
     , view : model -> Browser.Document msg
     , update : msg -> model -> ( model, effect )
     }
-    -> ProgramDefinition flags msg model effect
+    -> ProgramDefinition flags model msg effect
 createDocument program =
     ProgramDefinition emptyOptions <|
         \location flags ->
@@ -422,7 +422,7 @@ createApplication :
     , onUrlRequest : Browser.UrlRequest -> msg
     , onUrlChange : Url -> msg
     }
-    -> ProgramDefinition flags msg model effect
+    -> ProgramDefinition flags model msg effect
 createApplication program =
     ProgramDefinition emptyOptions <|
         \location flags ->
@@ -494,7 +494,7 @@ or (if neither of those support what you need) [`simulateLastEffect`](#simulateL
 as doing so will make your tests more robust to changes in your program's implementation details.
 
 -}
-update : msg -> ProgramTest msg model effect -> ProgramTest msg model effect
+update : msg -> ProgramTest model msg effect -> ProgramTest model msg effect
 update msg programTest =
     case programTest of
         Finished err ->
@@ -514,7 +514,7 @@ update msg programTest =
                 |> drain
 
 
-simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> ProgramTest msg model effect -> ProgramTest msg model effect
+simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateHelper functionDescription findTarget event programTest =
     case programTest of
         Finished err ->
@@ -558,7 +558,7 @@ After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/5
 a future release of this package will remove the `fieldId` parameter.
 
 -}
-simulateLabeledInputHelper : String -> String -> String -> Bool -> List Selector -> ( String, Json.Encode.Value ) -> ProgramTest msg model effect -> ProgramTest msg model effect
+simulateLabeledInputHelper : String -> String -> String -> Bool -> List Selector -> ( String, Json.Encode.Value ) -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateLabeledInputHelper functionDescription fieldId label allowTextArea additionalInputSelectors event programTest =
     programTest
         |> (if fieldId == "" then
@@ -625,7 +625,7 @@ Parameters:
     (see [Test.Html.Event "Event Builders"](http://package.elm-lang.org/packages/eeue56/elm-html-test/latest/Test-Html-Event#event-builders))
 
 -}
-simulate : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> ProgramTest msg model effect -> ProgramTest msg model effect
+simulate : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulate findTarget ( eventName, eventValue ) programTest =
     simulateHelper ("simulate " ++ escapeString eventName) findTarget ( eventName, eventValue ) programTest
 
@@ -643,7 +643,7 @@ NOTE: In the future, this function will be generalized to find buttons with acce
 matching the given `buttonText`.
 
 -}
-clickButton : String -> ProgramTest msg model effect -> ProgramTest msg model effect
+clickButton : String -> ProgramTest model msg effect -> ProgramTest model msg effect
 clickButton buttonText programTest =
     simulateHelper ("clickButton " ++ escapeString buttonText)
         (Query.Extra.oneOf
@@ -705,7 +705,7 @@ sets `preventDefault`, but this will be done in the future after
 <https://github.com/eeue56/elm-html-test/issues/63> is resolved.
 
 -}
-clickLink : String -> String -> ProgramTest msg model effect -> ProgramTest msg model effect
+clickLink : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
 clickLink linkText href programTest =
     let
         functionDescription =
@@ -798,7 +798,7 @@ clickLink linkText href programTest =
         |> tryClicking { otherwise = followLink functionDescription href }
 
 
-followLink : String -> String -> ProgramTest msg model effect -> ProgramTest msg model effect
+followLink : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
 followLink functionDescription href programTest =
     case programTest of
         Finished err ->
@@ -863,7 +863,7 @@ If you need more control over the finding the target element or creating the sim
 see [`simulate`](#simulate).
 
 -}
-fillIn : String -> String -> String -> ProgramTest msg model effect -> ProgramTest msg model effect
+fillIn : String -> String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
 fillIn fieldId label newContent programTest =
     simulateLabeledInputHelper ("fillIn " ++ escapeString label)
         fieldId
@@ -886,7 +886,7 @@ If you need more control over the finding the target element or creating the sim
 see [`simulate`](#simulate).
 
 -}
-fillInTextarea : String -> ProgramTest msg model effect -> ProgramTest msg model effect
+fillInTextarea : String -> ProgramTest model msg effect -> ProgramTest model msg effect
 fillInTextarea newContent programTest =
     simulateHelper "fillInTextarea"
         (Query.find [ Selector.tag "textarea" ])
@@ -923,7 +923,7 @@ If you need more control over the finding the target element or creating the sim
 see [`simulate`](#simulate).
 
 -}
-check : String -> String -> Bool -> ProgramTest msg model effect -> ProgramTest msg model effect
+check : String -> String -> Bool -> ProgramTest model msg effect -> ProgramTest model msg effect
 check fieldId label willBecomeChecked programTest =
     simulateLabeledInputHelper ("check " ++ escapeString label)
         fieldId
@@ -978,7 +978,7 @@ If you need more control over the finding the target element or creating the sim
 see [`simulate`](#simulate).
 
 -}
-selectOption : String -> String -> String -> String -> ProgramTest msg model effect -> ProgramTest msg model effect
+selectOption : String -> String -> String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
 selectOption fieldId label optionValue optionText programTest =
     let
         functionDescription =
@@ -1056,7 +1056,7 @@ then the following will allow you to simulate clicking the "Submit" button in th
         |> ...
 
 -}
-within : (Query.Single msg -> Query.Single msg) -> (ProgramTest msg model effect -> ProgramTest msg model effect) -> (ProgramTest msg model effect -> ProgramTest msg model effect)
+within : (Query.Single msg -> Query.Single msg) -> (ProgramTest model msg effect -> ProgramTest model msg effect) -> (ProgramTest model msg effect -> ProgramTest model msg effect)
 within findTarget onScopedTest programTest =
     case programTest of
         Finished err ->
@@ -1069,7 +1069,7 @@ within findTarget onScopedTest programTest =
                 |> replaceView state.program.view
 
 
-withSimulation : (EffectSimulation msg effect -> EffectSimulation msg effect) -> ProgramTest msg model effect -> ProgramTest msg model effect
+withSimulation : (EffectSimulation msg effect -> EffectSimulation msg effect) -> ProgramTest model msg effect -> ProgramTest model msg effect
 withSimulation f programTest =
     case programTest of
         Finished err ->
@@ -1080,7 +1080,7 @@ withSimulation f programTest =
                 { state | effectSimulation = Maybe.map f state.effectSimulation }
 
 
-queueEffect : effect -> ProgramTest msg model effect -> ProgramTest msg model effect
+queueEffect : effect -> ProgramTest model msg effect -> ProgramTest model msg effect
 queueEffect effect programTest =
     case programTest of
         Finished _ ->
@@ -1095,7 +1095,7 @@ queueEffect effect programTest =
                     queueSimulatedEffect (simulation.deconstructEffect effect) programTest
 
 
-queueSimulatedEffect : SimulatedEffect msg -> ProgramTest msg model effect -> ProgramTest msg model effect
+queueSimulatedEffect : SimulatedEffect msg -> ProgramTest model msg effect -> ProgramTest model msg effect
 queueSimulatedEffect effect programTest =
     case programTest of
         Finished _ ->
@@ -1143,7 +1143,7 @@ queueSimulatedEffect effect programTest =
                                 |> routeChange url
 
 
-drain : ProgramTest msg model effect -> ProgramTest msg model effect
+drain : ProgramTest model msg effect -> ProgramTest model msg effect
 drain =
     let
         advanceTimeIfSimulating t programTest =
@@ -1163,7 +1163,7 @@ drain =
         >> drainWorkQueue
 
 
-drainWorkQueue : ProgramTest msg model effect -> ProgramTest msg model effect
+drainWorkQueue : ProgramTest model msg effect -> ProgramTest model msg effect
 drainWorkQueue programTest =
     case programTest of
         Finished err ->
@@ -1202,7 +1202,7 @@ If you want to check the headers or request body, see [`assertHttpRequest`](#ass
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-assertHttpRequestWasMade : String -> String -> ProgramTest msg model effect -> Expectation
+assertHttpRequestWasMade : String -> String -> ProgramTest model msg effect -> Expectation
 assertHttpRequestWasMade method url programTest =
     done <|
         case programTest of
@@ -1240,8 +1240,8 @@ assertHttpRequest :
     String
     -> String
     -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
-    -> ProgramTest msg model effect
-    -> ProgramTest msg model effect
+    -> ProgramTest model msg effect
+    -> ProgramTest model msg effect
 assertHttpRequest method url checkRequest programTest =
     case programTest of
         Finished err ->
@@ -1285,7 +1285,7 @@ immediately before using `simulateHttpOk`.
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-simulateHttpOk : String -> String -> String -> ProgramTest msg model effect -> ProgramTest msg model effect
+simulateHttpOk : String -> String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateHttpOk method url responseBody =
     simulateHttpResponse method
         url
@@ -1312,7 +1312,7 @@ immediately before using `simulateHttpResponse`.
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-simulateHttpResponse : String -> String -> Http.Response String -> ProgramTest msg model effect -> ProgramTest msg model effect
+simulateHttpResponse : String -> String -> Http.Response String -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateHttpResponse method url response programTest =
     case programTest of
         Finished err ->
@@ -1352,7 +1352,7 @@ This will cause any pending `Task.sleep`s to trigger if their delay has elapsed.
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-advanceTime : Int -> ProgramTest msg model effect -> ProgramTest msg model effect
+advanceTime : Int -> ProgramTest model msg effect -> ProgramTest model msg effect
 advanceTime delta programTest =
     case programTest of
         Finished err ->
@@ -1367,7 +1367,7 @@ advanceTime delta programTest =
                     advanceTo "advanceTime" (simulation.state.nowMs + delta) programTest
 
 
-advanceTo : String -> Int -> ProgramTest msg model effect -> ProgramTest msg model effect
+advanceTo : String -> Int -> ProgramTest model msg effect -> ProgramTest model msg effect
 advanceTo functionName end programTest =
     case programTest of
         Finished err ->
@@ -1447,7 +1447,7 @@ For example:
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
-assertAndClearOutgoingPortValues : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest msg model effect -> ProgramTest msg model effect
+assertAndClearOutgoingPortValues : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
 assertAndClearOutgoingPortValues portName decoder checkValues programTest =
     case programTest of
         Finished err ->
@@ -1513,7 +1513,7 @@ The parameters are:
 NOTE: You must use [`withSimulatedSubscriptions`](#withSimulatedSubscriptions) before you call [`start`](#start) to be able to use this function.
 
 -}
-simulateIncomingPort : String -> Json.Encode.Value -> ProgramTest msg model effect -> ProgramTest msg model effect
+simulateIncomingPort : String -> Json.Encode.Value -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateIncomingPort portName value programTest =
     let
         fail_ =
@@ -1572,7 +1572,7 @@ simulateIncomingPort portName value programTest =
                         List.foldl step programTest matches
 
 
-replaceView : (model -> Query.Single msg) -> ProgramTest msg model effect -> ProgramTest msg model effect
+replaceView : (model -> Query.Single msg) -> ProgramTest model msg effect -> ProgramTest model msg effect
 replaceView newView programTest =
     case programTest of
         Finished err ->
@@ -1595,7 +1595,7 @@ a `Browser.application` and the user changes the URL in the browser's URL bar.
 The parameter may be an absolute URL or relative URL.
 
 -}
-routeChange : String -> ProgramTest msg model effect -> ProgramTest msg model effect
+routeChange : String -> ProgramTest model msg effect -> ProgramTest model msg effect
 routeChange url programTest =
     case programTest of
         Finished err ->
@@ -1620,7 +1620,7 @@ routeChange url programTest =
 
 {-| Make an assertion about the current state of a `ProgramTest`'s model.
 -}
-expectModel : (model -> Expectation) -> ProgramTest msg model effect -> Expectation
+expectModel : (model -> Expectation) -> ProgramTest model msg effect -> Expectation
 expectModel assertion programTest =
     done <|
         case programTest of
@@ -1647,7 +1647,7 @@ The function you provide will be called with the effect that was returned by the
 NOTE: If you are simulating HTTP response, you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
 
 -}
-simulateLastEffect : (effect -> Result String (List msg)) -> ProgramTest msg model effect -> ProgramTest msg model effect
+simulateLastEffect : (effect -> Result String (List msg)) -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateLastEffect toMsgs programTest =
     case programTest of
         Finished err ->
@@ -1662,7 +1662,7 @@ simulateLastEffect toMsgs programTest =
                     Finished (SimulateLastEffectFailed message)
 
 
-expectLastEffectHelper : String -> (effect -> Expectation) -> ProgramTest msg model effect -> ProgramTest msg model effect
+expectLastEffectHelper : String -> (effect -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
 expectLastEffectHelper functionName assertion programTest =
     case programTest of
         Finished err ->
@@ -1683,7 +1683,7 @@ NOTE: If you are asserting about HTTP requests being made,
 you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
 
 -}
-shouldHaveLastEffect : (effect -> Expectation) -> ProgramTest msg model effect -> ProgramTest msg model effect
+shouldHaveLastEffect : (effect -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
 shouldHaveLastEffect assertion programTest =
     expectLastEffectHelper "shouldHaveLastEffect" assertion programTest
 
@@ -1694,14 +1694,14 @@ NOTE: If you are asserting about HTTP requests being made,
 you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
 
 -}
-expectLastEffect : (effect -> Expectation) -> ProgramTest msg model effect -> Expectation
+expectLastEffect : (effect -> Expectation) -> ProgramTest model msg effect -> Expectation
 expectLastEffect assertion programTest =
     programTest
         |> expectLastEffectHelper "expectLastEffect" assertion
         |> done
 
 
-expectViewHelper : String -> (Query.Single msg -> Expectation) -> ProgramTest msg model effect -> ProgramTest msg model effect
+expectViewHelper : String -> (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
 expectViewHelper functionName assertion programTest =
     case programTest of
         Finished err ->
@@ -1723,28 +1723,28 @@ expectViewHelper functionName assertion programTest =
 
 {-| Validates the the current state of a `ProgramTest`'s view without ending the `ProgramTest`.
 -}
-shouldHaveView : (Query.Single msg -> Expectation) -> ProgramTest msg model effect -> ProgramTest msg model effect
+shouldHaveView : (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
 shouldHaveView assertion programTest =
     expectViewHelper "shouldHaveView" assertion programTest
 
 
 {-| `shouldHave [...selector...]` is equivalent to `shouldHaveView (Test.Html.Query.has [...selector...])`
 -}
-shouldHave : List Selector.Selector -> ProgramTest msg model effect -> ProgramTest msg model effect
+shouldHave : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
 shouldHave selector programTest =
     expectViewHelper "shouldHave" (Query.has selector) programTest
 
 
 {-| `shouldNotHave [...selector...]` is equivalent to `shouldHaveView (Test.Html.Query.hasNot [...selector...])`
 -}
-shouldNotHave : List Selector.Selector -> ProgramTest msg model effect -> ProgramTest msg model effect
+shouldNotHave : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
 shouldNotHave selector programTest =
     expectViewHelper "shouldNotHave" (Query.hasNot selector) programTest
 
 
 {-| Makes an assertion about the current state of a `ProgramTest`'s view.
 -}
-expectView : (Query.Single msg -> Expectation) -> ProgramTest msg model effect -> Expectation
+expectView : (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> Expectation
 expectView assertion programTest =
     programTest
         |> expectViewHelper "expectView" assertion
@@ -1756,7 +1756,7 @@ expectView assertion programTest =
 `expectViewHas [...selector...]` is the same as `expectView (Test.Html.Query.has [...selector...])`.
 
 -}
-expectViewHas : List Selector.Selector -> ProgramTest msg model effect -> Expectation
+expectViewHas : List Selector.Selector -> ProgramTest model msg effect -> Expectation
 expectViewHas selector programTest =
     programTest
         |> expectViewHelper "expectViewHas" (Query.has selector)
@@ -1769,7 +1769,7 @@ NOTE: You should prefer using a [final assertion](#final-assertions) to end your
 as doing so will [make the intent of your test more clear](https://www.artima.com/weblogs/viewpost.jsp?thread=35578).
 
 -}
-done : ProgramTest msg model effect -> Expectation
+done : ProgramTest model msg effect -> Expectation
 done programTest =
     case programTest of
         Active _ ->
@@ -1833,7 +1833,7 @@ done programTest =
 
 {-| Asserts that the program ended by navigating away to another URL.
 -}
-expectPageChange : String -> ProgramTest msg model effect -> Expectation
+expectPageChange : String -> ProgramTest model msg effect -> Expectation
 expectPageChange expectedUrl programTest =
     case programTest of
         Finished (ChangedPage cause finalLocation) ->
@@ -1851,7 +1851,7 @@ expectPageChange expectedUrl programTest =
 Example (this is a function that checks for a particular structure in the program's view,
 but will also fail the ProgramTest if the `expectedCount` parameter is invalid):
 
-    expectNotificationCount : Int -> ProgramTest Msg Model effect -> ProgramTest Msg Model effect
+    expectNotificationCount : Int -> ProgramTest model msg effect -> ProgramTest model msg effect
     expectNotificationCount expectedCount programTest =
         if expectedCount <= 0 then
             programTest
@@ -1868,7 +1868,7 @@ but will also fail the ProgramTest if the `expectedCount` parameter is invalid):
 If you are writing a convenience function that is creating a program test, see [`createFailed`](#createFailed).
 
 -}
-fail : String -> String -> ProgramTest msg model effect -> ProgramTest msg model effect
+fail : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
 fail assertionName failureMessage programTest =
     case programTest of
         Finished err ->
@@ -1895,7 +1895,7 @@ as it provides more context in the test failure message.
     import MyProgram exposing (Model, Msg)
     import ProgramTest exposing (ProgramTest)
 
-    createWithValidatedJson : Schema -> String -> ProgramTest Msg Model (Cmd Msg)
+    createWithValidatedJson : Schema -> String -> ProgramTest Model Msg (Cmd Msg)
     createWithValidatedJson schema json =
         case validateJsonSchema schema json of
             Err message ->
@@ -1912,6 +1912,6 @@ as it provides more context in the test failure message.
                     |> ProgramTest.start json
 
 -}
-createFailed : String -> String -> ProgramTest msg model effect
+createFailed : String -> String -> ProgramTest model msg effect
 createFailed functionName failureMessage =
     Finished (CustomFailure functionName failureMessage)

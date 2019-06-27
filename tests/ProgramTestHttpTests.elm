@@ -27,7 +27,7 @@ type alias TestModel =
     String
 
 
-start : TestEffect -> ProgramTest TestMsg TestModel TestEffect
+start : TestEffect -> ProgramTest TestModel TestMsg TestEffect
 start initialEffect =
     ProgramTest.createElement
         { init = \() -> ( "Init", initialEffect )
