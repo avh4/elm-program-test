@@ -258,7 +258,7 @@ One last step!  Now that we have a function of the required type,
 we can use it to enable effect simulation in our tests:
 
 ```elm{8}
-start : ProgramTest Main.Msg Main.Model Main.Effect
+start : ProgramTest Main.Model Main.Msg Main.Effect
 start =
     ProgramTest.createDocument
         { init = Main.init
