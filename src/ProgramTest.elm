@@ -1776,7 +1776,7 @@ done programTest =
             Expect.pass
 
         Finished (ChangedPage cause finalLocation) ->
-            Expect.fail (cause ++ " caused the program to end by navigating to " ++ escapeString (Url.toString finalLocation) ++ ".  NOTE: If this is what you intended, use `expectPageChange` instead of `done`.")
+            Expect.fail (cause ++ " caused the program to end by navigating to " ++ escapeString (Url.toString finalLocation) ++ ".  NOTE: If this is what you intended, use ProgramTest.expectPageChange to end your test.")
 
         Finished (ExpectFailed expectationName description reason) ->
             Expect.fail (expectationName ++ ":\n" ++ Test.Runner.Failure.format description reason)
@@ -1797,10 +1797,10 @@ done programTest =
             Expect.fail (functionName ++ ":\n" ++ message)
 
         Finished (ProgramDoesNotSupportNavigation functionName) ->
-            Expect.fail (functionName ++ ": Program does not support navigation.  Use ProgramTest.application to create a ProgramTest that supports navigation.")
+            Expect.fail (functionName ++ ": Program does not support navigation.  Use ProgramTest.createApplication to create a ProgramTest that supports navigation.")
 
         Finished (NoBaseUrl functionName relativeUrl) ->
-            Expect.fail (functionName ++ ": The ProgramTest does not have a base URL and cannot resolve the relative URL " ++ escapeString relativeUrl ++ ".  Use ProgramTest.startWithBaseUrl to create a ProgramTest that can resolve relative URLs.")
+            Expect.fail (functionName ++ ": The ProgramTest does not have a base URL and cannot resolve the relative URL " ++ escapeString relativeUrl ++ ".  Use ProgramTest.withBaseUrl before calling ProgramTest.start to create a ProgramTest that can resolve relative URLs.")
 
         Finished (NoMatchingHttpRequest functionName request pendingRequests) ->
             Expect.fail <|
