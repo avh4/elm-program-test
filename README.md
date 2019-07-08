@@ -9,6 +9,22 @@ and [elm-html-test](http://package.elm-lang.org/packages/eeue56/elm-html-test/la
 for testing your Elm programs as complete units.
 
 
+## [Guidebooks](https://elm-program-test.netlify.com/#guidebooks)
+
+Note: If you are just looking for a quick example of what using `elm-program-test` looks like,
+see the ["basic example"](#basic-example) below.
+
+For more detailed documentation, the following guides show examples of how to use
+`elm-program-test` to test different aspects of an Elm program:
+
+- [Testing programs with interactive views](https://elm-program-test.netlify.com/html.html) &mdash;
+  shows an example of test-driving adding form validation to an Elm program
+- [Testing programs with Cmds](https://elm-program-test.netlify.com/cmds.html) &mdash; shows testing a program
+  that uses `Http.get` and `Http.post`
+- [Testing programs with ports](https://elm-program-test.netlify.com/ports.html) &mdash; shows testing a program
+  that uses ports to interface with JavaScript
+
+
 ## Basic example
 
 In this example, `ProgramTest.create` is used to initiate testing of the imagined `MyProgram` module
