@@ -2,8 +2,8 @@ module VoterRegistrationExample exposing (Model, Msg(..), init, update, view)
 
 import Browser
 import Html
-import Html.Attributes exposing (for, id, type_, value)
-import Html.Events exposing (onClick, onInput, onSubmit)
+import Html.Attributes exposing (for, id, value)
+import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode
 import Json.Encode
@@ -14,6 +14,7 @@ type Model
         { name : String
         , streetAddress : String
         , postalCode : String
+        , error : Maybe String
         }
     | Loading
     | Success
@@ -39,6 +40,7 @@ init () =
         { name = ""
         , streetAddress = ""
         , postalCode = ""
+        , error = Nothing
         }
     , Cmd.none
     )
@@ -63,22 +65,32 @@ update msg model =
             )
 
         ( Form info, SubmitRegistration ) ->
-            ( Loading
-            , Http.post
-                { url = "/register"
-                , body =
-                    Http.jsonBody <|
-                        Json.Encode.object
-                            [ ( "name", Json.Encode.string info.name )
-                            , ( "streetAddress", Json.Encode.string info.streetAddress )
-                            , ( "postalCode", Json.Encode.string info.postalCode )
-                            ]
-                , expect =
-                    Http.expectJson
-                        RegistrationResponse
-                        (Json.Decode.field "nextElection" Json.Decode.string)
-                }
-            )
+            let
+                isValid =
+                    String.length info.postalCode == 5
+            in
+            if isValid then
+                ( Loading
+                , Http.post
+                    { url = "/register"
+                    , body =
+                        Http.jsonBody <|
+                            Json.Encode.object
+                                [ ( "name", Json.Encode.string info.name )
+                                , ( "streetAddress", Json.Encode.string info.streetAddress )
+                                , ( "postalCode", Json.Encode.string info.postalCode )
+                                ]
+                    , expect =
+                        Http.expectJson
+                            RegistrationResponse
+                            (Json.Decode.field "nextElection" Json.Decode.string)
+                    }
+                )
+
+            else
+                ( Form { info | error = Just "You must enter a valid postal code" }
+                , Cmd.none
+                )
 
         ( Form _, _ ) ->
             ( model, Cmd.none )
@@ -132,6 +144,12 @@ view model =
                         , value info.postalCode
                         ]
                         []
+                    , case info.error of
+                        Nothing ->
+                            Html.text ""
+
+                        Just error ->
+                            Html.text error
                     , Html.button
                         [ onClick SubmitRegistration ]
                         [ Html.text "Register" ]

@@ -20,17 +20,10 @@ good test coverage requires testing the interactions between your `view` and you
 
 ## Introducing the example program
 
-In this example, we'll be writing a new program from scratch,
-driving the development with tests,
-and using the preferred features of `elm-program-test` to
-encourage writing our UI in a way that makes it follow
-some accessibility best practices.  
-
-The program we'll be building is a simple voter registration form.
+In this example, we'll be working with simple voter registration form.
 Here's the page flow a user will experience:
 
 <!-- TODO: turn into SVG -->
-![](./bob.svg)
 ```
 +----------------+                                +---------------+
 |                |                                |               |
@@ -47,103 +40,39 @@ Here's the page flow a user will experience:
 +----------------+                                +---------------+
 ```
 
+We'll be using elm-program-test to help us add field validation for the
+"Postal code" field.
 
-Start with happy path program already implemented,  
-and this guide will add a test for a form validation
-
-
-## Setup
-
-<!-- TODO: fill in link -->
-(You can skip to the [next section]() if you are already familiar with
-setting up Elm and `elm-test` for a new project.
-All you need to know is that you'll need to install `avh4/elm-program-test`
-as a test dependency.)
-
-
-### Installing Elm and `elm-test`
-
-You may prefer to follow the official installation instructions
-[for Elm](https://guide.elm-lang.org/install.html)
-and [for `elm-test`](https://github.com/rtfeldman/node-test-runner#readme),
-but the quickest way to get started is:
-
-```sh
-npm install -g elm@elm0.19.0
-npm install -g elm-test@elm0.19.0
-mkdir example-app && cd example-app
-```
-
-### Initializing the project
-
-Elm and `elm-test` both include command line tools that are able to help set up your project.
-We'll use them both here:
-
-```sh
-elm init
-elm-test init
-elm-test install avh4/elm-program-test
-```
-
-The above commands will have created an appropriate `elm.json` and an example test file:
-
-```
-.
-├── elm.json
-├── src
-└── tests
-    └── Example.elm
-
-2 directories, 2 files
-```
-
-and we can now run the example test with `elm-test`:
-
-```sh
-$ elm-test
-
-elm-test 0.19.0-rev6
---------------------
-
-Running 1 test. To reproduce these results, run: elm-test --fuzz 100 --seed 261089602546669 /Users/avh4/workspace/elm-program-test/example-app/tests/Example.elm
-
-
-TEST RUN INCOMPLETE because there is 1 TODO remaining
-
-Duration: 162 ms
-Passed:   0
-Failed:   0
-Todo:     1
-↓ Example
-◦ TODO: Implement our first test. See https://package.elm-lang.org/packages/elm-explorations/test/latest for how to do this!
-
-```
+Using the `elm-program-test` will
+help us build our UI in a way that makes it follow
+some accessibility best practices.  
 
 
 ## Writing a program test
 
-Our goal will be to write a test for the following happy-path scenario:
+Our goal will be to write a test for the following scenario:
 
-- The user fills in the form:
+- The user fills in the form with:
     - their name
     - their street address
-    - their postal code
-- The user submits the form.
-- The server responds successfully.
-- The app should now show the "Success!" screen
-
-## Our first program test
+    - an **invalid postal code**
+- The user tries to submit the form
+- The app should show a validation error 
 
 
+### Preparing to write a program test
 
-```elm{22-33}
-module VoterRegistrationExampleTest exposing (all)
+Before we can write our actual test, we need to define how to create tests for our program.
+This is similar to writing your `main` definition for using your app in production.
+It's typical to call this definition `start` in your test file, but it can be called anything.
 
-import ProgramTest exposing (ProgramTest, clickButton, expectViewHas, fillIn, update)
-import Test exposing (..)
-import Test.Html.Selector exposing (text)
+Here's the `start` definition for our example program:
+
+```elm
+module VoteRegratistrationExampleTest exposing (..)
+
+import ProgramTest exposing (ProgramTest)
 import VoterRegistrationExample as Main
-
 
 start : ProgramTest Main.Model Main.Msg (Cmd Main.Msg)
 start =
@@ -153,31 +82,154 @@ start =
         , view = Main.view
         }
         |> ProgramTest.start ()
+```
+
+Just like when using one of the `Browser` module functions to create your real program,
+here we use one of the `ProgramText.create*` functions to create our program test.
+We provide the `init`, `update`, and `view` functions that comprise our program.
+After creating the program test definition, we use `ProgramTest.start` to pass the initial
+flags to the program.
+
+
+### Writing our test
+
+Now that we've defined how to start our program, we can write our test:
+
+
+```elm
+module VoterRegistrationExampleTest exposing (all)
+
+import ProgramTest exposing (ProgramTest, clickButton, expectViewHas, fillIn, update)
+import Test exposing (..)
+import Test.Html.Selector exposing (text)
+import VoterRegistrationExample as Main
 
 
 all : Test
 all =
     describe "voter registration frontend"
-        [ test "happy path: successful registration" <|
+        [ test "invalid postal code shows a validation error" <|
             \() ->
                 start
                     |> fillIn "name" "Name" "Bailey Sheppard"
                     |> fillIn "street-address" "Street Address" "14 North Moore Street"
-                    |> fillIn "postcode" "Postal Code" "60606"
+                    |> fillIn "postcode" "Postal Code" "0000"
                     |> clickButton "Register"
-                    |> update (Main.RegistrationResponse (Ok "Aug 12"))
                     |> expectViewHas
-                        [ text "Success!"
-                        , text "Next election date is: Aug 12"
+                        [ text "You must enter a valid postal code"
                         ]
         ]
 ```
 
-- `start`: ...
-- `fillIn`: ...
-- `clickButton`: ...
+Here we use `start` (which we defined in the previous section) to initialize the program,
+then simulate some user input using `fillIn` and `clickButton`,
+and finally we assert something about the final state of the page.
+
+Running the test gives us the following error:
+
+```
+↓ VoterRegistrationExampleTest
+↓ voter registration frontend
+✗ invalid postal code shows a validation error
+
+    expectViewHas:
+    ▼ Query.fromHtml
+    
+        <body>
+            Loading...
+        </body>
+
+    
+    ▼ Query.has [ text "You must enter a valid postal code" ]
+    
+    ✗ has text "You must enter a valid postal code"
 
 
-### (minimal Main module)
+TEST RUN FAILED
+```
 
-### test failure, and fix it...
+
+### Implementing the change
+
+This section doesn't explain anything specific to elm-program-test, but for completeness
+here are the changes needed to make the test pass:
+
+```diff
+--- a/src/VoterRegistrationExample.elm
++++ b/src/VoterRegistrationExample.elm
+ type Model
+     = Form
+         { name : String
+         , streetAddress : String
+         , postalCode : String
++        , error : Maybe String
+         }
+     | ...
+ 
+ 
+ init : Flags -> ( Model, Cmd Msg )
+ init () =
+     ( Form
+         { name = ""
+         , streetAddress = ""
+         , postalCode = ""
+|        , error = Nothing
+         }
+     , Cmd.none
+     )
+
+
+ update msg model =
+     case ( model, msg) of
+         ...
+ 
+         ( Form info, SubmitRegistration ) ->
++            let
++                isValid =
++                    String.length info.postalCode == 5
++            in
++            if isValid then
+                 ( Loading
+                 , Http.post
+                     { url = "/register"
+                     , body =
+                         Http.jsonBody <|
+                             Json.Encode.object
+                                 [ ( "name", Json.Encode.string info.name )
+                                 , ( "streetAddress", Json.Encode.string info.streetAddress )
+                                 , ( "postalCode", Json.Encode.string info.postalCode )
+                                 ]
+                     , expect =
+                         Http.expectJson
+                             RegistrationResponse
+                             (Json.Decode.field "nextElection" Json.Decode.string)
+                     }
+                 )
++
++            else
++                ( Form { info | error = Just "You must enter a valid postal code" }
++                , Cmd.none
++                )
+ 
+         ...
+
+
+view : Model -> Browser.Document Msg
+     ...
++                    , case info.error of
++                        Nothing ->
++                            Html.text ""
++
++                        Just error ->
++                            Html.text error
+                     , Html.button
+                         [ onClick SubmitRegistration ]
+                         [ Html.text "Register" ]
+     ...
+``` 
+
+
+## Try it out
+
+> TODO: once `elm-program-test` 3.0.0 is published,
+> a link to a live-editable version of this example will be added here

@@ -31,4 +31,14 @@ all =
                         [ text "Success!"
                         , text "Next election date is: Aug 12"
                         ]
+        , test "invalid postal code shows a validation error" <|
+            \() ->
+                start
+                    |> fillIn "name" "Name" "Bailey Sheppard"
+                    |> fillIn "street-address" "Street Address" "14 North Moore Street"
+                    |> fillIn "postcode" "Postal Code" "0000"
+                    |> clickButton "Register"
+                    |> expectViewHas
+                        [ text "You must enter a valid postal code"
+                        ]
         ]
