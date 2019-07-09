@@ -9,7 +9,7 @@ and [elm-html-test](http://package.elm-lang.org/packages/eeue56/elm-html-test/la
 for testing your Elm programs as complete units.
 
 Below are some very brief examples of some things you can do with `elm-program-test`.
-For more details, including how to test programs that use `Cmd`s, `Sub`s, and `Task`s`,
+For more details, including how to test programs that use `Cmd`s, `Sub`s, and `Task`s,
 see the [elm-program-test guidebooks](https://deploy-preview-56--elm-program-test.netlify.com/).
 
 
