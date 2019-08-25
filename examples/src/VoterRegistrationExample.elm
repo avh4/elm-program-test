@@ -2,7 +2,7 @@ module VoterRegistrationExample exposing (Model, Msg(..), init, update, view)
 
 import Browser
 import Html
-import Html.Attributes exposing (for, id, value)
+import Html.Attributes exposing (for, id, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode
@@ -151,7 +151,9 @@ view model =
                         Just error ->
                             Html.text error
                     , Html.button
-                        [ onClick SubmitRegistration ]
+                        [ onClick SubmitRegistration
+                        , type_ "button"
+                        ]
                         [ Html.text "Register" ]
                     ]
 
