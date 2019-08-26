@@ -11,11 +11,17 @@ make it possible to write unit tests for functions that return `Html msg`,
 but often
 (especially when your view is complicated enough to need to be tested)
 good test coverage requires testing the interactions between your `view` and your `update` functions
-(which communicate via the `Model` and `Msg`s).
+(which communicate via the `Model` and `Msg`s, as explained in ["An Introduction to Elm: The Elm Architecture"](https://guide.elm-lang.org/architecture/)).
 
-`elm-program-test` lets you write "high-level" tests for your program %%%
+`elm-program-test` lets you write "high-level" tests for your program,
+testing the public interface of your program rather than
+testing `view` and `update` functions independently.
+This gives you the flexibility to robustly test complex interactions
+between your `view`, `update`, and the state of your program when necessary; 
+and allows you to write your tests in terms of
+how users and external services interact with your program.
 
-%%% TODO: diagram of testing boundaries 
+![diagram of testing boundaries described in the preceding paragraph](./TestBoundaries.svg)
 
 
 ## Introducing the example program
@@ -104,7 +110,6 @@ import Test exposing (..)
 import Test.Html.Selector exposing (text)
 import VoterRegistrationExample as Main
 
-
 all : Test
 all =
     describe "voter registration frontend"
@@ -113,7 +118,7 @@ all =
                 start
                     |> fillIn "name" "Name" "Bailey Sheppard"
                     |> fillIn "street-address" "Street Address" "14 North Moore Street"
-                    |> fillIn "postcode" "Postal Code" "0000"
+                    |> fillIn "postcode" "Postal Code" "0000" -- (only 4 digits)
                     |> clickButton "Register"
                     |> expectViewHas
                         [ text "You must enter a valid postal code"
@@ -173,7 +178,7 @@ here are the changes needed to make the test pass:
          { name = ""
          , streetAddress = ""
          , postalCode = ""
-|        , error = Nothing
++        , error = Nothing
          }
      , Cmd.none
      )

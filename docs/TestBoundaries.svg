@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns="http://www.w3.org/2000/svg"
+     version="1.1" baseProfile="full" width="640px"
+     height="440px" viewBox="50 0 640 440" preserveAspectRatio="xMidYMid meet" style="zoom: 1;">
+    <g font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif'>
+
+        <rect fill="none" stroke="#007fff" stroke-width="2" stroke-dasharray="5,5" x="262" y="50" width="368" height="365" rx="20" ry="20"/>
+        <text fill="#007fff" x="375" y="39" font-size="18" text-anchor="middle" font-style="italic">elm-program-test tests</text>
+
+        <g transform="translate(156,79)">
+            <rect fill="#ffffff" stroke="#666" stroke-width="5" width="90" height="246"/>
+            <text fill="#666" x="10" y="27" font-size="20">Elm</text>
+            <text fill="#666" x="10" y="47" font-size="20">runtime</text>
+        </g>
+
+        <g transform="translate(274,0)">
+            <rect fill="#ffffff" stroke="#000000" stroke-width="5" y="63" width="342" height="200"/>
+            <text fill="#000000" text-anchor="middle" font-size="24" y="93" x="40">Main</text>
+
+            <g transform="translate(-10,40)">
+                <g transform="translate(37,126)">
+                    <rect fill="#ffffff" stroke="#000000" stroke-width="5" width="60" height="75"/>
+                    <text fill="#000000" x="30" y="25" font-size="24" text-anchor="middle">init</text>
+                </g>
+
+                <g transform="translate(125,126)">
+                    <rect fill="#ffffff" stroke="#000000" stroke-width="5" width="80" height="75"/>
+                    <text fill="#000000" x="40" y="25" font-size="24" text-anchor="middle">update</text>
+                    <rect fill="none" stroke="#ff7f00" stroke-width="2" stroke-dasharray="5,5" x="-10" y="-10" width="100" height="95" rx="10" ry="10"/>
+                </g>
+
+                <g transform="translate(244,126)">
+                    <rect fill="#ffffff" stroke="#000000" stroke-width="5" width="80" height="75"/>
+                    <text fill="#000000" x="40" y="25" font-size="24" text-anchor="middle">view</text>
+                    <rect fill="none" stroke="#ff7f00" stroke-width="2" stroke-dasharray="5,5" x="-10" y="-10" width="100" height="95" rx="10" ry="10"/>
+                </g>
+
+                <g transform="translate(120,-25)">
+                    <text fill="#ff7f00" y="89" font-size="18" font-style="italic">update/view unit tests</text>
+                    <text fill="#ff7f00" y="109" font-size="18" font-style="italic">no longer needed</text>
+                    <text fill="#ff7f00" y="129" font-size="18" font-style="italic">with elm-program-test</text>
+                </g>
+            </g>
+        </g>
+
+        <g transform="translate(296,230)">
+            <rect fill="#ffffff" stroke="#000000" stroke-width="5" y="83" width="117" height="73"/>
+            <text fill="#ff7f7f" x="0" y="63" font-size="18" font-style="italic">module unit tests</text>
+            <rect fill="none" stroke="#ff7f7f" stroke-width="2" stroke-dasharray="5,5" x="-10" y="73" width="137" height="93" rx="10" ry="10"/>
+
+            <text text-anchor="middle" font-size="48" y="124" x="170" fill="#000000">...</text>
+        </g>
+    </g>
+</svg>
