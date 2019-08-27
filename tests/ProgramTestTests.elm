@@ -188,6 +188,10 @@ all =
             \() ->
                 start
                     |> ProgramTest.expectViewHas [ Selector.tag "span" ]
+        , test "can assert on the view concisely with a terminal assertion given Html.Test.Selectors that should not exist" <|
+            \() ->
+                start
+                    |> ProgramTest.expectViewHasNot [ Selector.tag "article" ]
         , test "can assert on the view concisely given Html.Test.Selectors that should not exist" <|
             \() ->
                 start

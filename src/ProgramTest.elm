@@ -17,7 +17,7 @@ module ProgramTest exposing
     , assertAndClearOutgoingPortValues, simulateIncomingPort
     , update
     , simulateLastEffect
-    , expectViewHas, expectView
+    , expectViewHas, expectViewHasNot, expectView
     , expectLastEffect, expectModel
     , expectPageChange
     , shouldHave, shouldNotHave, shouldHaveView
@@ -109,7 +109,7 @@ The following functions allow you to configure your
 
 # Final assertions
 
-@docs expectViewHas, expectView
+@docs expectViewHas, expectViewHasNot, expectView
 @docs expectLastEffect, expectModel
 @docs expectPageChange
 
@@ -1721,21 +1721,27 @@ expectViewHelper functionName assertion programTest =
                     Finished (ExpectFailed functionName reason.description reason.reason)
 
 
-{-| Validates the the current state of a `ProgramTest`'s view without ending the `ProgramTest`.
+{-| Validates that the current state of a `ProgramTest`'s view without ending the `ProgramTest`.
 -}
 shouldHaveView : (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
 shouldHaveView assertion programTest =
     expectViewHelper "shouldHaveView" assertion programTest
 
 
-{-| `shouldHave [...selector...]` is equivalent to `shouldHaveView (Test.Html.Query.has [...selector...])`
+{-| Validates that the current state of a `ProgramTest`'s view matches a given selector.
+
+'`shouldHave [...selector...]` is equivalent to `shouldHaveView (Test.Html.Query.has [...selector...])`
+
 -}
 shouldHave : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
 shouldHave selector programTest =
     expectViewHelper "shouldHave" (Query.has selector) programTest
 
 
-{-| `shouldNotHave [...selector...]` is equivalent to `shouldHaveView (Test.Html.Query.hasNot [...selector...])`
+{-| Validates that the current state of a `ProgramTest`'s view does not match a given selector.
+
+`shouldNotHave [...selector...]` is equivalent to `shouldHaveView (Test.Html.Query.hasNot [...selector...])`
+
 -}
 shouldNotHave : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
 shouldNotHave selector programTest =
@@ -1760,6 +1766,18 @@ expectViewHas : List Selector.Selector -> ProgramTest model msg effect -> Expect
 expectViewHas selector programTest =
     programTest
         |> expectViewHelper "expectViewHas" (Query.has selector)
+        |> done
+
+
+{-| A simpler way to assert that a `ProgramTest`'s view does not match a given selector.
+
+`expectViewHasNot [...selector...]` is the same as `expectView (Test.Html.Query.hasNot [...selector...])`.
+
+-}
+expectViewHasNot : List Selector.Selector -> ProgramTest model msg effect -> Expectation
+expectViewHasNot selector programTest =
+    programTest
+        |> expectViewHelper "expectViewHasNot" (Query.hasNot selector)
         |> done
 
 
