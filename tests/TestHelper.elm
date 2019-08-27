@@ -1,4 +1,4 @@
-module TestHelper exposing (testAssertion2)
+module TestHelper exposing (testAssertion2, testAssertion3)
 
 import Expect exposing (Expectation)
 import Html
@@ -34,4 +34,21 @@ testAssertion2 expect ensure name go =
         , test "ensure" <|
             \() ->
                 go "ensure" (\a b -> ensure a b >> ProgramTest.done)
+        ]
+
+
+testAssertion3 :
+    (a -> b -> c -> ProgramTest model msg effect -> Expectation)
+    -> (a -> b -> c -> ProgramTest model msg effect -> ProgramTest model msg effect)
+    -> String
+    -> (String -> (a -> b -> c -> ProgramTest model msg effect -> Expectation) -> Expectation)
+    -> Test
+testAssertion3 expect ensure name go =
+    describe name
+        [ test "expect" <|
+            \() ->
+                go "expect" expect
+        , test "ensure" <|
+            \() ->
+                go "ensure" (\a b c -> ensure a b c >> ProgramTest.done)
         ]

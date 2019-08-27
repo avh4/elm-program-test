@@ -11,8 +11,8 @@ module ProgramTest exposing
     , routeChange
     , simulate
     , within
-    , expectHttpRequestWasMade, assertHttpRequest
-    , ensureHttpRequestWasMade
+    , expectHttpRequestWasMade, expectHttpRequest
+    , ensureHttpRequestWasMade, assertHttpRequest
     , simulateHttpOk, simulateHttpResponse
     , advanceTime
     , assertAndClearOutgoingPortValues, simulateIncomingPort
@@ -88,8 +88,8 @@ The following functions allow you to configure your
 
 ## Simulating HTTP responses
 
-@docs expectHttpRequestWasMade, assertHttpRequest
-@docs ensureHttpRequestWasMade
+@docs expectHttpRequestWasMade, expectHttpRequest
+@docs ensureHttpRequestWasMade, assertHttpRequest
 @docs simulateHttpOk, simulateHttpResponse
 
 
@@ -1234,10 +1234,29 @@ in create an expectation on the request.
 If you only care about whether the a request was made to the correct URL, see [`expectHttpRequestWasMade`](#expectHttpRequestWasMade).
 
     ...
-        |> assertHttpRequest "POST"
+        |> expectHttpRequest "POST"
             "https://example.com/save"
             (.body >> Expect.equal """{"content":"updated!"}""")
-        |> ...
+
+-}
+expectHttpRequest :
+    String
+    -> String
+    -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
+    -> ProgramTest model msg effect
+    -> Expectation
+expectHttpRequest method url checkRequest programTest =
+    programTest
+        |> expectHttpRequestHelper "expectHttpRequest" method url checkRequest
+        |> done
+
+
+{-| See the documentation for [`expectHttpRequest`](#expectHttpRequest).
+This is the same expect that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
+
+You should prefer `expectHttpRequest` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
 
 -}
 assertHttpRequest :
@@ -1247,7 +1266,7 @@ assertHttpRequest :
     -> ProgramTest model msg effect
     -> ProgramTest model msg effect
 assertHttpRequest method url checkRequest programTest =
-    expectHttpRequestHelper "assertHttpRequest" method url checkRequest programTest
+    expectHttpRequestHelper "ensureHttpRequest" method url checkRequest programTest
 
 
 expectHttpRequestHelper :

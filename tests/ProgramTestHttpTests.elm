@@ -73,6 +73,11 @@ all =
                 testAssertion2
                     ProgramTest.expectHttpRequestWasMade
                     ProgramTest.ensureHttpRequestWasMade
+
+            testRequest =
+                testAssertion3
+                    ProgramTest.expectHttpRequest
+                    ProgramTest.assertHttpRequest
         in
         [ describe "assertHttpRequest"
             [ testRequestWasMade "can assert that an HTTP request was made from init (failure)" <|
@@ -136,8 +141,8 @@ all =
                         |> expectFailure
                             [ "TEST SETUP ERROR: In order to use " ++ expect ++ "HttpRequestWasMade, you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start"
                             ]
-            , test "can assert on request body" <|
-                \() ->
+            , testRequest "can assert on request body" <|
+                \expect assertHttpRequest ->
                     start
                         (Http.post
                             { url = "https://example.com/ok"
@@ -145,20 +150,19 @@ all =
                             , expect = Http.expectString HandleStringResponse
                             }
                         )
-                        |> ProgramTest.assertHttpRequest "POST"
+                        |> assertHttpRequest "POST"
                             "https://example.com/ok"
                             (.body >> Expect.equal """{"ok":900}""")
-                        |> ProgramTest.done
                         |> expectFailure
-                            [ "assertHttpRequest:"
+                            [ expect ++ "HttpRequest:"
                             , """"{\\"ok\\":true}\""""
                             , "╵"
                             , "│ Expect.equal"
                             , "╷"
                             , """"{\\"ok\\":900}\""""
                             ]
-            , test "can assert on request headers" <|
-                \() ->
+            , testRequest "can assert on request headers" <|
+                \expect assertHttpRequest ->
                     start
                         (Http.request
                             { method = "POST"
@@ -170,7 +174,7 @@ all =
                             , tracker = Nothing
                             }
                         )
-                        |> ProgramTest.assertHttpRequest "POST"
+                        |> assertHttpRequest "POST"
                             "https://example.com/ok"
                             (.headers
                                 >> Expect.equal
@@ -178,7 +182,6 @@ all =
                                     , ( "X-Elm-Test", "Value 99" )
                                     ]
                             )
-                        |> ProgramTest.done
 
             -- TODO: how to handle multiple requests made to the same method/URL?
             ]

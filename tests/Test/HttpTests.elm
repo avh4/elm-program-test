@@ -8,6 +8,7 @@ import SimulatedEffect.Http as Http
 import Test exposing (..)
 import Test.Expect exposing (expectFailure)
 import Test.Http
+import TestHelper exposing (..)
 import TestingProgram exposing (Msg(..))
 
 
@@ -17,9 +18,15 @@ start =
 
 all : Test
 all =
-    describe "Test.Http"
-        [ test "can assert on request headers" <|
-            \() ->
+    describe "Test.Http" <|
+        let
+            testRequest =
+                testAssertion3
+                    ProgramTest.expectHttpRequest
+                    ProgramTest.assertHttpRequest
+        in
+        [ testRequest "can assert on request headers" <|
+            \expect assertHttpRequest ->
                 start
                     (Http.request
                         { method = "GET"
@@ -31,18 +38,17 @@ all =
                         , tracker = Nothing
                         }
                     )
-                    |> ProgramTest.assertHttpRequest "GET"
+                    |> assertHttpRequest "GET"
                         "https://example.com/ok"
                         (Test.Http.hasHeader "Content-Type" "application/json")
-                    |> ProgramTest.done
                     |> expectFailure
-                        [ "assertHttpRequest:"
+                        [ expect ++ "HttpRequest:"
                         , "Expected HTTP header Content-Type: application/json"
                         , "but got headers:"
                         , "    X-Elm-Test: Value 99"
                         ]
-        , test "can assert on JSON body" <|
-            \() ->
+        , testRequest "can assert on JSON body" <|
+            \expect assertHttpRequest ->
                 start
                     (Http.post
                         { url = "https://example.com/ok"
@@ -55,11 +61,10 @@ all =
                         , expect = Http.expectWhatever (Debug.toString >> Log)
                         }
                     )
-                    |> ProgramTest.assertHttpRequest "POST"
+                    |> assertHttpRequest "POST"
                         "https://example.com/ok"
                         (Test.Http.expectJsonBody
                             (Json.Decode.field "a" Json.Decode.int)
                             (Expect.equal 8)
                         )
-                    |> ProgramTest.done
         ]
