@@ -11,7 +11,7 @@ module ProgramTest exposing
     , routeChange
     , simulate
     , within
-    , assertHttpRequestWasMade, assertHttpRequest
+    , expectHttpRequestWasMade, assertHttpRequest
     , ensureHttpRequestWasMade
     , simulateHttpOk, simulateHttpResponse
     , advanceTime
@@ -88,7 +88,7 @@ The following functions allow you to configure your
 
 ## Simulating HTTP responses
 
-@docs assertHttpRequestWasMade, assertHttpRequest
+@docs expectHttpRequestWasMade, assertHttpRequest
 @docs ensureHttpRequestWasMade
 @docs simulateHttpOk, simulateHttpResponse
 
@@ -1206,18 +1206,18 @@ NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you ca
 If you want to interact with the program more after this assertion, see [`ensureHttpRequestWasMade`](#ensureHttpRequestWasMade).
 
 -}
-assertHttpRequestWasMade : String -> String -> ProgramTest model msg effect -> Expectation
-assertHttpRequestWasMade method url programTest =
+expectHttpRequestWasMade : String -> String -> ProgramTest model msg effect -> Expectation
+expectHttpRequestWasMade method url programTest =
     programTest
         |> expectHttpRequestHelper "expectHttpRequestWasMade" method url (always Expect.pass)
         |> done
 
 
-{-| See the documentation for [`assertHttpRequestWasMade`](#assertHttpRequestWasMade).
+{-| See the documentation for [`expectHttpRequestWasMade`](#expectHttpRequestWasMade).
 This is the same expect that it returns a `ProgramTest` instead of an `Expectation`
 so that you can interact with the program further after this assertion.
 
-You should prefer `assertHttpRequestWasMade` when possible,
+You should prefer `expectHttpRequestWasMade` when possible,
 as having a single assertion per test can make the intent of your tests more clear.
 
 -}
@@ -1231,7 +1231,7 @@ ensureHttpRequestWasMade method url =
 See the ["Expectations" section of `Test.Http`](Test-Http#expectations) for functions that might be helpful
 in create an expectation on the request.
 
-If you only care about whether the a request was made to the correct URL, see [`assertHttpRequestWasMade`](#assertHttpRequestWasMade).
+If you only care about whether the a request was made to the correct URL, see [`expectHttpRequestWasMade`](#expectHttpRequestWasMade).
 
     ...
         |> assertHttpRequest "POST"

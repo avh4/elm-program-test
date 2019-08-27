@@ -71,7 +71,7 @@ all =
         let
             testRequestWasMade =
                 testAssertion2
-                    ProgramTest.assertHttpRequestWasMade
+                    ProgramTest.expectHttpRequestWasMade
                     ProgramTest.ensureHttpRequestWasMade
         in
         [ describe "assertHttpRequest"
