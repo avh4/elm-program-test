@@ -21,7 +21,7 @@ module ProgramTest exposing
     , expectLastEffect, expectModel
     , expectPageChange
     , shouldHave, shouldNotHave, ensureView
-    , shouldHaveLastEffect
+    , ensureLastEffect
     , done
     , fail, createFailed
     )
@@ -119,7 +119,7 @@ The following functions allow you to configure your
 These functions can be used to make assertions on a `ProgramTest` without ending the test.
 
 @docs shouldHave, shouldNotHave, ensureView
-@docs shouldHaveLastEffect
+@docs ensureLastEffect
 
 To end a `ProgramTest` without using a [final assertion](#final-assertions), use the following function:
 
@@ -1682,16 +1682,22 @@ expectLastEffectHelper functionName assertion programTest =
 NOTE: If you are asserting about HTTP requests being made,
 you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
 
+NOTE: If this is the last step in your test, you can use [`expectLastEffect`](#expectLastEffect) instead
+to avoid having to call [`done`](#done) afterward.
+
 -}
-shouldHaveLastEffect : (effect -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
-shouldHaveLastEffect assertion programTest =
-    expectLastEffectHelper "shouldHaveLastEffect" assertion programTest
+ensureLastEffect : (effect -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureLastEffect assertion programTest =
+    expectLastEffectHelper "ensureLastEffect" assertion programTest
 
 
 {-| Makes an assertion about the last effect produced by a `ProgramTest`'s program.
 
 NOTE: If you are asserting about HTTP requests being made,
 you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
+
+NOTE: If you need to interact with the program more after this assertion,
+use [`ensureLastEffect`](#ensureLastEffect) instead.
 
 -}
 expectLastEffect : (effect -> Expectation) -> ProgramTest model msg effect -> Expectation

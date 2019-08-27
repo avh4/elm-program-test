@@ -216,9 +216,9 @@ all =
         , test "can assert on the last effect as an intermediate assertion" <|
             \() ->
                 start
-                    |> ProgramTest.shouldHaveLastEffect (Expect.equal NoOp)
+                    |> ProgramTest.ensureLastEffect (Expect.equal NoOp)
                     |> ProgramTest.clickButton "Click Me"
-                    |> ProgramTest.shouldHaveLastEffect (Expect.equal (LogUpdate "CLICK"))
+                    |> ProgramTest.ensureLastEffect (Expect.equal (LogUpdate "CLICK"))
                     |> ProgramTest.done
         , test "can simulate a response to the last effect" <|
             \() ->
