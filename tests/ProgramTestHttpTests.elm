@@ -11,6 +11,7 @@ import SimulatedEffect.Task as Task
 import Test exposing (..)
 import Test.Expect exposing (expectFailure, expectSuccess)
 import Test.Http
+import TestHelper exposing (..)
 
 
 type alias TestEffect =
@@ -66,23 +67,29 @@ start initialEffect =
 
 all : Test
 all =
-    describe "ProgramTest (HTTP API)"
+    describe "ProgramTest (HTTP API)" <|
+        let
+            testRequestWasMade =
+                testAssertion2
+                    ProgramTest.assertHttpRequestWasMade
+                    ProgramTest.ensureHttpRequestWasMade
+        in
         [ describe "assertHttpRequest"
-            [ test "can assert that an HTTP request was made from init (failure)" <|
-                \() ->
+            [ testRequestWasMade "can assert that an HTTP request was made from init (failure)" <|
+                \expect assertHttpRequestWasMade ->
                     start SimulatedEffect.Cmd.none
-                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectFailure
-                            [ "assertHttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
+                            [ expect ++ "HttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
                             , "    No requests were made."
                             ]
-            , test "can assert that an HTTP request was made from init (success)" <|
-                \() ->
+            , testRequestWasMade "can assert that an HTTP request was made from init (success)" <|
+                \expect assertHttpRequestWasMade ->
                     start (Http.get { url = "https://example.com/", expect = Http.expectString HandleStringResponse })
-                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectSuccess
-            , test "can assert that an HTTP request was made via a Task" <|
-                \() ->
+            , testRequestWasMade "can assert that an HTTP request was made via a Task" <|
+                \expect assertHttpRequestWasMade ->
                     start
                         (Http.task
                             { method = "GET"
@@ -94,40 +101,40 @@ all =
                             }
                             |> Task.attempt HandleStringResponse
                         )
-                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/get"
+                        |> assertHttpRequestWasMade "GET" "https://example.com/get"
                         |> expectSuccess
-            , test "can assert that an HTTP request was made from update" <|
-                \() ->
+            , testRequestWasMade "can assert that an HTTP request was made from update" <|
+                \expect assertHttpRequestWasMade ->
                     start SimulatedEffect.Cmd.none
                         |> ProgramTest.update (PassThroughEffect (Http.get { url = "https://example.com/from-update", expect = Http.expectString HandleStringResponse }))
-                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/from-update"
+                        |> assertHttpRequestWasMade "GET" "https://example.com/from-update"
                         |> expectSuccess
-            , test "can assert that an HTTP request was made via a user interaction" <|
-                \() ->
+            , testRequestWasMade "can assert that an HTTP request was made via a user interaction" <|
+                \expect assertHttpRequestWasMade ->
                     start SimulatedEffect.Cmd.none
                         |> ProgramTest.clickButton "Get"
-                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/buttons/get"
+                        |> assertHttpRequestWasMade "GET" "https://example.com/buttons/get"
                         |> expectSuccess
-            , test "error message includes list of pending requests" <|
-                \() ->
+            , testRequestWasMade "error message includes list of pending requests" <|
+                \expect assertHttpRequestWasMade ->
                     start (Http.get { url = "https://example.com/actualRequest", expect = Http.expectString HandleStringResponse })
-                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/not-made"
+                        |> assertHttpRequestWasMade "GET" "https://example.com/not-made"
                         |> expectFailure
-                            [ "assertHttpRequestWasMade: Expected HTTP request (GET https://example.com/not-made) to have been made, but it was not."
+                            [ expect ++ "HttpRequestWasMade: Expected HTTP request (GET https://example.com/not-made) to have been made, but it was not."
                             , "    The following requests were made:"
                             , "      - GET https://example.com/actualRequest"
                             ]
-            , test "gives explanatory error when using assertHttpRequest without using withSimulatedEffects" <|
-                \() ->
+            , testRequestWasMade "gives explanatory error when using assertHttpRequest without using withSimulatedEffects" <|
+                \expect assertHttpRequestWasMade ->
                     ProgramTest.createSandbox
                         { init = ()
                         , update = \() () -> ()
                         , view = \() -> Html.text "[view]"
                         }
                         |> ProgramTest.start ()
-                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectFailure
-                            [ "TEST SETUP ERROR: In order to use assertHttpRequestWasMade, you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start"
+                            [ "TEST SETUP ERROR: In order to use " ++ expect ++ "HttpRequestWasMade, you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start"
                             ]
             , test "can assert on request body" <|
                 \() ->
@@ -254,8 +261,8 @@ all =
                             "https://example.com/C/B-return"
                             """{}"""
                         |> ProgramTest.expectModel (Expect.equal """Ok "C-return\"""")
-            , test "a request can only be resolved once" <|
-                \() ->
+            , testRequestWasMade "a request can only be resolved once" <|
+                \expect assertHttpRequestWasMade ->
                     start
                         (Http.get
                             { url = "https://example.com/"
@@ -263,9 +270,9 @@ all =
                             }
                         )
                         |> ProgramTest.simulateHttpOk "GET" "https://example.com/" """{}"""
-                        |> ProgramTest.assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectFailure
-                            [ "assertHttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
+                            [ expect ++ "HttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
                             , "    No requests were made."
                             ]
             ]

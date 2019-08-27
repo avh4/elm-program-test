@@ -12,6 +12,7 @@ module ProgramTest exposing
     , simulate
     , within
     , assertHttpRequestWasMade, assertHttpRequest
+    , ensureHttpRequestWasMade
     , simulateHttpOk, simulateHttpResponse
     , advanceTime
     , assertAndClearOutgoingPortValues, simulateIncomingPort
@@ -88,6 +89,7 @@ The following functions allow you to configure your
 ## Simulating HTTP responses
 
 @docs assertHttpRequestWasMade, assertHttpRequest
+@docs ensureHttpRequestWasMade
 @docs simulateHttpOk, simulateHttpResponse
 
 
@@ -1195,31 +1197,33 @@ drainWorkQueue programTest =
                                 |> drain
 
 
-{-| A final assertion that checks whether an HTTP request to the specific url and method has been made.
+{-| Asserts that an HTTP request to the specific url and method has been made.
 
 If you want to check the headers or request body, see [`assertHttpRequest`](#assertHttpRequest).
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
+If you want to interact with the program more after this assertion, see [`ensureHttpRequestWasMade`](#ensureHttpRequestWasMade).
+
 -}
 assertHttpRequestWasMade : String -> String -> ProgramTest model msg effect -> Expectation
 assertHttpRequestWasMade method url programTest =
-    done <|
-        case programTest of
-            Finished err ->
-                Finished err
+    programTest
+        |> expectHttpRequestHelper "expectHttpRequestWasMade" method url (always Expect.pass)
+        |> done
 
-            Active state ->
-                case state.effectSimulation of
-                    Nothing ->
-                        Finished (EffectSimulationNotConfigured "assertHttpRequestWasMade")
 
-                    Just simulation ->
-                        if Dict.member ( method, url ) simulation.state.http then
-                            programTest
+{-| See the documentation for [`assertHttpRequestWasMade`](#assertHttpRequestWasMade).
+This is the same expect that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
 
-                        else
-                            Finished (NoMatchingHttpRequest "assertHttpRequestWasMade" { method = method, url = url } (Dict.keys simulation.state.http))
+You should prefer `assertHttpRequestWasMade` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
+
+-}
+ensureHttpRequestWasMade : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureHttpRequestWasMade method url =
+    expectHttpRequestHelper "ensureHttpRequestWasMade" method url (always Expect.pass)
 
 
 {-| Allows you to check the details of a pending HTTP request.
@@ -1243,6 +1247,17 @@ assertHttpRequest :
     -> ProgramTest model msg effect
     -> ProgramTest model msg effect
 assertHttpRequest method url checkRequest programTest =
+    expectHttpRequestHelper "assertHttpRequest" method url checkRequest programTest
+
+
+expectHttpRequestHelper :
+    String
+    -> String
+    -> String
+    -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
+    -> ProgramTest model msg effect
+    -> ProgramTest model msg effect
+expectHttpRequestHelper functionName method url checkRequest programTest =
     case programTest of
         Finished err ->
             Finished err
@@ -1250,7 +1265,7 @@ assertHttpRequest method url checkRequest programTest =
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished (EffectSimulationNotConfigured "assertHttpRequest")
+                    Finished (EffectSimulationNotConfigured functionName)
 
                 Just simulation ->
                     case Dict.get ( method, url ) simulation.state.http of
@@ -1261,10 +1276,10 @@ assertHttpRequest method url checkRequest programTest =
                                     programTest
 
                                 Just reason ->
-                                    Finished (ExpectFailed "assertHttpRequest" reason.description reason.reason)
+                                    Finished (ExpectFailed functionName reason.description reason.reason)
 
                         Nothing ->
-                            Finished (NoMatchingHttpRequest "assertHttpRequest" { method = method, url = url } (Dict.keys simulation.state.http))
+                            Finished (NoMatchingHttpRequest functionName { method = method, url = url } (Dict.keys simulation.state.http))
 
 
 {-| Simulates an HTTP 200 response to a pending request with the given method and url.
