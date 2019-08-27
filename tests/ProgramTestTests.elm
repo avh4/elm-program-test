@@ -182,7 +182,7 @@ all =
         , test "can assert on the view concisely given Html.Test.Selectors" <|
             \() ->
                 start
-                    |> ProgramTest.shouldHave [ Selector.tag "span" ]
+                    |> ProgramTest.ensureViewHas [ Selector.tag "span" ]
                     |> ProgramTest.done
         , test "can assert on the view concisely with a terminal assertion given Html.Test.Selectors" <|
             \() ->

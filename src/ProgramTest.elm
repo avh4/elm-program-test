@@ -20,7 +20,7 @@ module ProgramTest exposing
     , expectViewHas, expectViewHasNot, expectView
     , expectLastEffect, expectModel
     , expectPageChange
-    , shouldHave, ensureViewHasNot, ensureView
+    , ensureViewHas, ensureViewHasNot, ensureView
     , ensureLastEffect
     , done
     , fail, createFailed
@@ -118,7 +118,7 @@ The following functions allow you to configure your
 
 These functions can be used to make assertions on a `ProgramTest` without ending the test.
 
-@docs shouldHave, ensureViewHasNot, ensureView
+@docs ensureViewHas, ensureViewHasNot, ensureView
 @docs ensureLastEffect
 
 To end a `ProgramTest` without using a [final assertion](#final-assertions), use the following function:
@@ -1740,12 +1740,15 @@ ensureView assertion programTest =
 
 {-| Validates that the current state of a `ProgramTest`'s view matches a given selector.
 
-'`shouldHave [...selector...]` is equivalent to `ensureView (Test.Html.Query.has [...selector...])`
+`ensureViewHas [...selector...]` is equivalent to `ensureView (Test.Html.Query.has [...selector...])`
+
+NOTE: If this is the last step in your test, you can use [`expectViewHas`](#expectViewHas) instead
+to avoid having to call [`done`](#done) afterward.
 
 -}
-shouldHave : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
-shouldHave selector programTest =
-    expectViewHelper "shouldHave" (Query.has selector) programTest
+ensureViewHas : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureViewHas selector programTest =
+    expectViewHelper "ensureViewHas" (Query.has selector) programTest
 
 
 {-| Validates that the current state of a `ProgramTest`'s view does not match a given selector.
@@ -1777,6 +1780,9 @@ expectView assertion programTest =
 {-| A simpler way to assert that a `ProgramTest`'s view matches a given selector.
 
 `expectViewHas [...selector...]` is the same as `expectView (Test.Html.Query.has [...selector...])`.
+
+NOTE: If you need to interact with the program more after this assertion,
+use [`ensureViewHas`](#ensureViewHas) instead.
 
 -}
 expectViewHas : List Selector.Selector -> ProgramTest model msg effect -> Expectation
@@ -1889,7 +1895,7 @@ expectPageChange expectedUrl programTest =
 Example (this is a function that checks for a particular structure in the program's view,
 but will also fail the ProgramTest if the `expectedCount` parameter is invalid):
 
-    expectNotificationCount : Int -> ProgramTest model msg effect -> ProgramTest model msg effect
+    expectNotificationCount : Int -> ProgramTest model msg effect -> Expectation
     expectNotificationCount expectedCount programTest =
         if expectedCount <= 0 then
             programTest
@@ -1898,7 +1904,7 @@ but will also fail the ProgramTest if the `expectedCount` parameter is invalid):
 
         else
             programTest
-                |> shouldHave
+                |> expectViewHas
                     [ Test.Html.Selector.class "notifications"
                     , Test.Html.Selector.text (toString expectedCount)
                     ]
