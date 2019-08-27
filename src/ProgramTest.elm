@@ -9,7 +9,7 @@ module ProgramTest exposing
     , fillIn, fillInTextarea
     , check, selectOption
     , routeChange
-    , simulate
+    , simulateDomEvent
     , within
     , expectHttpRequestWasMade, expectHttpRequest
     , ensureHttpRequestWasMade, ensureHttpRequest
@@ -79,7 +79,7 @@ The following functions allow you to configure your
 
 ## Simulating user input (advanced)
 
-@docs simulate
+@docs simulateDomEvent
 @docs within
 
 
@@ -627,9 +627,9 @@ Parameters:
     (see [Test.Html.Event "Event Builders"](http://package.elm-lang.org/packages/eeue56/elm-html-test/latest/Test-Html-Event#event-builders))
 
 -}
-simulate : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> ProgramTest model msg effect -> ProgramTest model msg effect
-simulate findTarget ( eventName, eventValue ) programTest =
-    simulateHelper ("simulate " ++ escapeString eventName) findTarget ( eventName, eventValue ) programTest
+simulateDomEvent : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> ProgramTest model msg effect -> ProgramTest model msg effect
+simulateDomEvent findTarget ( eventName, eventValue ) programTest =
+    simulateHelper ("simulateDomEvent " ++ escapeString eventName) findTarget ( eventName, eventValue ) programTest
 
 
 escapeString : String -> String
@@ -862,7 +862,7 @@ If you need to target a `<textarea>` that does not have a label,
 see [`fillInTextarea`](#fillInTextArea).
 
 If you need more control over the finding the target element or creating the simulated event,
-see [`simulate`](#simulate).
+see [`simulateDomEvent`](#simulateDomEvent).
 
 -}
 fillIn : String -> String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -885,7 +885,7 @@ prefer adding associated `<label>` elements and use [`fillIn`](#fillIn).
 If you cannot add `<label>` elements see [`within`](#within).
 
 If you need more control over the finding the target element or creating the simulated event,
-see [`simulate`](#simulate).
+see [`simulateDomEvent`](#simulateDomEvent).
 
 -}
 fillInTextarea : String -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -922,7 +922,7 @@ NOTE: In the future, this will be generalized to work with
 aria accessibility attributes in addition to working with standard HTML label elements.
 
 If you need more control over the finding the target element or creating the simulated event,
-see [`simulate`](#simulate).
+see [`simulateDomEvent`](#simulateDomEvent).
 
 -}
 check : String -> String -> Bool -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -977,7 +977,7 @@ you can simulate selecting an option like this:
     ProgramTest.selectOption "pet-select" "Choose a pet" "dog" "Dog"
 
 If you need more control over the finding the target element or creating the simulated event,
-see [`simulate`](#simulate).
+see [`simulateDomEvent`](#simulateDomEvent).
 
 -}
 selectOption : String -> String -> String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect

@@ -200,7 +200,7 @@ all =
         , test "can simulate an arbitrary DOM event" <|
             \() ->
                 start
-                    |> ProgramTest.simulate
+                    |> ProgramTest.simulateDomEvent
                         (Query.find [ Selector.tag "strange" ])
                         ( "odd", Json.Encode.string "<ODD-VALUE>" )
                     |> ProgramTest.expectModel (Expect.equal "<INIT>;<ODD-VALUE>")
