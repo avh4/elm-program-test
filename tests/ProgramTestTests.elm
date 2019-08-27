@@ -154,7 +154,7 @@ all =
         , test "can assert on the view" <|
             \() ->
                 start
-                    |> ProgramTest.shouldHaveView
+                    |> ProgramTest.ensureView
                         (Query.find [ Selector.tag "span" ] >> Query.has [ Selector.text "<INIT>" ])
                     |> ProgramTest.done
         , test "can assert on the view concisely with a terminal assertion" <|

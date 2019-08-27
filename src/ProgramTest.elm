@@ -20,7 +20,7 @@ module ProgramTest exposing
     , expectViewHas, expectViewHasNot, expectView
     , expectLastEffect, expectModel
     , expectPageChange
-    , shouldHave, shouldNotHave, shouldHaveView
+    , shouldHave, shouldNotHave, ensureView
     , shouldHaveLastEffect
     , done
     , fail, createFailed
@@ -118,7 +118,7 @@ The following functions allow you to configure your
 
 These functions can be used to make assertions on a `ProgramTest` without ending the test.
 
-@docs shouldHave, shouldNotHave, shouldHaveView
+@docs shouldHave, shouldNotHave, ensureView
 @docs shouldHaveLastEffect
 
 To end a `ProgramTest` without using a [final assertion](#final-assertions), use the following function:
@@ -1722,15 +1722,19 @@ expectViewHelper functionName assertion programTest =
 
 
 {-| Validates that the current state of a `ProgramTest`'s view without ending the `ProgramTest`.
+
+NOTE: If this is the last step in your test, you can use [`expectView`](#expectView) instead
+to avoid having to call [`done`](#done) afterward.
+
 -}
-shouldHaveView : (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
-shouldHaveView assertion programTest =
-    expectViewHelper "shouldHaveView" assertion programTest
+ensureView : (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureView assertion programTest =
+    expectViewHelper "ensureView" assertion programTest
 
 
 {-| Validates that the current state of a `ProgramTest`'s view matches a given selector.
 
-'`shouldHave [...selector...]` is equivalent to `shouldHaveView (Test.Html.Query.has [...selector...])`
+'`shouldHave [...selector...]` is equivalent to `ensureView (Test.Html.Query.has [...selector...])`
 
 -}
 shouldHave : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -1740,7 +1744,7 @@ shouldHave selector programTest =
 
 {-| Validates that the current state of a `ProgramTest`'s view does not match a given selector.
 
-`shouldNotHave [...selector...]` is equivalent to `shouldHaveView (Test.Html.Query.hasNot [...selector...])`
+`shouldNotHave [...selector...]` is equivalent to `ensureView (Test.Html.Query.hasNot [...selector...])`
 
 -}
 shouldNotHave : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -1749,6 +1753,10 @@ shouldNotHave selector programTest =
 
 
 {-| Makes an assertion about the current state of a `ProgramTest`'s view.
+
+NOTE: If you need to interact with the program more after this assertion,
+use [`ensureView`](#ensureView) instead.
+
 -}
 expectView : (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> Expectation
 expectView assertion programTest =
