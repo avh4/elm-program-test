@@ -20,7 +20,7 @@ module ProgramTest exposing
     , expectViewHas, expectViewHasNot, expectView
     , expectLastEffect, expectModel
     , expectPageChange
-    , shouldHave, shouldNotHave, ensureView
+    , shouldHave, ensureViewHasNot, ensureView
     , ensureLastEffect
     , done
     , fail, createFailed
@@ -118,7 +118,7 @@ The following functions allow you to configure your
 
 These functions can be used to make assertions on a `ProgramTest` without ending the test.
 
-@docs shouldHave, shouldNotHave, ensureView
+@docs shouldHave, ensureViewHasNot, ensureView
 @docs ensureLastEffect
 
 To end a `ProgramTest` without using a [final assertion](#final-assertions), use the following function:
@@ -1750,12 +1750,15 @@ shouldHave selector programTest =
 
 {-| Validates that the current state of a `ProgramTest`'s view does not match a given selector.
 
-`shouldNotHave [...selector...]` is equivalent to `ensureView (Test.Html.Query.hasNot [...selector...])`
+`ensureViewHasNot [...selector...]` is equivalent to `ensureView (Test.Html.Query.hasNot [...selector...])`
+
+NOTE: If this is the last step in your test, you can use [`expectViewHasNot`](#expectViewHasNot) instead
+to avoid having to call [`done`](#done) afterward.
 
 -}
-shouldNotHave : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
-shouldNotHave selector programTest =
-    expectViewHelper "shouldNotHave" (Query.hasNot selector) programTest
+ensureViewHasNot : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureViewHasNot selector programTest =
+    expectViewHelper "ensureViewHasNot" (Query.hasNot selector) programTest
 
 
 {-| Makes an assertion about the current state of a `ProgramTest`'s view.
@@ -1786,6 +1789,9 @@ expectViewHas selector programTest =
 {-| A simpler way to assert that a `ProgramTest`'s view does not match a given selector.
 
 `expectViewHasNot [...selector...]` is the same as `expectView (Test.Html.Query.hasNot [...selector...])`.
+
+NOTE: If you need to interact with the program more after this assertion,
+use [`ensureViewHasNot`](#ensureViewHasNot) instead.
 
 -}
 expectViewHasNot : List Selector.Selector -> ProgramTest model msg effect -> Expectation
