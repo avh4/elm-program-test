@@ -77,7 +77,7 @@ all =
             testRequest =
                 testAssertion3
                     ProgramTest.expectHttpRequest
-                    ProgramTest.assertHttpRequest
+                    ProgramTest.ensureHttpRequest
         in
         [ describe "assertHttpRequest"
             [ testRequestWasMade "can assert that an HTTP request was made from init (failure)" <|
@@ -129,7 +129,7 @@ all =
                             , "    The following requests were made:"
                             , "      - GET https://example.com/actualRequest"
                             ]
-            , testRequestWasMade "gives explanatory error when using assertHttpRequest without using withSimulatedEffects" <|
+            , testRequestWasMade "gives explanatory error when used without `withSimulatedEffects`" <|
                 \expect assertHttpRequestWasMade ->
                     ProgramTest.createSandbox
                         { init = ()

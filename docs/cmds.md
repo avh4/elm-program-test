@@ -80,11 +80,10 @@ test "controlling a light" <|
                 "http://localhost:8003/lighting_service/v1/devices"
                 """[{"id":"K001", "name":"Kitchen", "dimmable":false, "value":0}]"""
             |> ProgramTest.clickButton "Turn on"
-            |> ProgramTest.assertHttpRequest
+            |> ProgramTest.expectHttpRequest
                 "POST"
                 "http://localhost:8003/lighting_service/v1/devices/K001"
                 (.body >> Expect.equal """{"value":1}""")
-            |> ProgramTest.done
 ```
 
 However, running this test produces the following failure:

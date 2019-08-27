@@ -12,7 +12,7 @@ module ProgramTest exposing
     , simulate
     , within
     , expectHttpRequestWasMade, expectHttpRequest
-    , ensureHttpRequestWasMade, assertHttpRequest
+    , ensureHttpRequestWasMade, ensureHttpRequest
     , simulateHttpOk, simulateHttpResponse
     , advanceTime
     , assertAndClearOutgoingPortValues, simulateIncomingPort
@@ -89,7 +89,7 @@ The following functions allow you to configure your
 ## Simulating HTTP responses
 
 @docs expectHttpRequestWasMade, expectHttpRequest
-@docs ensureHttpRequestWasMade, assertHttpRequest
+@docs ensureHttpRequestWasMade, ensureHttpRequest
 @docs simulateHttpOk, simulateHttpResponse
 
 
@@ -1199,7 +1199,7 @@ drainWorkQueue programTest =
 
 {-| Asserts that an HTTP request to the specific url and method has been made.
 
-If you want to check the headers or request body, see [`assertHttpRequest`](#assertHttpRequest).
+If you want to check the headers or request body, see [`expectHttpRequest`](#expectHttpRequest).
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
@@ -1238,6 +1238,8 @@ If you only care about whether the a request was made to the correct URL, see [`
             "https://example.com/save"
             (.body >> Expect.equal """{"content":"updated!"}""")
 
+If you want to interact with the program more after this assertion, see [`ensureHttpRequest`](#ensureHttpRequest).
+
 -}
 expectHttpRequest :
     String
@@ -1259,13 +1261,13 @@ You should prefer `expectHttpRequest` when possible,
 as having a single assertion per test can make the intent of your tests more clear.
 
 -}
-assertHttpRequest :
+ensureHttpRequest :
     String
     -> String
     -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
     -> ProgramTest model msg effect
     -> ProgramTest model msg effect
-assertHttpRequest method url checkRequest programTest =
+ensureHttpRequest method url checkRequest programTest =
     expectHttpRequestHelper "ensureHttpRequest" method url checkRequest programTest
 
 
@@ -1313,7 +1315,7 @@ If you need to simulate an error, a response with a different status code,
 or a response with response headers,
 see [`simulateHttpResponse`](#simulateHttpResponse).
 
-If you want to check the request headers or request body, use [`assertHttpRequest`](#assertHttpRequest)
+If you want to check the request headers or request body, use [`ensureHttpRequest`](#ensureHttpRequest)
 immediately before using `simulateHttpOk`.
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
@@ -1340,7 +1342,7 @@ for convenient ways to create `Http.Response` values.
 If you are simulating a 200 OK response and don't need to provide response headers,
 you can use the simpler [`simulateHttpOk`](#simulateHttpOk).
 
-If you want to check the request headers or request body, use [`assertHttpRequest`](#assertHttpRequest)
+If you want to check the request headers or request body, use [`ensureHttpRequest`](#ensureHttpRequest)
 immediately before using `simulateHttpResponse`.
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.

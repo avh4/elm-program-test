@@ -23,7 +23,7 @@ all =
             testRequest =
                 testAssertion3
                     ProgramTest.expectHttpRequest
-                    ProgramTest.assertHttpRequest
+                    ProgramTest.ensureHttpRequest
         in
         [ testRequest "can assert on request headers" <|
             \expect assertHttpRequest ->

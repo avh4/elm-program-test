@@ -29,13 +29,12 @@ import SimulatedEffect
 {-| A convenient way to check something about the request body of a pending HTTP request.
 
     ...
-        |> ProgramTest.assertHttpRequest "POST"
+        |> ProgramTest.expectHttpRequest "POST"
             "https://example.com/ok"
             (Test.Http.expectJsonBody
                 (Json.Decode.field "version" Json.Decode.string)
                 (Expect.equal "3.1.5")
             )
-        |> ...
 
 -}
 expectJsonBody :
@@ -55,10 +54,9 @@ expectJsonBody decoder check request =
 {-| Assert that the given HTTP request has the specified header.
 
     ...
-        |> ProgramTest.assertHttpRequest "POST"
+        |> ProgramTest.expectHttpRequest "POST"
             "https://example.com/ok"
             (Test.Http.hasHeader "Content-Type" "application/json")
-        |> ...
 
 -}
 hasHeader : String -> String -> SimulatedEffect.HttpRequest x a -> Expectation
