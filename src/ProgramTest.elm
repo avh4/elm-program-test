@@ -15,7 +15,8 @@ module ProgramTest exposing
     , ensureHttpRequestWasMade, ensureHttpRequest
     , simulateHttpOk, simulateHttpResponse
     , advanceTime
-    , assertAndClearOutgoingPortValues, simulateIncomingPort
+    , expectOutgoingPortValues, assertAndClearOutgoingPortValues
+    , simulateIncomingPort
     , update
     , simulateLastEffect
     , expectViewHas, expectViewHasNot, expectView
@@ -100,7 +101,8 @@ The following functions allow you to configure your
 
 ## Simulating ports
 
-@docs assertAndClearOutgoingPortValues, simulateIncomingPort
+@docs expectOutgoingPortValues, assertAndClearOutgoingPortValues
+@docs simulateIncomingPort
 
 
 # Directly sending Msgs
@@ -1468,23 +1470,44 @@ The parameters are:
 1.  The name of the port
 2.  A JSON decoder corresponding to the type of the port
 3.  A function that will receive the list of values sent to the port
-    since the last use of `assertAndClearOutgoingPortValues` (or since the start of the test)
+    since the last use of `ensureOutgoingPortValues` (or since the start of the test)
     and returns an `Expectation`
 
 For example:
 
     ...
-        |> assertAndClearOutgoingPortValues
+        |> expectOutgoingPortValues
             "saveApiTokenToLocalStorage"
             Json.Decode.string
             (Expect.equal [ "975774a26612", "920facb1bac0" ])
-        |> ...
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
+
+If you want to interact with the program more after this assertion, see [`assertAndClearOutgoingPortValues`](#assertAndClearOutgoingPortValues).
+
+-}
+expectOutgoingPortValues : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest model msg effect -> Expectation
+expectOutgoingPortValues portName decoder checkValues programTest =
+    programTest
+        |> expectOutgoingPortValuesHelper "expectOutgoingPortValues" portName decoder checkValues
+        |> done
+
+
+{-| See the documentation for [`expectOutgoingPortValues`](#expectOutgoingPortValues).
+This is the same expect that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
+
+You should prefer `expectOutgoingPortValues` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
 
 -}
 assertAndClearOutgoingPortValues : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
 assertAndClearOutgoingPortValues portName decoder checkValues programTest =
+    expectOutgoingPortValuesHelper "ensureOutgoingPortValues" portName decoder checkValues programTest
+
+
+expectOutgoingPortValuesHelper : String -> String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+expectOutgoingPortValuesHelper functionName portName decoder checkValues programTest =
     case programTest of
         Finished err ->
             Finished err
@@ -1492,12 +1515,12 @@ assertAndClearOutgoingPortValues portName decoder checkValues programTest =
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished (EffectSimulationNotConfigured "assertAndClearOutgoingPortValues")
+                    Finished (EffectSimulationNotConfigured functionName)
 
                 Just simulation ->
                     case allOk <| List.map (Json.Decode.decodeValue decoder) <| EffectSimulation.outgoingPortValues portName simulation of
                         Err errs ->
-                            Finished (CustomFailure "assertAndClearOutgoingPortValues: failed to decode port values" (List.map Json.Decode.errorToString errs |> String.join "\n"))
+                            Finished (CustomFailure (functionName ++ ": failed to decode port values") (List.map Json.Decode.errorToString errs |> String.join "\n"))
 
                         Ok values ->
                             case Test.Runner.getFailureReason (checkValues values) of
@@ -1511,7 +1534,7 @@ assertAndClearOutgoingPortValues portName decoder checkValues programTest =
 
                                 Just reason ->
                                     Finished
-                                        (ExpectFailed ("assertAndClearOutgoingPortValues: values sent to port \"" ++ portName ++ "\" did not match")
+                                        (ExpectFailed (functionName ++ ": values sent to port \"" ++ portName ++ "\" did not match")
                                             reason.description
                                             reason.reason
                                         )

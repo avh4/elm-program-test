@@ -10,6 +10,7 @@ import SimulatedEffect.Ports
 import SimulatedEffect.Sub
 import Test exposing (..)
 import Test.Expect exposing (expectFailure)
+import TestHelper exposing (..)
 import TestingProgram exposing (Msg(..))
 
 
@@ -19,45 +20,46 @@ start =
 
 all : Test
 all =
-    describe "simulated port effects"
+    describe "simulated port effects" <|
+        let
+            testOutgoingPortValues =
+                testAssertion3
+                    ProgramTest.expectOutgoingPortValues
+                    ProgramTest.assertAndClearOutgoingPortValues
+        in
         [ describe "outgoing ports"
-            [ test "can check sent values" <|
-                \() ->
+            [ testOutgoingPortValues "can check sent values" <|
+                \_ assertOutgoingPortValues ->
                     start (SimulatedEffect.Ports.send "unit" Json.null)
-                        |> ProgramTest.assertAndClearOutgoingPortValues "unit" (Decode.null ()) (Expect.equal [ () ])
-                        |> ProgramTest.done
-            , test "gives error if checked values don't match" <|
-                \() ->
+                        |> assertOutgoingPortValues "unit" (Decode.null ()) (Expect.equal [ () ])
+            , testOutgoingPortValues "gives error if checked values don't match" <|
+                \assert assertOutgoingPortValues ->
                     start (SimulatedEffect.Ports.send "unit" Json.null)
-                        |> ProgramTest.assertAndClearOutgoingPortValues "other" (Decode.null ()) (Expect.equal [ () ])
-                        |> ProgramTest.done
+                        |> assertOutgoingPortValues "other" (Decode.null ()) (Expect.equal [ () ])
                         |> expectFailure
-                            [ "assertAndClearOutgoingPortValues: values sent to port \"other\" did not match:"
+                            [ assert ++ "OutgoingPortValues: values sent to port \"other\" did not match:"
                             , "[]"
                             , "╵"
                             , "│ Expect.equal"
                             , "╷"
                             , "[()]"
                             ]
-            , test "clears values after checking" <|
-                \() ->
+            , testOutgoingPortValues "clears values after checking" <|
+                \_ assertOutgoingPortValues ->
                     start (SimulatedEffect.Ports.send "unit" Json.null)
                         |> ProgramTest.assertAndClearOutgoingPortValues "unit" (Decode.null ()) (Expect.equal [ () ])
-                        |> ProgramTest.assertAndClearOutgoingPortValues "unit" (Decode.null ()) (Expect.equal [])
-                        |> ProgramTest.done
-            , test "records values in correct order" <|
-                \() ->
+                        |> assertOutgoingPortValues "unit" (Decode.null ()) (Expect.equal [])
+            , testOutgoingPortValues "records values in correct order" <|
+                \_ assertOutgoingPortValues ->
                     start (SimulatedEffect.Ports.send "int" (Json.int 5))
                         |> ProgramTest.update (ProduceEffects (SimulatedEffect.Ports.send "int" (Json.int 7)))
-                        |> ProgramTest.assertAndClearOutgoingPortValues "int" Decode.int (Expect.equal [ 5, 7 ])
-                        |> ProgramTest.done
-            , test "shows useful error when decoding fails" <|
-                \() ->
+                        |> assertOutgoingPortValues "int" Decode.int (Expect.equal [ 5, 7 ])
+            , testOutgoingPortValues "shows useful error when decoding fails" <|
+                \assert assertOutgoingPortValues ->
                     start (SimulatedEffect.Ports.send "int" (Json.int 5))
-                        |> ProgramTest.assertAndClearOutgoingPortValues "int" Decode.string (Expect.equal [])
-                        |> ProgramTest.done
+                        |> assertOutgoingPortValues "int" Decode.string (Expect.equal [])
                         |> expectFailure
-                            [ "assertAndClearOutgoingPortValues: failed to decode port values: Problem with the given value:"
+                            [ assert ++ "OutgoingPortValues: failed to decode port values: Problem with the given value:"
                             , ""
                             , "5"
                             , ""
