@@ -5,26 +5,26 @@ module ProgramTest exposing
     , withBaseUrl, withJsonStringFlags
     , withSimulatedEffects, SimulatedEffect, SimulatedTask
     , withSimulatedSubscriptions, SimulatedSub
+    , done
+    , expectViewHas, expectViewHasNot, expectView
+    , ensureViewHas, ensureViewHasNot, ensureView
     , clickButton, clickLink
     , fillIn, fillInTextarea
     , check, selectOption
-    , routeChange
     , simulateDomEvent
     , within
     , expectHttpRequestWasMade, expectHttpRequest
     , ensureHttpRequestWasMade, ensureHttpRequest
     , simulateHttpOk, simulateHttpResponse
     , advanceTime
-    , expectOutgoingPortValues, assertAndClearOutgoingPortValues
+    , expectOutgoingPortValues, ensureOutgoingPortValues
     , simulateIncomingPort
-    , update
-    , simulateLastEffect
-    , expectViewHas, expectViewHasNot, expectView
-    , expectLastEffect, expectModel
     , expectPageChange
-    , ensureViewHas, ensureViewHasNot, ensureView
-    , ensureLastEffect
-    , done
+    , routeChange
+    , update
+    , expectModel
+    , expectLastEffect, ensureLastEffect
+    , simulateLastEffect
     , fail, createFailed
     )
 
@@ -35,13 +35,31 @@ in the case of drastic refactorings of your application architecture,
 and writing high-level tests helps you focus on the needs and behaviors of your end-users.)
 
 This module allows you to interact with your program by simulating
-DOM events (see ["Simulating user input"](#simulating-user-input)) and
-external events (see ["Simulating HTTP responses"](#simulating-http-responses),
-["Simulating time"](#simulating-time),
-and ["Simulating ports"](#simulating-ports)).
+user interactions and external events (like HTTP responses and ports),
+and make assertions about the HTML it renders and the external requests it makes.
 
-After simulating a series of events, you can then check assertions about
-the currently rendered state of your program (see ["Final assertions"](#final-assertions)).
+The list below is an index into the API documentation for the
+assertion and simulation functions relevant to each topic:
+
+  - **HTML**: [assertions](#inspecting-html) &mdash; [simulating user input](#simulating-user-input)
+  - **HTTP**: [assertions](#inspecting-http-requests) &mdash; [simulating responses](#simulating-http-responses)
+  - **time**: [simulating the passing of time](#simulating-time)
+  - **ports**: [assertions](#inspecting-outgoing-ports) &mdash; [simulating incoming ports](#simulating-incoming-ports)
+  - **browser**: [assertions](#browser-assertions) &mdash; [simulating](#simulating-browser-interactions)
+
+
+## Getting started
+
+For a more detailed explanation of how to get started,
+see the elm-program-test guidebooks
+(the best one to start with is "Testing programs with interactive views"):
+
+  - [Testing programs with interactive views](https://elm-program-test.netlify.com//html.html) &mdash;
+    shows an example of test-driving adding form validation to an Elm program
+  - [Testing programs with Cmds](https://elm-program-test.netlify.com/cmds.html) &mdash; shows testing a program
+    that uses `Http.get` and `Http.post`
+  - [Testing programs with ports](https://elm-program-test.netlify.com/ports.html) &mdash; shows testing a program
+    that uses ports to interface with JavaScript
 
 
 # Creating
@@ -70,12 +88,25 @@ The following functions allow you to configure your
 @docs withSimulatedSubscriptions, SimulatedSub
 
 
-# Simulating user input
+## Ending a test
+
+@docs done
+
+
+# Inspecting and interacting with HTML
+
+
+## Inspecting HTML
+
+@docs expectViewHas, expectViewHasNot, expectView
+@docs ensureViewHas, ensureViewHasNot, ensureView
+
+
+## Simulating user input
 
 @docs clickButton, clickLink
 @docs fillIn, fillInTextarea
 @docs check, selectOption
-@docs routeChange
 
 
 ## Simulating user input (advanced)
@@ -84,53 +115,70 @@ The following functions allow you to configure your
 @docs within
 
 
-# Simulating external events
+# Inspecting and simulating HTTP requests and responses
+
+
+# Inspecting HTTP requests
+
+@docs expectHttpRequestWasMade, expectHttpRequest
+@docs ensureHttpRequestWasMade, ensureHttpRequest
 
 
 ## Simulating HTTP responses
 
-@docs expectHttpRequestWasMade, expectHttpRequest
-@docs ensureHttpRequestWasMade, ensureHttpRequest
 @docs simulateHttpOk, simulateHttpResponse
 
 
-## Simulating time
+# Simulating time
 
 @docs advanceTime
 
 
-## Simulating ports
+# Inspecting and simulating ports
+
+
+## Inspecting outgoing ports
 
 @docs expectOutgoingPortValues, ensureOutgoingPortValues
+
+
+## Simulating incoming ports
+
 @docs simulateIncomingPort
 
 
-# Directly sending Msgs
-
-@docs update
-@docs simulateLastEffect
+# Browser navigation
 
 
-# Final assertions
+## Browser assertions
 
-@docs expectViewHas, expectViewHasNot, expectView
-@docs expectLastEffect, expectModel
 @docs expectPageChange
 
 
-# Intermediate assertions
+## Simulating browser interactions
 
-These functions can be used to make assertions on a `ProgramTest` without ending the test.
-
-@docs ensureViewHas, ensureViewHasNot, ensureView
-@docs ensureLastEffect
-
-To end a `ProgramTest` without using a [final assertion](#final-assertions), use the following function:
-
-@docs done
+@docs routeChange
 
 
-# Custom assertions
+# Low-level functions
+
+You should avoid the functions below when possible,
+but you may find them useful to test things that are not yet directly supported by elm-program-test.
+
+
+## Low-level functions for Msgs and Models
+
+@docs update
+@docs expectModel
+
+
+## Low-level functions for effects
+
+@docs expectLastEffect, ensureLastEffect
+@docs simulateLastEffect
+
+
+## Custom assertions
 
 These functions may be useful if you are writing your own custom assertion functions.
 
@@ -164,8 +212,8 @@ import Url.Extra
 and a log of any errors that have occurred while simulating interaction with the program.
 
   - To create a `ProgramTest`, see the `create*` functions below.
-  - To advance the state of a `ProgramTest`, see [Simulating user input](#simulating-user-input), and [Directly sending Msgs](#directly-sending-msgs)
-  - To assert on the resulting state of a `ProgramTest`, see [Final assertions](#final-assertions)
+  - To advance the state of a `ProgramTest`, see [Simulating user input](#simulating-user-input), or the many simulate functions in this module.
+  - To assert on the resulting state of a `ProgramTest`, see the many `expect*` functions in this module.
 
 -}
 type ProgramTest model msg effect
@@ -1481,6 +1529,8 @@ For example:
             Json.Decode.string
             (Expect.equal [ "975774a26612", "920facb1bac0" ])
 
+For a more detailed explanation and example, see the ["Testing programs with ports" guidebook](https://elm-program-test.netlify.com/ports.html).
+
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 If you want to interact with the program more after this assertion, see [`ensureOutgoingPortValues`](#ensureOutgoingPortValues).
@@ -1569,6 +1619,18 @@ The parameters are:
 1.  The name of the port
 2.  The JSON representation of the incoming value
 
+For example, here we are simulating the program recieving a list of strings on the incoming port
+`port resultsFromJavascript : (List String -> msg) -> Sub msg`:
+
+    ...
+        |> ProgramTest.simulateIncomingPort
+            "resultsFromJavascript"
+            (Json.Encode.list Json.Encode.string
+                [ "Garden-path sentences can confuse the reader." ]
+            )
+
+For a more detailed explanation and example, see the ["Testing programs with ports" guidebook](https://elm-program-test.netlify.com/ports.html).
+
 NOTE: You must use [`withSimulatedSubscriptions`](#withSimulatedSubscriptions) before you call [`start`](#start) to be able to use this function.
 
 -}
@@ -1649,7 +1711,7 @@ replaceView newView programTest =
 
 
 {-| Simulates a route change event (which would happen when your program is
-a `Browser.application` and the user changes the URL in the browser's URL bar.
+a `Browser.application` and the user changes the URL in the browser's URL bar).
 
 The parameter may be an absolute URL or relative URL.
 
@@ -1678,6 +1740,12 @@ routeChange url programTest =
 
 
 {-| Make an assertion about the current state of a `ProgramTest`'s model.
+
+When possible, you should prefer making assertions about the rendered view (see [`expectView`](#expectView))
+or external requests made by your program (see [`expectHttpRequest`](#expectHttpRequest), [`expectOutgoingPortValues`](#expectOutgoingPortValues)),
+as testing at the level that users and external services interact with your program
+will make your tests more resiliant to changes in the private implementation of your program.
+
 -}
 expectModel : (model -> Expectation) -> ProgramTest model msg effect -> Expectation
 expectModel assertion programTest =
@@ -1868,7 +1936,8 @@ expectViewHasNot selector programTest =
 
 {-| Ends a `ProgramTest`, reporting any errors that occurred.
 
-NOTE: You should prefer using a [final assertion](#final-assertions) to end your test over using `done`,
+You can also end a `ProgramTest` using any of the functions starting with `expect*`.
+In fact, you should prefer using one of the `expect*` functions when possible,
 as doing so will [make the intent of your test more clear](https://www.artima.com/weblogs/viewpost.jsp?thread=35578).
 
 -}
