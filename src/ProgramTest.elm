@@ -52,7 +52,7 @@ assertion and simulation functions relevant to each topic:
 
 For a more detailed explanation of how to get started,
 see the elm-program-test guidebooks
-(the best one to start with is "Testing programs with interactive views"):
+(the best one to start with is “Testing programs with interactive views”):
 
   - [Testing programs with interactive views](https://elm-program-test.netlify.com//html.html) &mdash;
     shows an example of test-driving adding form validation to an Elm program
@@ -400,8 +400,11 @@ withJsonStringFlags decoder (ProgramDefinition options program) =
 {-| This allows you to provide a function that lets `ProgramTest` simulate effects that would become `Cmd`s and `Task`s
 when your app runs in production
 (this enables you to use [`simulateHttpResponse`](#simulateHttpResponse), [`advanceTime`](#advanceTime), etc.).
+For a detailed explanation and example of how to set up tests that use simulated effects,
+see the [“Testing programs with Cmds” guidebook](https://elm-program-test.netlify.com/cmds.html).
 
-You only need to use this if you need to [simulate HTTP requests](#simulating-http-responses)
+You only need to use this if you need to [simulate HTTP requests](#simulating-http-responses),
+[outgoing ports](#expectOutgoingPortValues),
 or the [passing of time](#simulating-time).
 
 See the `SimulatedEffect.*` modules in this package for functions that you can use to implement
@@ -419,8 +422,9 @@ withSimulatedEffects fn (ProgramDefinition options program) =
 {-| This allows you to provide a function that lets `ProgramTest` simulate subscriptions that would be `Sub`s
 when your app runs in production
 (this enables you to use [`simulateIncomingPort`](#simulateIncomingPort), etc.).
-
 You only need to use this if you need to simulate subscriptions in your test.
+For a detailed explanation and example of how to set up tests that use simulated subscriptions,
+see the [“Testing programs with ports” guidebook](https://elm-program-test.netlify.com/ports.html).
 
 The function you provide should be similar to your program's `subscriptions` function
 but return `SimulatedSub`s instead of `Sub`s.
@@ -1251,6 +1255,9 @@ drainWorkQueue programTest =
 
 If you want to check the headers or request body, see [`expectHttpRequest`](#expectHttpRequest).
 
+    ...
+        |> expectHttpRequestWasMade "GET" "https://example.com/api/data"
+
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 If you want to interact with the program more after this assertion, see [`ensureHttpRequestWasMade`](#ensureHttpRequestWasMade).
@@ -1264,7 +1271,7 @@ expectHttpRequestWasMade method url programTest =
 
 
 {-| See the documentation for [`expectHttpRequestWasMade`](#expectHttpRequestWasMade).
-This is the same expect that it returns a `ProgramTest` instead of an `Expectation`
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
 so that you can interact with the program further after this assertion.
 
 You should prefer `expectHttpRequestWasMade` when possible,
@@ -1278,7 +1285,7 @@ ensureHttpRequestWasMade method url =
 
 {-| Allows you to check the details of a pending HTTP request.
 
-See the ["Expectations" section of `Test.Http`](Test-Http#expectations) for functions that might be helpful
+See the [“Expectations” section of `Test.Http`](Test-Http#expectations) for functions that might be helpful
 in create an expectation on the request.
 
 If you only care about whether the a request was made to the correct URL, see [`expectHttpRequestWasMade`](#expectHttpRequestWasMade).
@@ -1287,6 +1294,8 @@ If you only care about whether the a request was made to the correct URL, see [`
         |> expectHttpRequest "POST"
             "https://example.com/save"
             (.body >> Expect.equal """{"content":"updated!"}""")
+
+NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 If you want to interact with the program more after this assertion, see [`ensureHttpRequest`](#ensureHttpRequest).
 
@@ -1304,7 +1313,7 @@ expectHttpRequest method url checkRequest programTest =
 
 
 {-| See the documentation for [`expectHttpRequest`](#expectHttpRequest).
-This is the same expect that it returns a `ProgramTest` instead of an `Expectation`
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
 so that you can interact with the program further after this assertion.
 
 You should prefer `expectHttpRequest` when possible,
@@ -1386,7 +1395,7 @@ simulateHttpOk method url responseBody =
 {-| Simulates a response to a pending HTTP request.
 The test will fail if there is no pending request matching the given method and url.
 
-You may find it helpful to see the ["Responses" section in `Test.Http`](Test-Http#responses)
+You may find it helpful to see the [“Responses” section in `Test.Http`](Test-Http#responses)
 for convenient ways to create `Http.Response` values.
 
 If you are simulating a 200 OK response and don't need to provide response headers,
@@ -1529,7 +1538,7 @@ For example:
             Json.Decode.string
             (Expect.equal [ "975774a26612", "920facb1bac0" ])
 
-For a more detailed explanation and example, see the ["Testing programs with ports" guidebook](https://elm-program-test.netlify.com/ports.html).
+For a more detailed explanation and example, see the [“Testing programs with ports” guidebook](https://elm-program-test.netlify.com/ports.html).
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
@@ -1544,7 +1553,7 @@ expectOutgoingPortValues portName decoder checkValues programTest =
 
 
 {-| See the documentation for [`expectOutgoingPortValues`](#expectOutgoingPortValues).
-This is the same expect that it returns a `ProgramTest` instead of an `Expectation`
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
 so that you can interact with the program further after this assertion.
 
 You should prefer `expectOutgoingPortValues` when possible,
@@ -1629,7 +1638,7 @@ For example, here we are simulating the program recieving a list of strings on t
                 [ "Garden-path sentences can confuse the reader." ]
             )
 
-For a more detailed explanation and example, see the ["Testing programs with ports" guidebook](https://elm-program-test.netlify.com/ports.html).
+For a more detailed explanation and example, see the [“Testing programs with ports” guidebook](https://elm-program-test.netlify.com/ports.html).
 
 NOTE: You must use [`withSimulatedSubscriptions`](#withSimulatedSubscriptions) before you call [`start`](#start) to be able to use this function.
 
@@ -1771,7 +1780,7 @@ The function you provide will be called with the effect that was returned by the
   - If it returns `Err`, then that will cause the `ProgramTest` to enter a failure state with the provided message.
   - If it returns `Ok`, then the list of `msg`s will be applied in order via `ProgramTest.update`.
 
-NOTE: If you are simulating HTTP response, you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
+NOTE: If you are simulating HTTP response, you should prefer the functions described in [“Simulating HTTP responses”](#simulating-http-responses).
 
 -}
 simulateLastEffect : (effect -> Result String (List msg)) -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -1807,7 +1816,7 @@ expectLastEffectHelper functionName assertion programTest =
 {-| Validates the last effect produced by a `ProgramTest`'s program without ending the `ProgramTest`.
 
 NOTE: If you are asserting about HTTP requests being made,
-you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
+you should prefer the functions described in [“Simulating HTTP responses”](#simulating-http-responses).
 
 NOTE: If this is the last step in your test, you can use [`expectLastEffect`](#expectLastEffect) instead
 to avoid having to call [`done`](#done) afterward.
@@ -1821,7 +1830,7 @@ ensureLastEffect assertion programTest =
 {-| Makes an assertion about the last effect produced by a `ProgramTest`'s program.
 
 NOTE: If you are asserting about HTTP requests being made,
-you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
+you should prefer the functions described in [“Simulating HTTP responses”](#simulating-http-responses).
 
 NOTE: If you need to interact with the program more after this assertion,
 use [`ensureLastEffect`](#ensureLastEffect) instead.
