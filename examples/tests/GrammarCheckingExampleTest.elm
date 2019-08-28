@@ -33,7 +33,7 @@ all =
                         "Enter text to check"
                         "The youngest man the boat."
                     |> ProgramTest.clickButton "Check"
-                    |> ProgramTest.assertAndClearOutgoingPortValues
+                    |> ProgramTest.ensureOutgoingPortValues
                         "checkGrammar"
                         Json.Decode.string
                         (Expect.equal [ "The youngest man the boat." ])

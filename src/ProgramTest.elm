@@ -101,7 +101,7 @@ The following functions allow you to configure your
 
 ## Simulating ports
 
-@docs expectOutgoingPortValues, assertAndClearOutgoingPortValues
+@docs expectOutgoingPortValues, ensureOutgoingPortValues
 @docs simulateIncomingPort
 
 
@@ -1470,7 +1470,7 @@ The parameters are:
 1.  The name of the port
 2.  A JSON decoder corresponding to the type of the port
 3.  A function that will receive the list of values sent to the port
-    since the last use of `ensureOutgoingPortValues` (or since the start of the test)
+    since the the start of the test (or since the last use of `ensureOutgoingPortValues`)
     and returns an `Expectation`
 
 For example:
@@ -1483,7 +1483,7 @@ For example:
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
-If you want to interact with the program more after this assertion, see [`assertAndClearOutgoingPortValues`](#assertAndClearOutgoingPortValues).
+If you want to interact with the program more after this assertion, see [`ensureOutgoingPortValues`](#ensureOutgoingPortValues).
 
 -}
 expectOutgoingPortValues : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest model msg effect -> Expectation
@@ -1501,8 +1501,8 @@ You should prefer `expectOutgoingPortValues` when possible,
 as having a single assertion per test can make the intent of your tests more clear.
 
 -}
-assertAndClearOutgoingPortValues : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
-assertAndClearOutgoingPortValues portName decoder checkValues programTest =
+ensureOutgoingPortValues : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureOutgoingPortValues portName decoder checkValues programTest =
     expectOutgoingPortValuesHelper "ensureOutgoingPortValues" portName decoder checkValues programTest
 
 

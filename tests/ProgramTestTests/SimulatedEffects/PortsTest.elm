@@ -25,7 +25,7 @@ all =
             testOutgoingPortValues =
                 testAssertion3
                     ProgramTest.expectOutgoingPortValues
-                    ProgramTest.assertAndClearOutgoingPortValues
+                    ProgramTest.ensureOutgoingPortValues
         in
         [ describe "outgoing ports"
             [ testOutgoingPortValues "can check sent values" <|
@@ -47,7 +47,7 @@ all =
             , testOutgoingPortValues "clears values after checking" <|
                 \_ assertOutgoingPortValues ->
                     start (SimulatedEffect.Ports.send "unit" Json.null)
-                        |> ProgramTest.assertAndClearOutgoingPortValues "unit" (Decode.null ()) (Expect.equal [ () ])
+                        |> ProgramTest.ensureOutgoingPortValues "unit" (Decode.null ()) (Expect.equal [ () ])
                         |> assertOutgoingPortValues "unit" (Decode.null ()) (Expect.equal [])
             , testOutgoingPortValues "records values in correct order" <|
                 \_ assertOutgoingPortValues ->

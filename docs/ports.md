@@ -38,7 +38,7 @@ The test we want to write represents the following scenario:
 
 Here's what that test will look like in code:
 
-```elm
+```elm{14-22}
 import Expect
 import Json.Decode
 import Json.Encode
@@ -52,7 +52,7 @@ test "checking grammar" <|
                 "Enter text to check"
                 "The youngest man the boat."
             |> ProgramTest.clickButton "Check"
-            |> ProgramTest.assertAndClearOutgoingPortValues
+            |> ProgramTest.ensureOutgoingPortValues
                 "checkGrammar"
                 Json.Decode.string
                 (Expect.equal [ "The youngest man the boat." ])
@@ -64,6 +64,10 @@ test "checking grammar" <|
             |> ProgramTest.expectViewHas
                 [ text "Garden-path sentences can confuse the reader." ]
 ```
+
+After entering some text and clicking the "Check" button,
+the test uses `ensureOutgoingPortValues` to assert that the entered text has been sent out on the "checkGrammar" port.
+Then `simulateIncomingPort` is used to simulate a response coming in on the "grammarCheckResults" port.
 
 However, before this test can pass we'll have to do some setup work
 so that the test can simulate the incoming and outgoing ports.
