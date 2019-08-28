@@ -38,6 +38,9 @@ This module allows you to interact with your program by simulating
 user interactions and external events (like HTTP responses and ports),
 and make assertions about the HTML it renders and the external requests it makes.
 
+
+## Documentation index
+
 The list below is an index into the API documentation for the
 assertion and simulation functions relevant to each topic:
 
@@ -1780,7 +1783,9 @@ The function you provide will be called with the effect that was returned by the
   - If it returns `Err`, then that will cause the `ProgramTest` to enter a failure state with the provided message.
   - If it returns `Ok`, then the list of `msg`s will be applied in order via `ProgramTest.update`.
 
-NOTE: If you are simulating HTTP response, you should prefer the functions described in [“Simulating HTTP responses”](#simulating-http-responses).
+NOTE: If you are simulating HTTP responses or incoming ports,
+you should prefer more specific functions designed for that purpose.
+You can find links to the relevant documentation in the [documentation index](#documentation-index).
 
 -}
 simulateLastEffect : (effect -> Result String (List msg)) -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -1828,8 +1833,9 @@ ensureLastEffect assertion programTest =
 
 {-| Makes an assertion about the last effect produced by a `ProgramTest`'s program.
 
-NOTE: If you are asserting about HTTP requests being made,
-you should prefer the functions described in [“Simulating HTTP responses”](#simulating-http-responses).
+NOTE: If you are asserting about HTTP requests or outgoing ports,
+you should prefer more specific functions designed for that purpose.
+You can find links to the relevant documentation in the [documentation index](#documentation-index).
 
 If you want to interact with the program more after this assertion, see [`ensureLastEffect`](#ensureLastEffect).
 
