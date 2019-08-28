@@ -1813,13 +1813,12 @@ expectLastEffectHelper functionName assertion programTest =
                     Finished (ExpectFailed functionName reason.description reason.reason)
 
 
-{-| Validates the last effect produced by a `ProgramTest`'s program without ending the `ProgramTest`.
+{-| See the documentation for [`expectLastEffect`](#expectLastEffect).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
 
-NOTE: If you are asserting about HTTP requests being made,
-you should prefer the functions described in [“Simulating HTTP responses”](#simulating-http-responses).
-
-NOTE: If this is the last step in your test, you can use [`expectLastEffect`](#expectLastEffect) instead
-to avoid having to call [`done`](#done) afterward.
+You should prefer `expectLastEffect` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
 
 -}
 ensureLastEffect : (effect -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -1832,8 +1831,7 @@ ensureLastEffect assertion programTest =
 NOTE: If you are asserting about HTTP requests being made,
 you should prefer the functions described in [“Simulating HTTP responses”](#simulating-http-responses).
 
-NOTE: If you need to interact with the program more after this assertion,
-use [`ensureLastEffect`](#ensureLastEffect) instead.
+If you want to interact with the program more after this assertion, see [`ensureLastEffect`](#ensureLastEffect).
 
 -}
 expectLastEffect : (effect -> Expectation) -> ProgramTest model msg effect -> Expectation
@@ -1863,10 +1861,12 @@ expectViewHelper functionName assertion programTest =
                     Finished (ExpectFailed functionName reason.description reason.reason)
 
 
-{-| Validates that the current state of a `ProgramTest`'s view without ending the `ProgramTest`.
+{-| See the documentation for [`expectView`](#expectView).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
 
-NOTE: If this is the last step in your test, you can use [`expectView`](#expectView) instead
-to avoid having to call [`done`](#done) afterward.
+You should prefer `expectView` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
 
 -}
 ensureView : (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -1874,12 +1874,12 @@ ensureView assertion programTest =
     expectViewHelper "ensureView" assertion programTest
 
 
-{-| Validates that the current state of a `ProgramTest`'s view matches a given selector.
+{-| See the documentation for [`expectViewHas`](#expectViewHas).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
 
-`ensureViewHas [...selector...]` is equivalent to `ensureView (Test.Html.Query.has [...selector...])`
-
-NOTE: If this is the last step in your test, you can use [`expectViewHas`](#expectViewHas) instead
-to avoid having to call [`done`](#done) afterward.
+You should prefer `expectViewHas` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
 
 -}
 ensureViewHas : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -1887,12 +1887,12 @@ ensureViewHas selector programTest =
     expectViewHelper "ensureViewHas" (Query.has selector) programTest
 
 
-{-| Validates that the current state of a `ProgramTest`'s view does not match a given selector.
+{-| See the documentation for [`expectViewHasNot`](#expectViewHasNot).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
 
-`ensureViewHasNot [...selector...]` is equivalent to `ensureView (Test.Html.Query.hasNot [...selector...])`
-
-NOTE: If this is the last step in your test, you can use [`expectViewHasNot`](#expectViewHasNot) instead
-to avoid having to call [`done`](#done) afterward.
+You should prefer `expectViewHasNot` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
 
 -}
 ensureViewHasNot : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -1902,8 +1902,7 @@ ensureViewHasNot selector programTest =
 
 {-| Makes an assertion about the current state of a `ProgramTest`'s view.
 
-NOTE: If you need to interact with the program more after this assertion,
-use [`ensureView`](#ensureView) instead.
+If you want to interact with the program more after this assertion, see [`ensureView`](#ensureView).
 
 -}
 expectView : (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> Expectation
@@ -1917,8 +1916,7 @@ expectView assertion programTest =
 
 `expectViewHas [...selector...]` is the same as `expectView (Test.Html.Query.has [...selector...])`.
 
-NOTE: If you need to interact with the program more after this assertion,
-use [`ensureViewHas`](#ensureViewHas) instead.
+If you want to interact with the program more after this assertion, see [`ensureViewHas`](#ensureViewHas).
 
 -}
 expectViewHas : List Selector.Selector -> ProgramTest model msg effect -> Expectation
@@ -1932,8 +1930,7 @@ expectViewHas selector programTest =
 
 `expectViewHasNot [...selector...]` is the same as `expectView (Test.Html.Query.hasNot [...selector...])`.
 
-NOTE: If you need to interact with the program more after this assertion,
-use [`ensureViewHasNot`](#ensureViewHasNot) instead.
+If you want to interact with the program more after this assertion, see [`ensureViewHasNot`](#ensureViewHasNot).
 
 -}
 expectViewHasNot : List Selector.Selector -> ProgramTest model msg effect -> Expectation
