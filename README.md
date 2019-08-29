@@ -66,7 +66,7 @@ flags and/or navigation that a program might required.
 ```elm
 import Test exposing (..)
 import Test.Html.Selector exposing (class, text)
-import ProgramTest exposing (ProgramTest clickButton, expectViewHas)
+import ProgramTest exposing (ProgramTest, clickButton, expectViewHas)
 import MyProgram exposing (Flags, Msg, Model) -- just an imaginary example
 
 start : String -> Flags -> ProgramTest Model Msg (Cmd Msg)
@@ -103,7 +103,7 @@ This example tests a module for a complicated view by making a program with a tr
 import DateTimePicker -- using abadi199/datetimepicker 6.0.0 as an example of a view to test
 import Test exposing (..)
 import Test.Html.Selector exposing (text)
-import ProgramTest exposing (clickButton, expectViewHas)
+import ProgramTest exposing (ProgramTest, clickButton, expectViewHas)
 
 startDatePicker :
     ProgramTest
@@ -111,7 +111,7 @@ startDatePicker :
         (DateTimePicker.State, Maybe Date) -- msg: in this trivial program, the msg is simply the new model value
         (Cmd never) -- effect: could use any type here, but Cmd seems least confusing
 startDatePicker =
-    ProgramTest.element
+    ProgramTest.createElement
         { init = \() -> ((DateTimePicker.initialState, Nothing), Cmd.none)
         , update = newState model -> (newState, Cmd.none)
         , view =
@@ -122,7 +122,7 @@ startDatePicker =
 
 datePickerTest : Test
 datePickerTest =
-    test "" <|
+    test "can advance to the next month" <|
         \() ->
             startDatePicker
                 |> clickButton "Next Month"

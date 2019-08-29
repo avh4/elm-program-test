@@ -8,9 +8,11 @@ import Json.Decode
 import Json.Encode
 import ProgramTest exposing (ProgramTest)
 import Test exposing (..)
+import Test.Expect exposing (expectFailure)
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
 import Test.Runner
+import TestHelper exposing (..)
 
 
 type TestEffect
@@ -90,7 +92,28 @@ start =
 
 all : Test
 all =
-    describe "ProgramTest"
+    describe "ProgramTest" <|
+        let
+            testAssertView =
+                testAssertion1
+                    ProgramTest.expectView
+                    ProgramTest.ensureView
+
+            testViewHas =
+                testAssertion1
+                    ProgramTest.expectViewHas
+                    ProgramTest.ensureViewHas
+
+            testViewHasNot =
+                testAssertion1
+                    ProgramTest.expectViewHasNot
+                    ProgramTest.ensureViewHasNot
+
+            testLastEffect =
+                testAssertion1
+                    ProgramTest.expectLastEffect
+                    ProgramTest.ensureLastEffect
+        in
         [ test "has initial model" <|
             \() ->
                 start
@@ -151,16 +174,10 @@ all =
                     |> ProgramTest.withBaseUrl "https://example.com/path"
                     |> ProgramTest.start "flags"
                     |> ProgramTest.expectModel (Expect.equal "<INIT:/path:flags>")
-        , test "can assert on the view" <|
-            \() ->
+        , testAssertView "can assert on the view" <|
+            \_ assertView ->
                 start
-                    |> ProgramTest.shouldHaveView
-                        (Query.find [ Selector.tag "span" ] >> Query.has [ Selector.text "<INIT>" ])
-                    |> ProgramTest.done
-        , test "can assert on the view concisely with a terminal assertion" <|
-            \() ->
-                start
-                    |> ProgramTest.expectView
+                    |> assertView
                         (Query.find [ Selector.tag "span" ] >> Query.has [ Selector.text "<INIT>" ])
         , test "can create with navigation and JSON string flags" <|
             \() ->
@@ -179,42 +196,36 @@ all =
                     |> ProgramTest.withBaseUrl "https://example.com/path"
                     |> ProgramTest.start """{"x": "fromJson"}"""
                     |> ProgramTest.expectModel (Expect.equal "<INIT:/path:fromJson>")
-        , test "can assert on the view concisely given Html.Test.Selectors" <|
-            \() ->
+        , testViewHas "can assert on the view concisely given Html.Test.Selectors" <|
+            \_ assertViewHas ->
                 start
-                    |> ProgramTest.shouldHave [ Selector.tag "span" ]
-                    |> ProgramTest.done
-        , test "can assert on the view concisely with a terminal assertion given Html.Test.Selectors" <|
-            \() ->
+                    |> assertViewHas [ Selector.tag "span" ]
+        , testViewHasNot "can assert on the view concisely given Html.Test.Selectors that should not exist" <|
+            \_ assertViewHasNot ->
                 start
-                    |> ProgramTest.expectViewHas [ Selector.tag "span" ]
-        , test "can assert on the view concisely given Html.Test.Selectors that should not exist" <|
-            \() ->
-                start
-                    |> ProgramTest.shouldNotHave [ Selector.tag "article" ]
-                    |> ProgramTest.done
+                    |> assertViewHasNot [ Selector.tag "article" ]
         , test "can simulate an arbitrary DOM event" <|
             \() ->
                 start
-                    |> ProgramTest.simulate
+                    |> ProgramTest.simulateDomEvent
                         (Query.find [ Selector.tag "strange" ])
                         ( "odd", Json.Encode.string "<ODD-VALUE>" )
                     |> ProgramTest.expectModel (Expect.equal "<INIT>;<ODD-VALUE>")
-        , test "can assert on the last effect after init" <|
-            \() ->
+        , testLastEffect "can assert on the last effect after init" <|
+            \_ assertLastEffect ->
                 start
-                    |> ProgramTest.expectLastEffect (Expect.equal NoOp)
-        , test "can assert on the last effect after update" <|
-            \() ->
+                    |> assertLastEffect (Expect.equal NoOp)
+        , testLastEffect "can assert on the last effect after update" <|
+            \_ assertLastEffect ->
                 start
                     |> ProgramTest.clickButton "Click Me"
-                    |> ProgramTest.expectLastEffect (Expect.equal (LogUpdate "CLICK"))
+                    |> assertLastEffect (Expect.equal (LogUpdate "CLICK"))
         , test "can assert on the last effect as an intermediate assertion" <|
             \() ->
                 start
-                    |> ProgramTest.shouldHaveLastEffect (Expect.equal NoOp)
+                    |> ProgramTest.ensureLastEffect (Expect.equal NoOp)
                     |> ProgramTest.clickButton "Click Me"
-                    |> ProgramTest.shouldHaveLastEffect (Expect.equal (LogUpdate "CLICK"))
+                    |> ProgramTest.ensureLastEffect (Expect.equal (LogUpdate "CLICK"))
                     |> ProgramTest.done
         , test "can simulate a response to the last effect" <|
             \() ->
@@ -236,9 +247,7 @@ all =
                 start
                     |> ProgramTest.fail "custom" "Because I said so"
                     |> ProgramTest.done
-                    |> Test.Runner.getFailureReason
-                    |> Maybe.map .description
-                    |> Expect.equal (Just "custom: Because I said so")
+                    |> expectFailure [ "custom: Because I said so" ]
         , test "can narrow down the area to specified element" <|
             \() ->
                 start
