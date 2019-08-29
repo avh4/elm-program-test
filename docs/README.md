@@ -14,7 +14,7 @@ provides test coverage that is resiliant even to drastic refactorings of your ap
 and encourages tests that make clear how your end-users and external services interact with your program.
 
 - [API documentation](https://package.elm-lang.org/packages/avh4/elm-program-test/latest)
-- [github page](https://github.com/avh4/elm-program-test)
+- [GitHub page](https://github.com/avh4/elm-program-test)
 
 
 ## Guidebooks
