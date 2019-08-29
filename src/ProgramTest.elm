@@ -38,6 +38,8 @@ This module allows you to interact with your program by simulating
 user interactions and external events (like HTTP responses and ports),
 and make assertions about the HTML it renders and the external requests it makes.
 
+  - [Guide for upgrading from elm-program-test 2.x to 3.x](https://elm-program-test.netlify.com/upgrade-3.0.0.html)
+
 
 ## Documentation index
 

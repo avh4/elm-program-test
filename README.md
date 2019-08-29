@@ -23,6 +23,7 @@ For more detailed documentation, the following guides show examples of how to us
   that uses `Http.get` and `Http.post`
 - [Testing programs with ports](https://elm-program-test.netlify.com/ports.html) &mdash; shows testing a program
   that uses ports to interface with JavaScript
+- [Upgrading from elm-program-test 2.x to 3.x](https://elm-program-test.netlify.com/upgrade-3.0.0.html)
 
 
 ## Basic example

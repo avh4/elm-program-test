@@ -27,4 +27,5 @@ test in your program.
   that uses `Http.get` and `Http.post`
 - [Testing programs with ports](ports.md) &mdash; shows testing a program
   that uses ports to interface with JavaScript
+- [Upgrading from elm-program-test 2.x to 3.x](upgrade-3.0.0.md)
 
