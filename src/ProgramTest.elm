@@ -31,8 +31,8 @@ module ProgramTest exposing
 {-| A `ProgramTest` simulates the execution of an Elm program
 enabling you write high-level tests for your program.
 (Testing your programs at this level
-provides test coverage that is resiliant even to drastic refactorings of your application architecture,
-and encourages tests that make clear how your end-users and external services interact with your program.)
+provides test coverage that is resilient even to drastic refactorings of your application architecture,
+and encourages tests that make it clear how end-users and external services will interact with your program.)
 
 This module allows you to interact with your program by simulating
 user interactions and external events (like HTTP responses and ports),
@@ -1758,7 +1758,7 @@ routeChange url programTest =
 When possible, you should prefer making assertions about the rendered view (see [`expectView`](#expectView))
 or external requests made by your program (see [`expectHttpRequest`](#expectHttpRequest), [`expectOutgoingPortValues`](#expectOutgoingPortValues)),
 as testing at the level that users and external services interact with your program
-will make your tests more resiliant to changes in the private implementation of your program.
+will make your tests more resilient to changes in the private implementation of your program.
 
 -}
 expectModel : (model -> Expectation) -> ProgramTest model msg effect -> Expectation

@@ -10,8 +10,8 @@ title: Guide to elm-program-test
 and [elm-html-test](http://package.elm-lang.org/packages/eeue56/elm-html-test/latest)
 for testing your Elm programs as complete units.
 Testing your programs at this level
-provides test coverage that is resiliant even to drastic refactorings of your application architecture,
-and encourages tests that make clear how your end-users and external services interact with your program.
+provides test coverage that is resilient even to drastic refactorings of your application architecture,
+and encourages tests that make it clear how end-users and external services will interact with your program.
 
 - [API documentation](https://package.elm-lang.org/packages/avh4/elm-program-test/latest)
 - [GitHub page](https://github.com/avh4/elm-program-test)
