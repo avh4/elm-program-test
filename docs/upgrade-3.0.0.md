@@ -2,6 +2,7 @@
 id: upgrade-3.0.0
 title: Upgrading from elm-program-test 2.x to 3.x
 sidebar: auto
+next: html.md
 ---
 
 # Upgrading from elm-program-test 2.x to 3.x

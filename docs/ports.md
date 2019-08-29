@@ -2,6 +2,7 @@
 id: ports
 title: Testing programs with ports
 sidebar: auto
+prev: cmds.md
 ---
 
 # Testing programs with ports

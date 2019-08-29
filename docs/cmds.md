@@ -2,6 +2,8 @@
 id: cmds
 title: Testing programs with Cmds
 sidebar: auto
+prev: html.md
+next: ports.md
 ---
 
 # Testing programs with Cmds

@@ -2,6 +2,7 @@
 id: html
 title: Testing programs with interactive HTML
 sidebar: auto
+next: cmds.md
 ---
 
 # Testing programs with interactive HTML
