@@ -1,3 +1,3 @@
 module.exports = {
-  title: 'elm-program-test'
+  title: 'avh4/elm-program-test'
 }
