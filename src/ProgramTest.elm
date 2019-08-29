@@ -30,13 +30,15 @@ module ProgramTest exposing
 
 {-| A `ProgramTest` simulates the execution of an Elm program
 enabling you write high-level tests for your program.
-(High-level tests are valuable in that they provide extremely robust test coverage
-in the case of drastic refactorings of your application architecture,
-and writing high-level tests helps you focus on the needs and behaviors of your end-users.)
+(Testing your programs at this level
+provides test coverage that is resiliant even to drastic refactorings of your application architecture,
+and encourages tests that make clear how your end-users and external services interact with your program.)
 
 This module allows you to interact with your program by simulating
 user interactions and external events (like HTTP responses and ports),
 and make assertions about the HTML it renders and the external requests it makes.
+
+  - [Guide for upgrading from elm-program-test 2.x to 3.x](https://elm-program-test.netlify.com/upgrade-3.0.0.html)
 
 
 ## Documentation index
