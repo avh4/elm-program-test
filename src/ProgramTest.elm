@@ -683,7 +683,7 @@ Parameters:
   - `findTarget`: A function to find the HTML element that responds to the event
     (typically this will be a call to `Test.Html.Query.find [ ...some selector... ]`)
   - `( eventName, eventValue )`: The event to simulate
-    (see [Test.Html.Event "Event Builders"](http://package.elm-lang.org/packages/eeue56/elm-html-test/latest/Test-Html-Event#event-builders))
+    (see [Test.Html.Event "Event Builders"](https://package.elm-lang.org/packages/elm-explorations/test/latest/Test-Html-Event#event-builders))
 
 -}
 simulateDomEvent : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> ProgramTest model msg effect -> ProgramTest model msg effect
