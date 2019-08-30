@@ -4,7 +4,7 @@
 # Test Elm Programs
 
 `elm-program-test` provides a convenient API that works with
-[elm-test](http://package.elm-lang.org/packages/elm-community/elm-test/latest)
+[elm-test](http://package.elm-lang.org/packages/elm-explorations/test/latest)
 (including `Test.Html`)
 for testing your Elm programs as complete units.
 
