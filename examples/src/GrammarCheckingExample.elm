@@ -1,7 +1,7 @@
 port module GrammarCheckingExample exposing (Effect(..), Model, Msg(..), init, main, update, view)
 
 import Browser
-import Html exposing (Html, text)
+import Html exposing (Html)
 import Html.Attributes exposing (for, id)
 import Html.Events exposing (onClick, onInput)
 
@@ -103,7 +103,7 @@ view model =
     , body =
         [ Html.label
             [ for "main" ]
-            [ text "Enter text to check" ]
+            [ Html.text "Enter text to check" ]
         , Html.input
             [ id "main"
             , onInput ChangeText

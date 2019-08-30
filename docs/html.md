@@ -237,5 +237,7 @@ view : Model -> Browser.Document Msg
 
 ## Try it out
 
-> TODO: once `elm-program-test` 3.0.0 is published,
-> a link to a live-editable version of this example will be added here
+You can play around with the example here:
+<https://ellie-app.com/6wsc2LK2D97a1>
+Try editing the tests or the implementation to make the tests fail
+and see what kind of failure messages you get.
