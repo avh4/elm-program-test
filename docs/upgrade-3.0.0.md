@@ -39,12 +39,12 @@ and update to the new API in a way that's appropriate for your specific program.
 
 ## Updated API for assertions
 
-All assertion/"should"/"expect" functions have been updates to have more consistent naming.
+All assertion/"should"/"expect" functions have been updated to have more consistent naming.
 There are now two parallel functions for each assertion:
 one starting with `expect...` which returns an `Expectation`, meaning it should be used at the end of a test;
 and one starting with `ensure...` which returns a `ProgramTest`, meaning it can be used in the middle of a test.
 
-Here's a full list of the changes to assertion functions.
+Here's a full list of changes to existing assertion functions.
 
 - 👉 Rename uses of the following functions:
   - `assertHttpRequest` -> `expectHttpRequestWasMade` (and it now takes the method and URL as two String parameters instead of as fields in a record parameter)
