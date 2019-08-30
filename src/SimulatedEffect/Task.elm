@@ -6,7 +6,7 @@ module SimulatedEffect.Task exposing
     )
 
 {-| This module parallels [elm/core's `Task` module](https://package.elm-lang.org/packages/elm/core/1.0.2/Task).
-PRs are welcome to add any functions that are missing.
+_Pull requests are welcome to add any functions that are missing._
 
 The functions here produce `SimulatedTasks`s instead of `Tasks`s
 and `SimulatedEffect`s instead of `Cmd`s, which are meant to be used

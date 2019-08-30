@@ -4,9 +4,12 @@ module Test.Http exposing
     )
 
 {-| Convenience functions for testing HTTP requests.
+_Pull requests are welcome to add more useful functions._
 
 
 ## Expectations
+
+These functions provide some convenient checks that can be used with [`ProgramTest.expectHttpRequest`](ProgramTest#expectHttpRequest).
 
 @docs expectJsonBody, hasHeader
 

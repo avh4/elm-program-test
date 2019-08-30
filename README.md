@@ -29,7 +29,7 @@ For more detailed documentation, the following guides show examples of how to us
 ## Basic example
 
 In this example, `ProgramTest.createElement` and `start` are used to initiate testing of the imagined `MyProgram` module
-(which follows the [Elm architecture](https://guide.elm-lang.org/architecture/)).
+(which follows [the Elm architecture](https://guide.elm-lang.org/architecture/)).
 Then `clickButton` is used to simulate user interaction with the program,
 and finally `expectViewHas` is used to assert the final state of the program's displayed HTML.
 

@@ -5,7 +5,7 @@ See [Upgrading elm-program-test 2.x to 3.x](https://elm-program-test.netlify.com
 
 API Changes:
 
-  - Central module is renamed from `TestContext` -> `ProgramTest`
+  - The core module is renamed from `TestContext` -> `ProgramTest`
   - Redesigned API for creating and starting tests
   - Many assertion functions are renamed so that the API is more consistent
   
