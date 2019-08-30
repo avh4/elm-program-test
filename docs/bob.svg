@@ -1,0 +1,161 @@
+<svg class="bob" font-family="arial" font-size="14" height="208" width="536" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="triangle" markerHeight="8" markerWidth="8" orient="auto" refX="4" refY="2" viewBox="0 0 8 4">
+<polygon class="fg_fill" points="0,0 0,4 8,2 0,0"/>
+</marker>
+<marker id="clear_triangle" markerHeight="10" markerWidth="10" orient="auto" refX="1" refY="7" viewBox="0 0 20 14">
+<polygon class="bg_fill fg_stroke" points="2,2 2,12 18,7 2,2"/>
+</marker>
+<marker id="circle" markerHeight="5" markerWidth="5" orient="auto" refX="10" refY="10" viewBox="0 0 20 20">
+<circle class="fg_fill" cx="10" cy="10" r="8"/>
+</marker>
+<marker id="square" markerHeight="5" markerWidth="5" orient="auto" refX="10" refY="10" viewBox="0 0 20 20">
+<rect class="fg_fill" height="20" width="20" x="0" y="0"/>
+</marker>
+<marker id="open_circle" markerHeight="10" markerWidth="10" orient="auto" refX="10" refY="10" viewBox="0 0 20 20">
+<circle class="bg_fill fg_stroke" cx="10" cy="10" r="4"/>
+</marker>
+<marker id="big_open_circle" markerHeight="20" markerWidth="20" orient="auto" refX="20" refY="20" viewBox="0 0 40 40">
+<circle class="bg_fill fg_stroke" cx="20" cy="20" r="6"/>
+</marker>
+</defs>
+<style type="text/css">
+
+rect.backdrop {
+    fill: white;
+}
+
+.fg_fill {
+    fill: black;
+}
+
+
+.bg_fill {
+    fill: white;
+}
+
+.fg_stroke {
+    stroke: black;
+    stroke-width: 2;
+}
+
+.no_fill {
+    fill: none;
+}
+
+.dashed {
+    stroke-dasharray: 5;
+}
+
+
+text{
+    fill: black;
+}
+
+line, path {
+    stroke-linecap: round;
+    stroke-linejoin: miter;
+    stroke-opacity: 1;
+    fill-opacity: 1;
+}
+
+
+
+
+tspan.head{
+    fill: none;
+    stroke: none;
+}
+    
+</style>
+<rect class="backdrop" height="208" width="536" x="0" y="0"/>
+<g>
+<line class="fg_stroke" x1="4" x2="4" y1="8" y2="200"/>
+<line class="fg_stroke" x1="4" x2="140" y1="8" y2="8"/>
+<line class="fg_stroke" x1="4" x2="140" y1="200" y2="200"/>
+<line class="fg_stroke" x1="140" x2="140" y1="8" y2="200"/>
+</g>
+<g>
+<line class="fg_stroke" marker-end="url(#triangle)" x1="140" x2="220" y1="104" y2="104"/>
+</g>
+<g>
+<line class="fg_stroke" x1="228" x2="228" y1="56" y2="152"/>
+<line class="fg_stroke" x1="228" x2="332" y1="56" y2="56"/>
+<line class="fg_stroke" x1="228" x2="332" y1="152" y2="152"/>
+<line class="fg_stroke" x1="332" x2="332" y1="56" y2="152"/>
+</g>
+<g>
+<line class="fg_stroke" marker-end="url(#triangle)" x1="332" x2="396" y1="104" y2="104"/>
+</g>
+<g>
+<line class="fg_stroke" x1="404" x2="404" y1="8" y2="200"/>
+<line class="fg_stroke" x1="404" x2="532" y1="8" y2="8"/>
+<line class="fg_stroke" x1="404" x2="532" y1="200" y2="200"/>
+<line class="fg_stroke" x1="532" x2="532" y1="8" y2="200"/>
+</g>
+<g>
+<text class="fg_fill" x="25" y="60">
+Name:
+</text>
+</g>
+<g>
+<text class="fg_fill" x="25" y="92">
+Street
+</text>
+</g>
+<g>
+<text class="fg_fill" x="25" y="108">
+Address:
+</text>
+</g>
+<g>
+<text class="fg_fill" x="25" y="140">
+Postal
+</text>
+</g>
+<g>
+<text class="fg_fill" x="81" y="140">
+code:
+</text>
+</g>
+<g>
+<text class="fg_fill" x="153" y="92">
+submit
+</text>
+</g>
+<g>
+<text class="fg_fill" x="241" y="108">
+Loading...
+</text>
+</g>
+<g>
+<text class="fg_fill" x="417" y="60">
+Success!
+</text>
+</g>
+<g>
+<text class="fg_fill" x="417" y="108">
+Next
+</text>
+</g>
+<g>
+<text class="fg_fill" x="417" y="124">
+date
+</text>
+</g>
+<g>
+<text class="fg_fill" x="457" y="108">
+election
+</text>
+</g>
+<g>
+<text class="fg_fill" x="457" y="124">
+is
+</text>
+</g>
+<g>
+<text class="fg_fill" x="481" y="124">
+...
+</text>
+</g>
+</svg>

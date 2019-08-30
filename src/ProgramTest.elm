@@ -5,41 +5,67 @@ module ProgramTest exposing
     , withBaseUrl, withJsonStringFlags
     , withSimulatedEffects, SimulatedEffect, SimulatedTask
     , withSimulatedSubscriptions, SimulatedSub
+    , done
+    , expectViewHas, expectViewHasNot, expectView
+    , ensureViewHas, ensureViewHasNot, ensureView
     , clickButton, clickLink
     , fillIn, fillInTextarea
     , check, selectOption
-    , routeChange
-    , simulate
+    , simulateDomEvent
     , within
-    , assertHttpRequestWasMade, assertHttpRequest
+    , expectHttpRequestWasMade, expectHttpRequest
+    , ensureHttpRequestWasMade, ensureHttpRequest
     , simulateHttpOk, simulateHttpResponse
     , advanceTime
-    , assertAndClearOutgoingPortValues, simulateIncomingPort
-    , update
-    , simulateLastEffect
-    , expectViewHas, expectView
-    , expectLastEffect, expectModel
+    , expectOutgoingPortValues, ensureOutgoingPortValues
+    , simulateIncomingPort
     , expectPageChange
-    , shouldHave, shouldNotHave, shouldHaveView
-    , shouldHaveLastEffect
-    , done
+    , routeChange
+    , update
+    , expectModel
+    , expectLastEffect, ensureLastEffect
+    , simulateLastEffect
     , fail, createFailed
     )
 
 {-| A `ProgramTest` simulates the execution of an Elm program
 enabling you write high-level tests for your program.
-(High-level tests are valuable in that they provide extremely robust test coverage
-in the case of drastic refactorings of your application architecture,
-and writing high-level tests helps you focus on the needs and behaviors of your end-users.)
+(Testing your programs at this level
+provides test coverage that is resilient even to drastic refactorings of your application architecture,
+and encourages tests that make it clear how end-users and external services will interact with your program.)
 
 This module allows you to interact with your program by simulating
-DOM events (see ["Simulating user input"](#simulating-user-input)) and
-external events (see ["Simulating HTTP responses"](#simulating-http-responses),
-["Simulating time"](#simulating-time),
-and ["Simulating ports"](#simulating-ports)).
+user interactions and external events (like HTTP responses and ports),
+and making assertions about the HTML it renders and the external requests it makes.
 
-After simulating a series of events, you can then check assertions about
-the currently rendered state of your program (see ["Final assertions"](#final-assertions)).
+  - [Guide for upgrading from elm-program-test 2.x to 3.x](https://elm-program-test.netlify.com/upgrade-3.0.0.html)
+
+
+## Documentation index
+
+The list below is an index into the API documentation for the
+assertion and simulation functions relevant to each topic:
+
+  - creating tests: [creating](#creating-program-definitions) &mdash; [starting](#start) &mdash; [options](#options)
+  - **HTML**: [assertions](#inspecting-html) &mdash; [simulating user input](#simulating-user-input)
+  - **HTTP**: [assertions](#inspecting-http-requests) &mdash; [simulating responses](#simulating-http-responses)
+  - **time**: [simulating the passing of time](#simulating-time)
+  - **ports**: [assertions](#inspecting-outgoing-ports) &mdash; [simulating incoming ports](#simulating-incoming-ports)
+  - **browser**: [assertions](#browser-assertions) &mdash; [simulating](#simulating-browser-interactions)
+
+
+## Getting started
+
+For a more detailed explanation of how to get started,
+see the elm-program-test guidebooks
+(the best one to start with is “Testing programs with interactive views”):
+
+  - [Testing programs with interactive views](https://elm-program-test.netlify.com//html.html) &mdash;
+    shows an example of test-driving adding form validation to an Elm program
+  - [Testing programs with Cmds](https://elm-program-test.netlify.com/cmds.html) &mdash; shows testing a program
+    that uses `Http.get` and `Http.post`
+  - [Testing programs with ports](https://elm-program-test.netlify.com/ports.html) &mdash; shows testing a program
+    that uses ports to interface with JavaScript
 
 
 # Creating
@@ -51,7 +77,7 @@ the currently rendered state of your program (see ["Final assertions"](#final-as
 
 A `ProgramDefinition` (required to create a `ProgramTest` with [`start`](#start))
 can be created with one of the following functions that parallel
-the functions in `elm/browser`'s `Browser` module.
+the functions in [`elm/browser`](https://package.elm-lang.org/packages/elm/browser/latest/Browser) for creating programs.
 
 @docs createSandbox, createElement, createDocument, createApplication
 @docs ProgramDefinition
@@ -68,65 +94,97 @@ The following functions allow you to configure your
 @docs withSimulatedSubscriptions, SimulatedSub
 
 
-# Simulating user input
-
-@docs clickButton, clickLink
-@docs fillIn, fillInTextarea
-@docs check, selectOption
-@docs routeChange
-
-
-## Simulating user input (advanced)
-
-@docs simulate
-@docs within
-
-
-# Simulating external events
-
-
-## Simulating HTTP responses
-
-@docs assertHttpRequestWasMade, assertHttpRequest
-@docs simulateHttpOk, simulateHttpResponse
-
-
-## Simulating time
-
-@docs advanceTime
-
-
-## Simulating ports
-
-@docs assertAndClearOutgoingPortValues, simulateIncomingPort
-
-
-# Directly sending Msgs
-
-@docs update
-@docs simulateLastEffect
-
-
-# Final assertions
-
-@docs expectViewHas, expectView
-@docs expectLastEffect, expectModel
-@docs expectPageChange
-
-
-# Intermediate assertions
-
-These functions can be used to make assertions on a `ProgramTest` without ending the test.
-
-@docs shouldHave, shouldNotHave, shouldHaveView
-@docs shouldHaveLastEffect
-
-To end a `ProgramTest` without using a [final assertion](#final-assertions), use the following function:
+## Ending a test
 
 @docs done
 
 
-# Custom assertions
+# Inspecting and interacting with HTML
+
+
+## Inspecting HTML
+
+@docs expectViewHas, expectViewHasNot, expectView
+@docs ensureViewHas, ensureViewHasNot, ensureView
+
+
+## Simulating user input
+
+@docs clickButton, clickLink
+@docs fillIn, fillInTextarea
+@docs check, selectOption
+
+
+## Simulating user input (advanced)
+
+@docs simulateDomEvent
+@docs within
+
+
+# Inspecting and simulating HTTP requests and responses
+
+
+# Inspecting HTTP requests
+
+@docs expectHttpRequestWasMade, expectHttpRequest
+@docs ensureHttpRequestWasMade, ensureHttpRequest
+
+
+## Simulating HTTP responses
+
+@docs simulateHttpOk, simulateHttpResponse
+
+
+# Simulating time
+
+@docs advanceTime
+
+
+# Inspecting and simulating ports
+
+
+## Inspecting outgoing ports
+
+@docs expectOutgoingPortValues, ensureOutgoingPortValues
+
+
+## Simulating incoming ports
+
+@docs simulateIncomingPort
+
+
+# Browser navigation
+
+
+## Browser assertions
+
+@docs expectPageChange
+
+
+## Simulating browser interactions
+
+@docs routeChange
+
+
+# Low-level functions
+
+You should avoid the functions below when possible,
+but you may find them useful to test things that are not yet directly supported by elm-program-test.
+
+
+## Low-level functions for Msgs and Models
+
+@docs update
+@docs expectModel
+
+
+## Low-level functions for effects
+
+@docs expectLastEffect, ensureLastEffect
+@docs simulateLastEffect
+
+
+## Custom assertions
 
 These functions may be useful if you are writing your own custom assertion functions.
 
@@ -156,12 +214,14 @@ import Url exposing (Url)
 import Url.Extra
 
 
-{-| A `ProgramTest` represents an Elm program, a current state for that program,
+{-| A `ProgramTest` represents an Elm program,
+a current state for that program,
+information about external effects that have been produced by the program (such as pending HTTP requests, values sent to outgoing ports, etc),
 and a log of any errors that have occurred while simulating interaction with the program.
 
   - To create a `ProgramTest`, see the `create*` functions below.
-  - To advance the state of a `ProgramTest`, see [Simulating user input](#simulating-user-input), and [Directly sending Msgs](#directly-sending-msgs)
-  - To assert on the resulting state of a `ProgramTest`, see [Final assertions](#final-assertions)
+  - To advance the state of a `ProgramTest`, see [Simulating user input](#simulating-user-input), or the many simulate functions in this module.
+  - To assert on the resulting state of a `ProgramTest`, see the many `expect*` functions in this module.
 
 -}
 type ProgramTest model msg effect
@@ -199,6 +259,28 @@ type Failure
     | CustomFailure String String
 
 
+type alias ProgramOptions model msg effect =
+    { baseUrl : Maybe Url
+    , deconstructEffect : Maybe (effect -> SimulatedEffect msg)
+    , subscriptions : Maybe (model -> SimulatedSub msg)
+    }
+
+
+emptyOptions : ProgramOptions model msg effect
+emptyOptions =
+    { baseUrl = Nothing
+    , deconstructEffect = Nothing
+    , subscriptions = Nothing
+    }
+
+
+{-| Represents an unstarted program test.
+Use [`start`](#start) to start the program being tested.
+-}
+type ProgramDefinition flags model msg effect
+    = ProgramDefinition (ProgramOptions model msg effect) (Maybe Url -> flags -> ProgramOptions model msg effect -> ProgramTest model msg effect)
+
+
 createHelper :
     { init : ( model, effect )
     , update : msg -> model -> ( model, effect )
@@ -230,15 +312,15 @@ createHelper program options =
         |> drain
 
 
-{-| Creates a `ProgramDefinition` from the parts of a `Browser.sandbox` program.
+{-| Creates a `ProgramDefinition` from the parts of a [`Browser.sandbox`](https://package.elm-lang.org/packages/elm/browser/latest/Browser#sandbox) program.
 
 See other `create*` functions below if the program you want to test does not use `Browser.sandbox`.
 
 -}
 createSandbox :
     { init : model
-    , update : msg -> model -> model
     , view : model -> Html msg
+    , update : msg -> model -> model
     }
     -> ProgramDefinition () model msg ()
 createSandbox program =
@@ -252,29 +334,7 @@ createSandbox program =
                 }
 
 
-{-| Represents an unstarted program test.
-Use [`start`](#start) to start the program being tested.
--}
-type ProgramDefinition flags model msg effect
-    = ProgramDefinition (ProgramOptions model msg effect) (Maybe Url -> flags -> ProgramOptions model msg effect -> ProgramTest model msg effect)
-
-
-type alias ProgramOptions model msg effect =
-    { baseUrl : Maybe Url
-    , deconstructEffect : Maybe (effect -> SimulatedEffect msg)
-    , subscriptions : Maybe (model -> SimulatedSub msg)
-    }
-
-
-emptyOptions : ProgramOptions model msg effect
-emptyOptions =
-    { baseUrl = Nothing
-    , deconstructEffect = Nothing
-    , subscriptions = Nothing
-    }
-
-
-{-| Creates a `ProgramTest` from the parts of a `Browser.element` program.
+{-| Creates a `ProgramTest` from the parts of a [`Browser.element`](https://package.elm-lang.org/packages/elm/browser/latest/Browser#element) program.
 
 See other `create*` functions below if the program you want to test does not use `Browser.element`.
 
@@ -348,8 +408,11 @@ withJsonStringFlags decoder (ProgramDefinition options program) =
 {-| This allows you to provide a function that lets `ProgramTest` simulate effects that would become `Cmd`s and `Task`s
 when your app runs in production
 (this enables you to use [`simulateHttpResponse`](#simulateHttpResponse), [`advanceTime`](#advanceTime), etc.).
+For a detailed explanation and example of how to set up tests that use simulated effects,
+see the [“Testing programs with Cmds” guidebook](https://elm-program-test.netlify.com/cmds.html).
 
-You only need to use this if you need to [simulate HTTP requests](#simulating-http-responses)
+You only need to use this if you need to simulate [HTTP requests](#simulating-http-responses),
+[outgoing ports](#expectOutgoingPortValues),
 or the [passing of time](#simulating-time).
 
 See the `SimulatedEffect.*` modules in this package for functions that you can use to implement
@@ -367,8 +430,9 @@ withSimulatedEffects fn (ProgramDefinition options program) =
 {-| This allows you to provide a function that lets `ProgramTest` simulate subscriptions that would be `Sub`s
 when your app runs in production
 (this enables you to use [`simulateIncomingPort`](#simulateIncomingPort), etc.).
-
 You only need to use this if you need to simulate subscriptions in your test.
+For a detailed explanation and example of how to set up tests that use simulated subscriptions,
+see the [“Testing programs with ports” guidebook](https://elm-program-test.netlify.com/ports.html).
 
 The function you provide should be similar to your program's `subscriptions` function
 but return `SimulatedSub`s instead of `Sub`s.
@@ -384,7 +448,7 @@ withSimulatedSubscriptions fn (ProgramDefinition options program) =
     ProgramDefinition { options | subscriptions = Just fn } program
 
 
-{-| Creates a `ProgramTest` from the parts of a `Browser.document` program.
+{-| Creates a `ProgramTest` from the parts of a [`Browser.document`](https://package.elm-lang.org/packages/elm/browser/latest/Browser#document) program.
 
 See other `create*` functions if the program you want to test does not use `Browser.document`.
 
@@ -408,11 +472,25 @@ createDocument program =
                 }
 
 
-{-| Creates a `ProgramTest` from the parts of a `Browser.application` program.
+{-| Creates a `ProgramTest` from the parts of a [`Browser.application`](https://package.elm-lang.org/packages/elm/browser/latest/Browser#application) program.
 
 See other `create*` functions if the program you want to test does not use `Browser.application`.
 
 If your program has subscriptions that you want to simulate, see [`withSimulatedSubscriptions`](#withSimulatedSubscriptions).
+
+Note that Elm currently does not provide any way to create a [`Browser.Navigation.Key`](https://package.elm-lang.org/packages/elm/browser/latest/Browser-Navigation#Key) in tests, so this function uses `()` as the key type instead.
+It should be possible to test programs that make use of navigation keys,
+but this is not well documented yet.
+(As a point in the right direction, you will probably need to generalize
+all your functions that use the key like this:)
+
+    update : (key -> String -> Cmd msg) -> Msg -> Model key -> (Model, Cmd msg)
+    update pushUrl msg model =
+        case msg of
+            ... ->
+                ( model
+                , pushUrl model.key
+                )
 
 -}
 createApplication :
@@ -491,7 +569,7 @@ This can be used to simulate events that can only be triggered by [commands (`Cm
 NOTE: When possible, you should prefer [Simulating user input](#simulating-user-input),
 [Simulating HTTP responses](#simulating-http-responses),
 or (if neither of those support what you need) [`simulateLastEffect`](#simulateLastEffect),
-as doing so will make your tests more robust to changes in your program's implementation details.
+as doing so will make your tests more resilient to changes in your program's implementation details.
 
 -}
 update : msg -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -614,20 +692,20 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
 
 {-| Simulates a custom DOM event.
 
-NOTE: If there is another, more specific function (see [Simulating user input](#simulating-user-input)
+NOTE: If there is another, more specific function (see [“Simulating user input”](#simulating-user-input))
 that does what you want, prefer that instead, as you will get the benefit of better error messages.
 
-Parameters:
+The parameters are:
 
-  - `findTarget`: A function to find the HTML element that responds to the event
+1.  A function to find the HTML element that responds to the event
     (typically this will be a call to `Test.Html.Query.find [ ...some selector... ]`)
-  - `( eventName, eventValue )`: The event to simulate
-    (see [Test.Html.Event "Event Builders"](http://package.elm-lang.org/packages/eeue56/elm-html-test/latest/Test-Html-Event#event-builders))
+2.  The event to simulate
+    (see [Test.Html.Event "Event Builders"](https://package.elm-lang.org/packages/elm-explorations/test/latest/Test-Html-Event#event-builders))
 
 -}
-simulate : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> ProgramTest model msg effect -> ProgramTest model msg effect
-simulate findTarget ( eventName, eventValue ) programTest =
-    simulateHelper ("simulate " ++ escapeString eventName) findTarget ( eventName, eventValue ) programTest
+simulateDomEvent : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> ProgramTest model msg effect -> ProgramTest model msg effect
+simulateDomEvent findTarget ( eventName, eventValue ) programTest =
+    simulateHelper ("simulateDomEvent " ++ escapeString eventName) findTarget ( eventName, eventValue ) programTest
 
 
 escapeString : String -> String
@@ -830,7 +908,7 @@ followLink functionDescription href programTest =
 
 2.  The label text of the input field.
 
-3.  The text that will entered into the input field.
+3.  The text that will be entered into the input field.
 
 There are a few different ways to accessibly label your input fields so that `fillIn` will find them:
 
@@ -859,8 +937,8 @@ There are a few different ways to accessibly label your input fields so that `fi
 If you need to target a `<textarea>` that does not have a label,
 see [`fillInTextarea`](#fillInTextArea).
 
-If you need more control over the finding the target element or creating the simulated event,
-see [`simulate`](#simulate).
+If you need more control over finding the target element or creating the simulated event,
+see [`simulateDomEvent`](#simulateDomEvent).
 
 -}
 fillIn : String -> String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -882,8 +960,8 @@ If your view has more than one `<textarea>`,
 prefer adding associated `<label>` elements and use [`fillIn`](#fillIn).
 If you cannot add `<label>` elements see [`within`](#within).
 
-If you need more control over the finding the target element or creating the simulated event,
-see [`simulate`](#simulate).
+If you need more control over finding the target element or creating the simulated event,
+see [`simulateDomEvent`](#simulateDomEvent).
 
 -}
 fillInTextarea : String -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -910,17 +988,11 @@ The parameters are:
 
 3.  A `Bool` indicating whether to check (`True`) or uncheck (`False`) the checkbox.
 
-NOTE: Currently, this function requires that you also provide the field id
-(which must match both the `id` attribute of the target `input` element,
-and the `for` attribute of the `label` element).
-After [eeue56/elm-html-test#52](https://github.com/eeue56/elm-html-test/issues/52) is resolved,
-a future release of this package will remove the `fieldId` parameter.
-
 NOTE: In the future, this will be generalized to work with
 aria accessibility attributes in addition to working with standard HTML label elements.
 
-If you need more control over the finding the target element or creating the simulated event,
-see [`simulate`](#simulate).
+If you need more control over finding the target element or creating the simulated event,
+see [`simulateDomEvent`](#simulateDomEvent).
 
 -}
 check : String -> String -> Bool -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -974,8 +1046,8 @@ you can simulate selecting an option like this:
 
     ProgramTest.selectOption "pet-select" "Choose a pet" "dog" "Dog"
 
-If you need more control over the finding the target element or creating the simulated event,
-see [`simulate`](#simulate).
+If you need more control over finding the target element or creating the simulated event,
+see [`simulateDomEvent`](#simulateDomEvent).
 
 -}
 selectOption : String -> String -> String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -1195,54 +1267,100 @@ drainWorkQueue programTest =
                                 |> drain
 
 
-{-| A final assertion that checks whether an HTTP request to the specific url and method has been made.
+{-| Asserts that an HTTP request to the specific url and method has been made.
 
-If you want to check the headers or request body, see [`assertHttpRequest`](#assertHttpRequest).
+The parameters are:
+
+1.  The HTTP method of the expected request (typically `"GET"` or `"POST"`)
+2.  The absolute URL of the expected request
+
+For example:
+
+    ...
+        |> expectHttpRequestWasMade "GET" "https://example.com/api/data"
+
+If you want to check the headers or request body, see [`expectHttpRequest`](#expectHttpRequest).
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
+If you want to interact with the program more after this assertion, see [`ensureHttpRequestWasMade`](#ensureHttpRequestWasMade).
+
 -}
-assertHttpRequestWasMade : String -> String -> ProgramTest model msg effect -> Expectation
-assertHttpRequestWasMade method url programTest =
-    done <|
-        case programTest of
-            Finished err ->
-                Finished err
+expectHttpRequestWasMade : String -> String -> ProgramTest model msg effect -> Expectation
+expectHttpRequestWasMade method url programTest =
+    programTest
+        |> expectHttpRequestHelper "expectHttpRequestWasMade" method url (always Expect.pass)
+        |> done
 
-            Active state ->
-                case state.effectSimulation of
-                    Nothing ->
-                        Finished (EffectSimulationNotConfigured "assertHttpRequestWasMade")
 
-                    Just simulation ->
-                        if Dict.member ( method, url ) simulation.state.http then
-                            programTest
+{-| See the documentation for [`expectHttpRequestWasMade`](#expectHttpRequestWasMade).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
 
-                        else
-                            Finished (NoMatchingHttpRequest "assertHttpRequestWasMade" { method = method, url = url } (Dict.keys simulation.state.http))
+You should prefer `expectHttpRequestWasMade` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
+
+-}
+ensureHttpRequestWasMade : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureHttpRequestWasMade method url =
+    expectHttpRequestHelper "ensureHttpRequestWasMade" method url (always Expect.pass)
 
 
 {-| Allows you to check the details of a pending HTTP request.
 
-See the ["Expectations" section of `Test.Http`](Test-Http#expectations) for functions that might be helpful
+See the [“Expectations” section of `Test.Http`](Test-Http#expectations) for functions that might be helpful
 in create an expectation on the request.
 
-If you only care about whether the a request was made to the correct URL, see [`assertHttpRequestWasMade`](#assertHttpRequestWasMade).
+If you only care about whether the a request was made to the correct URL, see [`expectHttpRequestWasMade`](#expectHttpRequestWasMade).
 
     ...
-        |> assertHttpRequest "POST"
+        |> expectHttpRequest "POST"
             "https://example.com/save"
             (.body >> Expect.equal """{"content":"updated!"}""")
-        |> ...
+
+NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
+
+If you want to interact with the program more after this assertion, see [`ensureHttpRequest`](#ensureHttpRequest).
 
 -}
-assertHttpRequest :
+expectHttpRequest :
+    String
+    -> String
+    -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
+    -> ProgramTest model msg effect
+    -> Expectation
+expectHttpRequest method url checkRequest programTest =
+    programTest
+        |> expectHttpRequestHelper "expectHttpRequest" method url checkRequest
+        |> done
+
+
+{-| See the documentation for [`expectHttpRequest`](#expectHttpRequest).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
+
+You should prefer `expectHttpRequest` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
+
+-}
+ensureHttpRequest :
     String
     -> String
     -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
     -> ProgramTest model msg effect
     -> ProgramTest model msg effect
-assertHttpRequest method url checkRequest programTest =
+ensureHttpRequest method url checkRequest programTest =
+    expectHttpRequestHelper "ensureHttpRequest" method url checkRequest programTest
+
+
+expectHttpRequestHelper :
+    String
+    -> String
+    -> String
+    -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
+    -> ProgramTest model msg effect
+    -> ProgramTest model msg effect
+expectHttpRequestHelper functionName method url checkRequest programTest =
     case programTest of
         Finished err ->
             Finished err
@@ -1250,7 +1368,7 @@ assertHttpRequest method url checkRequest programTest =
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished (EffectSimulationNotConfigured "assertHttpRequest")
+                    Finished (EffectSimulationNotConfigured functionName)
 
                 Just simulation ->
                     case Dict.get ( method, url ) simulation.state.http of
@@ -1261,13 +1379,21 @@ assertHttpRequest method url checkRequest programTest =
                                     programTest
 
                                 Just reason ->
-                                    Finished (ExpectFailed "assertHttpRequest" reason.description reason.reason)
+                                    Finished (ExpectFailed functionName reason.description reason.reason)
 
                         Nothing ->
-                            Finished (NoMatchingHttpRequest "assertHttpRequest" { method = method, url = url } (Dict.keys simulation.state.http))
+                            Finished (NoMatchingHttpRequest functionName { method = method, url = url } (Dict.keys simulation.state.http))
 
 
 {-| Simulates an HTTP 200 response to a pending request with the given method and url.
+
+The parameters are:
+
+1.  The HTTP method of the request to simulate a response for (typically `"GET"` or `"POST"`)
+2.  The URL of the request to simulate a response for
+3.  The response body for the simulated response
+
+For example:
 
     ...
         |> simulateHttpOk "GET"
@@ -1279,7 +1405,7 @@ If you need to simulate an error, a response with a different status code,
 or a response with response headers,
 see [`simulateHttpResponse`](#simulateHttpResponse).
 
-If you want to check the request headers or request body, use [`assertHttpRequest`](#assertHttpRequest)
+If you want to check the request headers or request body, use [`ensureHttpRequest`](#ensureHttpRequest)
 immediately before using `simulateHttpOk`.
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
@@ -1300,13 +1426,33 @@ simulateHttpOk method url responseBody =
 {-| Simulates a response to a pending HTTP request.
 The test will fail if there is no pending request matching the given method and url.
 
-You may find it helpful to see the ["Responses" section in `Test.Http`](Test-Http#responses)
-for convenient ways to create `Http.Response` values.
+The parameters are:
+
+1.  The HTTP method of the request to simulate a response for (typically `"GET"` or `"POST"`)
+2.  The URL of the request to simulate a response for
+3.  The [`Http.Response`](https://package.elm-lang.org/packages/elm/http/latest/Http#Response) value for the simulated response. You may find it helpful to see the [“Responses” section in `Test.Http`](Test-Http#responses)
+    for convenient ways to create `Http.Response` values.
+
+For example:
+
+    ...
+        |> simulateHttpResponse "GET"
+            "https://example.com/time.json"
+            Test.Http.networkError
+        |> ...
+        |> simulateHttpResponse "POST"
+            "https://example.com/api/v1/process_data"
+            (Test.Http.httpResponse
+                { statusCode : 204
+                , headers : [ ( "X-Procesing-Time", "1506ms") ]
+                , body : ""
+                }
+            )
 
 If you are simulating a 200 OK response and don't need to provide response headers,
 you can use the simpler [`simulateHttpOk`](#simulateHttpOk).
 
-If you want to check the request headers or request body, use [`assertHttpRequest`](#assertHttpRequest)
+If you want to check the request headers or request body, use [`ensureHttpRequest`](#ensureHttpRequest)
 immediately before using `simulateHttpResponse`.
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
@@ -1425,30 +1571,53 @@ advanceTo functionName end programTest =
                                     }
 
 
-{-| Lets you assert on the values that have been sent to an outgoing port.
+{-| Lets you assert on the values that the program being tested has sent to an outgoing port.
 
 The parameters are:
 
 1.  The name of the port
 2.  A JSON decoder corresponding to the type of the port
 3.  A function that will receive the list of values sent to the port
-    since the last use of `assertAndClearOutgoingPortValues` (or since the start of the test)
-    and returns an `Expectation`
+    since the the start of the test (or since the last use of `ensureOutgoingPortValues`)
+    and return an `Expectation`
 
 For example:
 
     ...
-        |> assertAndClearOutgoingPortValues
+        |> expectOutgoingPortValues
             "saveApiTokenToLocalStorage"
             Json.Decode.string
             (Expect.equal [ "975774a26612", "920facb1bac0" ])
-        |> ...
+
+For a more detailed explanation and example, see the [“Testing programs with ports” guidebook](https://elm-program-test.netlify.com/ports.html).
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
+If you want to interact with the program more after this assertion, see [`ensureOutgoingPortValues`](#ensureOutgoingPortValues).
+
 -}
-assertAndClearOutgoingPortValues : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
-assertAndClearOutgoingPortValues portName decoder checkValues programTest =
+expectOutgoingPortValues : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest model msg effect -> Expectation
+expectOutgoingPortValues portName decoder checkValues programTest =
+    programTest
+        |> expectOutgoingPortValuesHelper "expectOutgoingPortValues" portName decoder checkValues
+        |> done
+
+
+{-| See the documentation for [`expectOutgoingPortValues`](#expectOutgoingPortValues).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
+
+You should prefer `expectOutgoingPortValues` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
+
+-}
+ensureOutgoingPortValues : String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureOutgoingPortValues portName decoder checkValues programTest =
+    expectOutgoingPortValuesHelper "ensureOutgoingPortValues" portName decoder checkValues programTest
+
+
+expectOutgoingPortValuesHelper : String -> String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+expectOutgoingPortValuesHelper functionName portName decoder checkValues programTest =
     case programTest of
         Finished err ->
             Finished err
@@ -1456,12 +1625,12 @@ assertAndClearOutgoingPortValues portName decoder checkValues programTest =
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished (EffectSimulationNotConfigured "assertAndClearOutgoingPortValues")
+                    Finished (EffectSimulationNotConfigured functionName)
 
                 Just simulation ->
                     case allOk <| List.map (Json.Decode.decodeValue decoder) <| EffectSimulation.outgoingPortValues portName simulation of
                         Err errs ->
-                            Finished (CustomFailure "assertAndClearOutgoingPortValues: failed to decode port values" (List.map Json.Decode.errorToString errs |> String.join "\n"))
+                            Finished (CustomFailure (functionName ++ ": failed to decode port values") (List.map Json.Decode.errorToString errs |> String.join "\n"))
 
                         Ok values ->
                             case Test.Runner.getFailureReason (checkValues values) of
@@ -1475,7 +1644,7 @@ assertAndClearOutgoingPortValues portName decoder checkValues programTest =
 
                                 Just reason ->
                                     Finished
-                                        (ExpectFailed ("assertAndClearOutgoingPortValues: values sent to port \"" ++ portName ++ "\" did not match")
+                                        (ExpectFailed (functionName ++ ": values sent to port \"" ++ portName ++ "\" did not match")
                                             reason.description
                                             reason.reason
                                         )
@@ -1503,12 +1672,24 @@ allOk results =
         |> Result.mapError List.reverse
 
 
-{-| Lets you simulate a value being received on an incoming port.
+{-| Lets you simulate a value being sent to the program being tested via an incoming port.
 
 The parameters are:
 
 1.  The name of the port
 2.  The JSON representation of the incoming value
+
+For example, here we are simulating the program recieving a list of strings on the incoming port
+`port resultsFromJavascript : (List String -> msg) -> Sub msg`:
+
+    ...
+        |> ProgramTest.simulateIncomingPort
+            "resultsFromJavascript"
+            (Json.Encode.list Json.Encode.string
+                [ "Garden-path sentences can confuse the reader." ]
+            )
+
+For a more detailed explanation and example, see the [“Testing programs with ports” guidebook](https://elm-program-test.netlify.com/ports.html).
 
 NOTE: You must use [`withSimulatedSubscriptions`](#withSimulatedSubscriptions) before you call [`start`](#start) to be able to use this function.
 
@@ -1590,7 +1771,7 @@ replaceView newView programTest =
 
 
 {-| Simulates a route change event (which would happen when your program is
-a `Browser.application` and the user changes the URL in the browser's URL bar.
+a `Browser.application` and the user manually changes the URL in the browser's URL bar).
 
 The parameter may be an absolute URL or relative URL.
 
@@ -1619,6 +1800,12 @@ routeChange url programTest =
 
 
 {-| Make an assertion about the current state of a `ProgramTest`'s model.
+
+When possible, you should prefer making assertions about the rendered view (see [`expectView`](#expectView))
+or external requests made by your program (see [`expectHttpRequest`](#expectHttpRequest), [`expectOutgoingPortValues`](#expectOutgoingPortValues)),
+as testing at the level that users and external services interact with your program
+will make your tests more resilient to changes in the private implementation of your program.
+
 -}
 expectModel : (model -> Expectation) -> ProgramTest model msg effect -> Expectation
 expectModel assertion programTest =
@@ -1641,10 +1828,12 @@ by providing a function that can convert the last effect into `msg`s.
 
 The function you provide will be called with the effect that was returned by the most recent call to `update` or `init` in the `ProgramTest`.
 
-  - If it returns `Err`, then that will cause the `ProgramTest` to enter a failure state with the provided message.
+  - If it returns `Err`, then the `ProgramTest` will enter a failure state with the provided error message.
   - If it returns `Ok`, then the list of `msg`s will be applied in order via `ProgramTest.update`.
 
-NOTE: If you are simulating HTTP response, you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
+NOTE: If you are simulating HTTP responses,
+you should prefer more specific functions designed for that purpose.
+You can find links to the relevant documentation in the [documentation index](#documentation-index).
 
 -}
 simulateLastEffect : (effect -> Result String (List msg)) -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -1677,21 +1866,26 @@ expectLastEffectHelper functionName assertion programTest =
                     Finished (ExpectFailed functionName reason.description reason.reason)
 
 
-{-| Validates the last effect produced by a `ProgramTest`'s program without ending the `ProgramTest`.
+{-| See the documentation for [`expectLastEffect`](#expectLastEffect).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
 
-NOTE: If you are asserting about HTTP requests being made,
-you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
+You should prefer `expectLastEffect` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
 
 -}
-shouldHaveLastEffect : (effect -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
-shouldHaveLastEffect assertion programTest =
-    expectLastEffectHelper "shouldHaveLastEffect" assertion programTest
+ensureLastEffect : (effect -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureLastEffect assertion programTest =
+    expectLastEffectHelper "ensureLastEffect" assertion programTest
 
 
 {-| Makes an assertion about the last effect produced by a `ProgramTest`'s program.
 
-NOTE: If you are asserting about HTTP requests being made,
-you should prefer the functions described in ["Simulating HTTP responses"](#simulating-http-responses).
+NOTE: If you are asserting about HTTP requests or outgoing ports,
+you should prefer more specific functions designed for that purpose.
+You can find links to the relevant documentation in the [documentation index](#documentation-index).
+
+If you want to interact with the program more after this assertion, see [`ensureLastEffect`](#ensureLastEffect).
 
 -}
 expectLastEffect : (effect -> Expectation) -> ProgramTest model msg effect -> Expectation
@@ -1721,28 +1915,49 @@ expectViewHelper functionName assertion programTest =
                     Finished (ExpectFailed functionName reason.description reason.reason)
 
 
-{-| Validates the the current state of a `ProgramTest`'s view without ending the `ProgramTest`.
+{-| See the documentation for [`expectView`](#expectView).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
+
+You should prefer `expectView` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
+
 -}
-shouldHaveView : (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
-shouldHaveView assertion programTest =
-    expectViewHelper "shouldHaveView" assertion programTest
+ensureView : (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureView assertion programTest =
+    expectViewHelper "ensureView" assertion programTest
 
 
-{-| `shouldHave [...selector...]` is equivalent to `shouldHaveView (Test.Html.Query.has [...selector...])`
+{-| See the documentation for [`expectViewHas`](#expectViewHas).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
+
+You should prefer `expectViewHas` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
+
 -}
-shouldHave : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
-shouldHave selector programTest =
-    expectViewHelper "shouldHave" (Query.has selector) programTest
+ensureViewHas : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureViewHas selector programTest =
+    expectViewHelper "ensureViewHas" (Query.has selector) programTest
 
 
-{-| `shouldNotHave [...selector...]` is equivalent to `shouldHaveView (Test.Html.Query.hasNot [...selector...])`
+{-| See the documentation for [`expectViewHasNot`](#expectViewHasNot).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
+
+You should prefer `expectViewHasNot` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
+
 -}
-shouldNotHave : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
-shouldNotHave selector programTest =
-    expectViewHelper "shouldNotHave" (Query.hasNot selector) programTest
+ensureViewHasNot : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureViewHasNot selector programTest =
+    expectViewHelper "ensureViewHasNot" (Query.hasNot selector) programTest
 
 
 {-| Makes an assertion about the current state of a `ProgramTest`'s view.
+
+If you want to interact with the program more after this assertion, see [`ensureView`](#ensureView).
+
 -}
 expectView : (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> Expectation
 expectView assertion programTest =
@@ -1755,6 +1970,8 @@ expectView assertion programTest =
 
 `expectViewHas [...selector...]` is the same as `expectView (Test.Html.Query.has [...selector...])`.
 
+If you want to interact with the program more after this assertion, see [`ensureViewHas`](#ensureViewHas).
+
 -}
 expectViewHas : List Selector.Selector -> ProgramTest model msg effect -> Expectation
 expectViewHas selector programTest =
@@ -1763,9 +1980,24 @@ expectViewHas selector programTest =
         |> done
 
 
+{-| A simpler way to assert that a `ProgramTest`'s view does not match a given selector.
+
+`expectViewHasNot [...selector...]` is the same as `expectView (Test.Html.Query.hasNot [...selector...])`.
+
+If you want to interact with the program more after this assertion, see [`ensureViewHasNot`](#ensureViewHasNot).
+
+-}
+expectViewHasNot : List Selector.Selector -> ProgramTest model msg effect -> Expectation
+expectViewHasNot selector programTest =
+    programTest
+        |> expectViewHelper "expectViewHasNot" (Query.hasNot selector)
+        |> done
+
+
 {-| Ends a `ProgramTest`, reporting any errors that occurred.
 
-NOTE: You should prefer using a [final assertion](#final-assertions) to end your test over using `done`,
+You can also end a `ProgramTest` using any of the functions starting with `expect*`.
+In fact, you should prefer using one of the `expect*` functions when possible,
 as doing so will [make the intent of your test more clear](https://www.artima.com/weblogs/viewpost.jsp?thread=35578).
 
 -}
@@ -1832,6 +2064,11 @@ done programTest =
 
 
 {-| Asserts that the program ended by navigating away to another URL.
+
+The parameter is:
+
+1.  The expected URL that the program should have navigated away to.
+
 -}
 expectPageChange : String -> ProgramTest model msg effect -> Expectation
 expectPageChange expectedUrl programTest =
@@ -1848,10 +2085,10 @@ expectPageChange expectedUrl programTest =
 
 {-| `fail` can be used to report custom errors if you are writing your own convenience functions to deal with program tests.
 
-Example (this is a function that checks for a particular structure in the program's view,
-but will also fail the ProgramTest if the `expectedCount` parameter is invalid):
+For example, this function checks for a particular structure in the program's view,
+but will also fail the ProgramTest if the `expectedCount` parameter is invalid:
 
-    expectNotificationCount : Int -> ProgramTest model msg effect -> ProgramTest model msg effect
+    expectNotificationCount : Int -> ProgramTest model msg effect -> Expectation
     expectNotificationCount expectedCount programTest =
         if expectedCount <= 0 then
             programTest
@@ -1860,7 +2097,7 @@ but will also fail the ProgramTest if the `expectedCount` parameter is invalid):
 
         else
             programTest
-                |> shouldHave
+                |> expectViewHas
                     [ Test.Html.Selector.class "notifications"
                     , Test.Html.Selector.text (toString expectedCount)
                     ]
@@ -1878,15 +2115,17 @@ fail assertionName failureMessage programTest =
             Finished (CustomFailure assertionName failureMessage)
 
 
-{-| `createFailed` can be used to report custom errors if you are writing your own convenience functions to **create** program tests.
+{-| `createFailed` can be used to report custom errors if you are writing your own convenience functions to _create_ program tests.
+
+NOTE: if you are writing a convenience function that takes a `ProgramTest` as input, you should use [`fail`](#fail) instead,
+as it provides more context in the test failure message.
 
 The parameters are:
 
 1.  The name of your helper function (displayed in failure messages)
 2.  The failure message (also included in the failure message)
 
-NOTE: if you are writing a convenience function that takes a `ProgramTest` as input, you should use [`fail`](#fail) instead,
-as it provides more context in the test failure message.
+For example:
 
     -- JsonSchema and MyProgram are imaginary modules for this example
 

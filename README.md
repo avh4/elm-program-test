@@ -5,14 +5,31 @@
 
 `elm-program-test` provides a convenient API that works with
 [elm-test](http://package.elm-lang.org/packages/elm-community/elm-test/latest)
-and [elm-html-test](http://package.elm-lang.org/packages/eeue56/elm-html-test/latest)
+(including `Test.Html`)
 for testing your Elm programs as complete units.
+
+
+## [Guidebooks](https://elm-program-test.netlify.com/#guidebooks)
+
+Note: If you are just looking for a quick example of what using `elm-program-test` looks like,
+see the ["basic example"](#basic-example) below.
+
+For more detailed documentation, the following guides show examples of how to use
+`elm-program-test` to test different aspects of an Elm program:
+
+- [Testing programs with interactive views](https://elm-program-test.netlify.com/html.html) &mdash;
+  shows an example of test-driving adding form validation to an Elm program
+- [Testing programs with Cmds](https://elm-program-test.netlify.com/cmds.html) &mdash; shows testing a program
+  that uses `Http.get` and `Http.post`
+- [Testing programs with ports](https://elm-program-test.netlify.com/ports.html) &mdash; shows testing a program
+  that uses ports to interface with JavaScript
+- [Upgrading from elm-program-test 2.x to 3.x](https://elm-program-test.netlify.com/upgrade-3.0.0.html)
 
 
 ## Basic example
 
-In this example, `ProgramTest.create` is used to initiate testing of the imagined `MyProgram` module
-(which follows the [Elm architecture](https://guide.elm-lang.org/architecture/)).
+In this example, `ProgramTest.createElement` and `start` are used to initiate testing of the imagined `MyProgram` module
+(which follows [the Elm architecture](https://guide.elm-lang.org/architecture/)).
 Then `clickButton` is used to simulate user interaction with the program,
 and finally `expectViewHas` is used to assert the final state of the program's displayed HTML.
 
@@ -43,21 +60,24 @@ exampleProgramTest =
 
 ## Testing programs with flags and/or navigation
 
-This example tests a program that requires both [flags](https://guide.elm-lang.org/interop/javascript.html#flags) and [navigation](http://package.elm-lang.org/packages/elm-lang/navigation/latest).
-There are variants of the `ProgramTest.create*` functions ([see all](ProgramTest#creating)) for all combinations of
-flags and/or navigation that a program might required.
+This example tests a program that requires both [flags](https://guide.elm-lang.org/interop/javascript.html#flags) and [navigation](https://package.elm-lang.org/packages/elm/browser/latest/Browser#application).
+There are variants of the `ProgramTest.create*` functions ([see all](ProgramTest#creating)) for each type of Elm program supported by `elm/browser`,
+and there are a handful of other options that can be used to configure the test before starting it.
 
 ```elm
 import Test exposing (..)
 import Test.Html.Selector exposing (class, text)
-import ProgramTest exposing (ProgramTest clickButton, expectViewHas)
+import ProgramTest exposing (ProgramTest, clickButton, expectViewHas)
 import MyProgram exposing (Flags, Msg, Model) -- just an imaginary example
 
 start : String -> Flags -> ProgramTest Model Msg (Cmd Msg)
 start initialUrl flags =
     ProgramTest.createApplication
         { onUrlChange = MyProgram.OnRouteChange
-        , init = MyProgram.init -- the type of MyProgram.init is: MyProgram.Flags -> Navigation.Location -> (MyProgram.Model, Cmd MyProgram.Msg)
+        , init =
+            -- NOTE: the type of MyProgram.init is:
+            -- MyProgram.Flags -> Navigation.Location -> (MyProgram.Model, Cmd MyProgram.Msg)
+            MyProgram.init
         , update = MyProgram.update
         , view = MyProgram.view
         }
@@ -87,7 +107,7 @@ This example tests a module for a complicated view by making a program with a tr
 import DateTimePicker -- using abadi199/datetimepicker 6.0.0 as an example of a view to test
 import Test exposing (..)
 import Test.Html.Selector exposing (text)
-import ProgramTest exposing (clickButton, expectViewHas)
+import ProgramTest exposing (ProgramTest, clickButton, expectViewHas)
 
 startDatePicker :
     ProgramTest
@@ -95,7 +115,7 @@ startDatePicker :
         (DateTimePicker.State, Maybe Date) -- msg: in this trivial program, the msg is simply the new model value
         (Cmd never) -- effect: could use any type here, but Cmd seems least confusing
 startDatePicker =
-    ProgramTest.element
+    ProgramTest.createElement
         { init = \() -> ((DateTimePicker.initialState, Nothing), Cmd.none)
         , update = newState model -> (newState, Cmd.none)
         , view =
@@ -106,7 +126,7 @@ startDatePicker =
 
 datePickerTest : Test
 datePickerTest =
-    test "" <|
+    test "can advance to the next month" <|
         \() ->
             startDatePicker
                 |> clickButton "Next Month"

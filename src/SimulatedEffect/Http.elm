@@ -8,7 +8,7 @@ module SimulatedEffect.Http exposing
     )
 
 {-| This module parallels [elm/http's `Http` module](https://package.elm-lang.org/packages/elm/http/2.0.0/Http).
-PRs are welcome to add any functions that are missing.
+_Pull requests are welcome to add any functions that are missing._
 
 The functions here produce `SimulatedEffect`s instead of `Cmd`s, which are meant to be used
 to help you implement the function to provide when using [`ProgramTest.withSimulatedEffects`](ProgramTest#withSimulatedEffects).

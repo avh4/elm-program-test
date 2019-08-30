@@ -7,6 +7,8 @@ to help you implement the function to provide when using
 [`ProgramTest.withSimulatedEffects`](ProgramTest#withSimulatedEffects)
 and [`ProgramTest.withSimulatedSubscriptions`](ProgramTest#withSimulatedSubscriptions).
 
+For a detailed example, see the [“Testing programs with ports” guidebook](https://elm-program-test.netlify.com/ports.html).
+
 @docs send, subscribe
 
 -}
