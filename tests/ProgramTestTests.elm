@@ -174,6 +174,14 @@ all =
                     |> ProgramTest.withBaseUrl "https://example.com/path"
                     |> ProgramTest.start "flags"
                     |> ProgramTest.expectModel (Expect.equal "<INIT:/path:flags>")
+        , test "can create headless worker" <|
+            \() ->
+                ProgramTest.createWorker
+                    { init = \flags -> ( "<INIT:" ++ flags ++ ">", NoOp )
+                    , update = testUpdate
+                    }
+                    |> ProgramTest.start "flags"
+                    |> ProgramTest.expectModel (Expect.equal "<INIT:flags>")
         , testAssertView "can assert on the view" <|
             \_ assertView ->
                 start
