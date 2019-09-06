@@ -1,3 +1,11 @@
+## 3.1.0
+
+New features:
+
+  - added `SimulatedEffect.Http.expectStringResponse`
+  - added `ProgramTest.createWorker`
+
+
 ## 3.0.0
 
 There are many significant changes!

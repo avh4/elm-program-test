@@ -1,6 +1,6 @@
 module ProgramTest exposing
     ( ProgramTest, start
-    , createSandbox, createElement, createDocument, createApplication
+    , createSandbox, createElement, createDocument, createApplication, createWorker
     , ProgramDefinition
     , withBaseUrl, withJsonStringFlags
     , withSimulatedEffects, SimulatedEffect, SimulatedTask
@@ -79,7 +79,7 @@ A `ProgramDefinition` (required to create a `ProgramTest` with [`start`](#start)
 can be created with one of the following functions that parallel
 the functions in [`elm/browser`](https://package.elm-lang.org/packages/elm/browser/latest/Browser) for creating programs.
 
-@docs createSandbox, createElement, createDocument, createApplication
+@docs createSandbox, createElement, createDocument, createApplication, createWorker
 @docs ProgramDefinition
 
 
@@ -330,6 +330,29 @@ createSandbox program =
                 { init = ( program.init, () )
                 , update = \msg model -> ( program.update msg model, () )
                 , view = program.view
+                , onRouteChange = \_ -> Nothing
+                }
+
+
+{-| Creates a `ProgramTest` from the parts of a [`Platform.worker`](https://package.elm-lang.org/packages/elm/core/latest/Platform#worker) program.
+
+See other `create*` functions if the program you want to test does not use `Platform.worker`.
+
+If your program has subscriptions that you want to simulate, see [`withSimulatedSubscriptions`](#withSimulatedSubscriptions).
+
+-}
+createWorker :
+    { init : flags -> ( model, effect )
+    , update : msg -> model -> ( model, effect )
+    }
+    -> ProgramDefinition flags model msg effect
+createWorker program =
+    ProgramDefinition emptyOptions <|
+        \location flags ->
+            createHelper
+                { init = program.init flags
+                , update = program.update
+                , view = \_ -> Html.text "** Programs created with ProgramTest.createWorker do not have a view.  Use ProgramTest.createElement instead if you meant to provide a view function. **"
                 , onRouteChange = \_ -> Nothing
                 }
 
