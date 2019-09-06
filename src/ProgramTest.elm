@@ -336,7 +336,7 @@ createSandbox program =
 
 {-| Creates a `ProgramTest` from the parts of a [`Platform.worker`](https://package.elm-lang.org/packages/elm/core/latest/Platform#worker) program.
 
-See other `create*` functions below if the program you want to test does not use `Platform.worker`.
+See other `create*` functions if the program you want to test does not use `Platform.worker`.
 
 If your program has subscriptions that you want to simulate, see [`withSimulatedSubscriptions`](#withSimulatedSubscriptions).
 
