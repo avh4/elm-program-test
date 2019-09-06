@@ -3,7 +3,7 @@ module SimulatedEffect.Http exposing
     , Header, header
     , Body, emptyBody, stringBody, jsonBody
     , Expect, expectString, expectJson, expectWhatever, Error
-    , Response
+    , expectStringResponse, Response
     , task, Resolver, stringResolver
     )
 
@@ -36,7 +36,7 @@ to help you implement the function to provide when using [`ProgramTest.withSimul
 
 # Elaborate Expectations
 
-@docs Response
+@docs expectStringResponse, Response
 
 
 # Tasks
@@ -207,6 +207,13 @@ expectString onResult =
 
                 Http.GoodStatus_ _ body ->
                     onResult (Ok body)
+
+
+{-| Expect a Response with a String body.
+-}
+expectStringResponse : (Result x a -> msg) -> (Response String -> Result x a) -> Expect msg
+expectStringResponse toMsg onResponse =
+    Expect (onResponse >> toMsg)
 
 
 {-| Expect the response body to be JSON.
