@@ -17,8 +17,9 @@ good test coverage requires testing the interactions between your `view` and you
 `elm-program-test` lets you write "high-level" tests for your program,
 testing the public interface of your program rather than
 testing `view` and `update` functions independently.
-This gives you the flexibility to robustly test complex interactions
-between your `view`, `update`, and the state of your program when necessary; 
+This gives you the flexibility to test complex interactions
+between your `view`, `update`, and the state of your program
+in a way that's extremely resiliant to refactoring; 
 and allows you to write your tests in terms of
 how users and external services interact with your program.
 
@@ -50,7 +51,7 @@ Here's the page flow a user will experience:
 We'll be using elm-program-test to help us add field validation for the
 "Postal code" field.
 
-Using the `elm-program-test` will
+Using `elm-program-test` will also
 help us build our UI in a way that makes it follow
 some accessibility best practices.  
 
@@ -70,7 +71,7 @@ Our goal will be to write a test for the following scenario:
 ### Preparing to write a program test
 
 Before we can write our actual test, we need to define how to create tests for our program.
-This is similar to writing your `main` definition for using your app in production.
+This is similar to writing the `main` definition for using your app in production.
 It's typical to call this definition `start` in your test file, but it can be called anything.
 
 Here's the `start` definition for our example program:
@@ -92,7 +93,7 @@ start =
 ```
 
 Just like when using one of the `Browser` module functions to create your real program,
-here we use one of the `ProgramText.create*` functions to create our program test.
+here we use one of the `ProgramTest.create*` functions to create our program test.
 We provide the `init`, `update`, and `view` functions that comprise our program.
 After creating the program test definition, we use `ProgramTest.start` to pass the initial
 flags to the program.
