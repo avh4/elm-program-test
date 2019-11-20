@@ -1,4 +1,4 @@
-module Test.Expect exposing (expectFailure, expectSuccess)
+module Test.Expect exposing (expectAnyFailure, expectFailure, expectSuccess)
 
 {-| Functions for asserting things about expectations.
 -}
@@ -26,3 +26,13 @@ expectFailure expectedFailureMessage actualResult =
         Just actualInfo ->
             actualInfo.description
                 |> Expect.equal (String.join "\n" expectedFailureMessage)
+
+
+expectAnyFailure : Expectation -> Expectation
+expectAnyFailure actualResult =
+    case Test.Runner.getFailureReason actualResult of
+        Nothing ->
+            Expect.fail "Expected a failure, but got a pass"
+
+        Just actualInfo ->
+            Expect.pass
