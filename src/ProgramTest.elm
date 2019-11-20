@@ -19,7 +19,8 @@ module ProgramTest exposing
     , advanceTime
     , expectOutgoingPortValues, ensureOutgoingPortValues
     , simulateIncomingPort
-    , expectPageChange
+    , expectPageChange, expectBrowserUrl, expectBrowserHistory
+    , ensureBrowserUrl, ensureBrowserHistory
     , routeChange
     , update
     , expectModel
@@ -158,7 +159,8 @@ The following functions allow you to configure your
 
 ## Browser assertions
 
-@docs expectPageChange
+@docs expectPageChange, expectBrowserUrl, expectBrowserHistory
+@docs ensureBrowserUrl, ensureBrowserHistory
 
 
 ## Simulating browser interactions
@@ -229,7 +231,11 @@ type ProgramTest model msg effect
         { program : TestProgram model msg effect (SimulatedSub msg)
         , currentModel : model
         , lastEffect : effect
-        , currentLocation : Maybe Url
+        , navigation :
+            Maybe
+                { currentLocation : Url
+                , browserHistory : List Url
+                }
         , effectSimulation : Maybe (EffectSimulation msg effect)
         }
     | Finished Failure
@@ -305,7 +311,16 @@ createHelper program options =
         { program = program_
         , currentModel = newModel
         , lastEffect = newEffect
-        , currentLocation = options.baseUrl
+        , navigation =
+            case options.baseUrl of
+                Nothing ->
+                    Nothing
+
+                Just baseUrl ->
+                    Just
+                        { currentLocation = baseUrl
+                        , browserHistory = []
+                        }
         , effectSimulation = Maybe.map EffectSimulation.init options.deconstructEffect
         }
         |> queueEffect newEffect
@@ -906,7 +921,7 @@ followLink functionDescription href programTest =
             Finished err
 
         Active state ->
-            case state.currentLocation of
+            case Maybe.map .currentLocation state.navigation of
                 Just location ->
                     Finished (ChangedPage functionDescription (Url.Extra.resolve location href))
 
@@ -1231,11 +1246,11 @@ queueSimulatedEffect effect programTest =
 
                         SimulatedEffect.PushUrl url ->
                             programTest
-                                |> routeChange url
+                                |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.pushUrl " ++ escapeString url) False url
 
                         SimulatedEffect.ReplaceUrl url ->
                             programTest
-                                |> routeChange url
+                                |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.replaceUrl " ++ escapeString url) True url
 
 
 drain : ProgramTest model msg effect -> ProgramTest model msg effect
@@ -1801,25 +1816,49 @@ The parameter may be an absolute URL or relative URL.
 -}
 routeChange : String -> ProgramTest model msg effect -> ProgramTest model msg effect
 routeChange url programTest =
+    routeChangeHelper "routeChange" False url programTest
+
+
+routeChangeHelper : String -> Bool -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
+routeChangeHelper functionName replace url programTest =
     case programTest of
         Finished err ->
             Finished err
 
         Active state ->
-            case state.currentLocation of
+            case state.navigation of
                 Nothing ->
-                    Finished (ProgramDoesNotSupportNavigation "routeChange")
+                    Finished (ProgramDoesNotSupportNavigation functionName)
 
-                Just currentLocation ->
-                    case
-                        Url.Extra.resolve currentLocation url
-                            |> state.program.onRouteChange
-                    of
-                        Nothing ->
-                            programTest
+                Just { currentLocation, browserHistory } ->
+                    let
+                        newLocation =
+                            Url.Extra.resolve currentLocation url
+                    in
+                    let
+                        processRouteChange =
+                            case state.program.onRouteChange newLocation of
+                                Nothing ->
+                                    identity
 
-                        Just msg ->
-                            update msg programTest
+                                Just msg ->
+                                    -- TODO: should this be set before or after?
+                                    update msg
+                    in
+                    Active
+                        { state
+                            | navigation =
+                                Just
+                                    { currentLocation = newLocation
+                                    , browserHistory =
+                                        if replace then
+                                            browserHistory
+
+                                        else
+                                            currentLocation :: browserHistory
+                                    }
+                        }
+                        |> processRouteChange
 
 
 {-| Make an assertion about the current state of a `ProgramTest`'s model.
@@ -2092,6 +2131,10 @@ The parameter is:
 
 1.  The expected URL that the program should have navigated away to.
 
+If your program is an application that manages URL changes
+(created with [`createApplication`](#createApplication)),
+then you probably want [`expectBrowserUrl`](#expectBrowserUrl) instead.
+
 -}
 expectPageChange : String -> ProgramTest model msg effect -> Expectation
 expectPageChange expectedUrl programTest =
@@ -2104,6 +2147,130 @@ expectPageChange expectedUrl programTest =
 
         Active _ ->
             Expect.fail "expectPageChange: expected to have navigated to a different URL, but no links were clicked"
+
+
+{-| Asserts on the current value of the browser URL bar in the simulated test environment.
+
+The parameter is:
+
+1.  A function that asserts on the current URL. Typically you will use `Expect.equal` with the exact URL you expect.
+
+If your program is _not_ an application that manages URL changes
+and you want to assert that the user clicked a link that goes to an external web page,
+then you probably want [`expectPageChange`](#expectPageChange) instead.
+
+-}
+expectBrowserUrl : (String -> Expectation) -> ProgramTest model msg effect -> Expectation
+expectBrowserUrl checkUrl programTest =
+    expectBrowserUrlHelper "expectBrowserUrl" checkUrl programTest
+        |> done
+
+
+{-| See the documentation for [`expectBrowserUrl`](#expectBrowserUrl).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
+
+You should prefer `expectBrowserUrl` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
+
+-}
+ensureBrowserUrl : (String -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureBrowserUrl checkUrl programTest =
+    expectBrowserUrlHelper "ensureBrowserUrl" checkUrl programTest
+
+
+expectBrowserUrlHelper : String -> (String -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+expectBrowserUrlHelper functionName checkUrl programTest =
+    case programTest of
+        Finished _ ->
+            programTest
+
+        Active state ->
+            case Maybe.map .currentLocation state.navigation of
+                Nothing ->
+                    Finished (ProgramDoesNotSupportNavigation functionName)
+
+                Just url ->
+                    case Test.Runner.getFailureReason (checkUrl (Url.toString url)) of
+                        Nothing ->
+                            -- check succeeded
+                            programTest
+
+                        Just reason ->
+                            Finished (ExpectFailed functionName reason.description reason.reason)
+
+
+{-| Asserts on the current browser history in the simulated test environment.
+This only makes sense if you are using [`withSimulatedEffects`](#withSimulatedEffects)
+and the function you provide to it produces
+[`SimulatedEffect.Navigation.replaceUrl`](SimulatedEffect-Navigation#replaceUrl) or
+[`SimulatedEffect.Navigation.pushUrl`](SimulatedEffect-Navigation#pushUrl)
+for one or more of your effects.
+The previous URL is added to the simulated browser history whenever a `pushUrl` effect is simulated.
+
+The parameter is:
+
+1.  A function that asserts on the current browser history (most recent at the head) to an expectation.
+
+Example: If there's only one expected item in the history or if you want check the complete history since the start of the test, use this with `Expect.equal`
+
+    createApplication { ... }
+        |> withBaseUrl "https://example.com/resource/123"
+        |> start ()
+        |> clickButton "Details"
+        |> expectBackHistory (Expect.equal [ "https://example.com/resource/123/details" ])
+
+Example: If there might be multiple items in the history and you only want to check the most recent item:
+
+    createApplication { ... }
+        |> withBaseUrl "https://example.com/resource/123"
+        |> start ()
+        |> clickButton "Details"
+        |> clickButton "Calendar"
+        |> expectBackHistory (List.head >> Expect.equal (Just "https://example.com/resource/123/calendar"))
+
+If you need to assert on the current URL, see [`expectBrowserUrl`](#expectBrowserUrl).
+
+-}
+expectBrowserHistory : (List String -> Expectation) -> ProgramTest model msg effect -> Expectation
+expectBrowserHistory checkHistory programTest =
+    expectBrowserHistoryHelper "expectBrowserHistory" checkHistory programTest
+        |> done
+
+
+{-| See the documentation for [`expectBrowserHistory`](#expectBrowserHistory).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
+
+You should prefer `expectBrowserHistory` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
+
+-}
+ensureBrowserHistory : (List String -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureBrowserHistory checkHistory programTest =
+    expectBrowserHistoryHelper "ensureBrowserHistory" checkHistory programTest
+
+
+expectBrowserHistoryHelper : String -> (List String -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+expectBrowserHistoryHelper functionName checkHistory programTest =
+    case programTest of
+        Finished _ ->
+            programTest
+
+        Active state ->
+            case Maybe.map .browserHistory state.navigation of
+                Nothing ->
+                    -- TODO: use withBaseUrl error
+                    Finished (ProgramDoesNotSupportNavigation functionName)
+
+                Just browserHistoryYes ->
+                    case Test.Runner.getFailureReason (checkHistory (List.map Url.toString browserHistoryYes)) of
+                        Nothing ->
+                            -- check succeeded
+                            programTest
+
+                        Just reason ->
+                            Finished (ExpectFailed functionName reason.description reason.reason)
 
 
 {-| `fail` can be used to report custom errors if you are writing your own convenience functions to deal with program tests.
