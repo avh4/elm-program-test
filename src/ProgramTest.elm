@@ -851,7 +851,6 @@ clickButton buttonText programTest =
                         { good =
                             [ Selector.tag "form"
                             , Selector.containing
-                                -- TODO: don't match disabled buttons
                                 [ Selector.tag "button"
                                 , Selector.containing [ Selector.text buttonText ]
                                 ]
@@ -861,6 +860,13 @@ clickButton buttonText programTest =
                               , Selector.containing
                                     [ Selector.tag "button"
                                     , Selector.attribute (Html.Attributes.type_ "button")
+                                    , Selector.containing [ Selector.text buttonText ]
+                                    ]
+                              ]
+                            , [ Selector.tag "form"
+                              , Selector.containing
+                                    [ Selector.tag "button"
+                                    , Selector.attribute (Html.Attributes.disabled True)
                                     , Selector.containing [ Selector.text buttonText ]
                                     ]
                               ]
@@ -880,15 +886,35 @@ clickButton buttonText programTest =
               )
             , ( "a <form> with onSubmit containing an <input type=submit value=" ++ escapeString buttonText ++ "> (not disabled)"
               , simulateHelper functionDescription
-                    (Query.find
-                        [ Selector.tag "form"
-                        , Selector.containing
-                            -- TODO: don't match disabled buttons
-                            [ Selector.tag "input"
-                            , Selector.attribute (Html.Attributes.type_ "submit")
-                            , Selector.attribute (Html.Attributes.value buttonText)
+                    (findButNot
+                        { good =
+                            [ Selector.tag "form"
+                            , Selector.containing
+                                [ Selector.tag "input"
+                                , Selector.attribute (Html.Attributes.type_ "submit")
+                                , Selector.attribute (Html.Attributes.value buttonText)
+                                ]
                             ]
-                        ]
+                        , bads =
+                            [ [ Selector.tag "form"
+                              , Selector.containing
+                                    [ Selector.tag "input"
+                                    , Selector.attribute (Html.Attributes.type_ "submit")
+                                    , Selector.attribute (Html.Attributes.disabled True)
+                                    , Selector.attribute (Html.Attributes.value buttonText)
+                                    ]
+                              ]
+                            ]
+                        , onError =
+                            [ Selector.tag "form"
+                            , Selector.containing
+                                [ Selector.tag "input"
+                                , Selector.attribute (Html.Attributes.type_ "submit")
+                                , Selector.attribute (Html.Attributes.disabled False)
+                                , Selector.attribute (Html.Attributes.value buttonText)
+                                ]
+                            ]
+                        }
                     )
                     Test.Html.Event.submit
               )

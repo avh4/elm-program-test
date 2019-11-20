@@ -2,7 +2,7 @@ module ProgramTestTests.UserInput.ClickButtonTest exposing (all)
 
 import Expect exposing (Expectation)
 import Html
-import Html.Attributes exposing (type_, value)
+import Html.Attributes exposing (disabled, type_, value)
 import Html.Events exposing (onClick, onSubmit)
 import ProgramTest exposing (ProgramTest)
 import Test exposing (..)
@@ -83,7 +83,7 @@ all =
                 TestingProgram.startView
                     (Html.button
                         [ onClick (Log "CLICK")
-                        , Html.Attributes.disabled True
+                        , disabled True
                         ]
                         [ Html.text "Click Me" ]
                     )
@@ -110,4 +110,26 @@ all =
                         , "- a <form> with onSubmit containing a <button> (not disabled, not type=button) with text \"Click Me\""
                         , "- a <form> with onSubmit containing an <input type=submit value=\"Click Me\"> (not disabled)"
                         ]
+        , test "fails when clicking a disabled button in a form" <|
+            \() ->
+                TestingProgram.startView
+                    (Html.form
+                        [ onSubmit (Log "SUBMIT") ]
+                        [ Html.button [ disabled True ] [ Html.text "Click Me" ]
+                        ]
+                    )
+                    |> ProgramTest.clickButton "Click Me"
+                    |> ProgramTest.done
+                    |> expectAnyFailure
+        , test "fails when clicking a disabled <input type=submit> in a form" <|
+            \() ->
+                TestingProgram.startView
+                    (Html.form
+                        [ onSubmit (Log "SUBMIT") ]
+                        [ Html.input [ type_ "submit", disabled True, value "Click Me" ] []
+                        ]
+                    )
+                    |> ProgramTest.clickButton "Click Me"
+                    |> ProgramTest.done
+                    |> expectAnyFailure
         ]
