@@ -856,14 +856,14 @@ clickButton buttonText programTest =
                                 , Selector.containing [ Selector.text buttonText ]
                                 ]
                             ]
-                        , bad =
-                            [ Selector.tag "form"
-                            , Selector.containing
-                                -- TODO: don't match disabled buttons
-                                [ Selector.tag "button"
-                                , Selector.attribute (Html.Attributes.type_ "button")
-                                , Selector.containing [ Selector.text buttonText ]
-                                ]
+                        , bads =
+                            [ [ Selector.tag "form"
+                              , Selector.containing
+                                    [ Selector.tag "button"
+                                    , Selector.attribute (Html.Attributes.type_ "button")
+                                    , Selector.containing [ Selector.text buttonText ]
+                                    ]
+                              ]
                             ]
                         , onError =
                             [ Selector.tag "form"
@@ -908,34 +908,48 @@ findNotDisabled selectors source =
     -- (We can't just search for "disabled=False" because we need to allow elements that don't specify "disabled" at all.)
     findButNot
         { good = selectors
-        , bad = Selector.disabled True :: selectors
+        , bads = [ Selector.disabled True :: selectors ]
         , onError = Selector.disabled False :: selectors
         }
         source
 
 
-findButNot : { good : List Selector, bad : List Selector, onError : List Selector } -> Query.Single msg -> Query.Single msg
-findButNot { good, bad, onError } source =
+{-| PRIVATE
+
+  - `good`: the primary selector that must match
+  - `bads`: a list of selectors that must NOT match
+  - `onError`: the selector to use to produce an error message if any of the checks fail
+
+-}
+findButNot : { good : List Selector, bads : List (List Selector), onError : List Selector } -> Query.Single msg -> Query.Single msg
+findButNot { good, bads, onError } source =
     -- This is tricky because Test.Html doesn't provide a way to search for an attribute being *not* present.
     -- So we have to check if a selector we don't want *is* present, and manually force a failure if it is.
-    Query.find good source
-        |> (\found ->
-                let
-                    isBad =
-                        Query.find bad source
-                            |> Query.has []
-                in
-                case Test.Runner.getFailureReason isBad of
-                    Nothing ->
-                        -- the element matches the bad selectors; produce a Query using the onError selectors that will fail that will show a reasonable failure message
-                        Query.find
-                            onError
-                            source
+    let
+        checkBads bads_ found =
+            case bads_ of
+                [] ->
+                    found
 
-                    Just _ ->
-                        -- the element we found is good; return it
-                        found
-           )
+                next :: rest ->
+                    let
+                        isBad =
+                            Query.find next source
+                                |> Query.has []
+                    in
+                    case Test.Runner.getFailureReason isBad of
+                        Nothing ->
+                            -- the element matches the bad selectors; produce a Query using the onError selectors that will fail that will show a reasonable failure message
+                            Query.find
+                                onError
+                                source
+
+                        Just _ ->
+                            -- the element we found is good; continue on to the next check
+                            checkBads rest found
+    in
+    Query.find good source
+        |> checkBads bads
 
 
 {-| Simulates clicking a `<a href="...">` link.
