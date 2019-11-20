@@ -19,7 +19,8 @@ module ProgramTest exposing
     , advanceTime
     , expectOutgoingPortValues, ensureOutgoingPortValues
     , simulateIncomingPort
-    , expectPageChange
+    , expectPageChange, expectBrowserUrl
+    , ensureBrowserUrl
     , routeChange
     , update
     , expectModel
@@ -158,7 +159,8 @@ The following functions allow you to configure your
 
 ## Browser assertions
 
-@docs expectPageChange
+@docs expectPageChange, expectBrowserUrl
+@docs ensureBrowserUrl
 
 
 ## Simulating browser interactions
@@ -1806,20 +1808,32 @@ routeChange url programTest =
             Finished err
 
         Active state ->
-            case state.currentLocation of
+            let
+                newLocation =
+                    case state.currentLocation of
+                        Nothing ->
+                            Url.fromString url
+
+                        Just currentLocation ->
+                            Just (Url.Extra.resolve currentLocation url)
+            in
+            case newLocation of
                 Nothing ->
                     Finished (ProgramDoesNotSupportNavigation "routeChange")
 
-                Just currentLocation ->
-                    case
-                        Url.Extra.resolve currentLocation url
-                            |> state.program.onRouteChange
-                    of
-                        Nothing ->
-                            programTest
+                Just newLocationYes ->
+                    let
+                        processRouteChange =
+                            case state.program.onRouteChange newLocationYes of
+                                Nothing ->
+                                    identity
 
-                        Just msg ->
-                            update msg programTest
+                                Just msg ->
+                                    -- TODO: should this be set before or after?
+                                    update msg
+                    in
+                    Active { state | currentLocation = Just newLocationYes }
+                        |> processRouteChange
 
 
 {-| Make an assertion about the current state of a `ProgramTest`'s model.
@@ -2104,6 +2118,53 @@ expectPageChange expectedUrl programTest =
 
         Active _ ->
             Expect.fail "expectPageChange: expected to have navigated to a different URL, but no links were clicked"
+
+
+{-| Asserts on the current value of the browser URL bar in the simulated test environment.
+
+The parameter is:
+
+1.  A function that takes the URL to an expectation.
+
+-}
+expectBrowserUrl : (String -> Expectation) -> ProgramTest model msg effect -> Expectation
+expectBrowserUrl checkUrl programTest =
+    expectBrowserUrlHelper "expectBrowserUrl" checkUrl programTest
+        |> done
+
+
+{-| See the documentation for [`expectBrowserUrl`](#expectBrowserUrl).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
+
+You should prefer `expectBrowserUrl` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
+
+-}
+ensureBrowserUrl : (String -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureBrowserUrl checkUrl programTest =
+    expectBrowserUrlHelper "ensureBrowserUrl" checkUrl programTest
+
+
+expectBrowserUrlHelper : String -> (String -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+expectBrowserUrlHelper functionName checkUrl programTest =
+    case programTest of
+        Finished _ ->
+            programTest
+
+        Active { currentLocation } ->
+            case currentLocation of
+                Nothing ->
+                    Finished (ProgramDoesNotSupportNavigation functionName)
+
+                Just url ->
+                    case Test.Runner.getFailureReason (checkUrl (Url.toString url)) of
+                        Nothing ->
+                            -- check succeeded
+                            programTest
+
+                        Just reason ->
+                            Finished (ExpectFailed functionName reason.description reason.reason)
 
 
 {-| `fail` can be used to report custom errors if you are writing your own convenience functions to deal with program tests.
