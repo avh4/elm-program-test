@@ -676,56 +676,116 @@ a future release of this package will remove the `fieldId` parameter.
 -}
 simulateLabeledInputHelper : String -> String -> String -> Bool -> List Selector -> ( String, Json.Encode.Value ) -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateLabeledInputHelper functionDescription fieldId label allowTextArea additionalInputSelectors event programTest =
-    programTest
-        |> (if fieldId == "" then
-                identity
+    let
+        associatedLabel =
+            expectViewHelper functionDescription
+                (Query.find
+                    [ Selector.tag "label"
+                    , Selector.attribute (Html.Attributes.for fieldId)
+                    , Selector.text label
+                    ]
+                    >> Query.has []
+                )
+
+        checks =
+            if allowTextArea then
+                checks_ "an" "input" ++ checks_ "a" "textarea"
 
             else
-                expectViewHelper functionDescription
-                    (Query.find
-                        [ Selector.tag "label"
-                        , Selector.attribute (Html.Attributes.for fieldId)
-                        , Selector.text label
-                        ]
-                        >> Query.has []
-                    )
-           )
-        |> simulateHelper functionDescription
-            (Query.Extra.oneOf <|
-                List.concat
-                    [ if fieldId == "" then
-                        [ Query.find
+                checks_ "an" "input"
+
+        checks_ article inputTag =
+            if fieldId == "" then
+                [ ( "a <label> with text " ++ escapeString label ++ " containing " ++ article ++ " <" ++ inputTag ++ ">"
+                  , simulateHelper functionDescription
+                        (Query.find
                             [ Selector.tag "label"
                             , Selector.containing [ Selector.text label ]
                             ]
-                            >> Query.find [ Selector.tag "input" ]
-                        , Query.find
-                            [ Selector.tag "input"
+                            >> Query.find [ Selector.tag inputTag ]
+                        )
+                        event
+                  )
+                , ( "<" ++ inputTag ++ " aria-label=" ++ escapeString label ++ ">"
+                  , simulateHelper functionDescription
+                        (Query.find
+                            [ Selector.tag inputTag
                             , Selector.attribute (attribute "aria-label" label)
                             ]
-                        ]
+                        )
+                        event
+                  )
+                ]
 
-                      else
-                        [ Query.find <|
-                            List.concat
-                                [ [ Selector.tag "input"
-                                  , Selector.id fieldId
-                                  ]
-                                , additionalInputSelectors
-                                ]
-                        ]
-                    , if allowTextArea then
-                        [ Query.find
-                            [ Selector.tag "textarea"
+            else
+                [ ( "<label for=" ++ escapeString fieldId ++ "> with text " ++ escapeString label ++ " and " ++ article ++ " <" ++ inputTag ++ " id=" ++ escapeString fieldId ++ ">"
+                  , associatedLabel
+                        >> simulateHelper functionDescription
+                            (Query.find <|
+                                List.concat
+                                    [ [ Selector.tag inputTag
+                                      , Selector.id fieldId
+                                      ]
+                                    , additionalInputSelectors
+                                    ]
+                            )
+                            event
+                  )
+                , ( "<" ++ inputTag ++ " aria-label=" ++ escapeString label ++ " id=" ++ escapeString fieldId ++ ">"
+                  , simulateHelper functionDescription
+                        (Query.find
+                            [ Selector.tag inputTag
                             , Selector.id fieldId
+                            , Selector.attribute (attribute "aria-label" label)
                             ]
-                        ]
+                        )
+                        event
+                  )
+                ]
+    in
+    expectOneOfManyViewChecks
+        functionDescription
+        ("Expected one of the following to exist and have an " ++ escapeString ("on" ++ Tuple.first event) ++ " handler")
+        checks
+        programTest
 
-                      else
-                        []
-                    ]
-            )
-            event
+
+{-| TODO: have other internal functions use this to have more consistent error message.
+-}
+expectOneOfManyViewChecks :
+    String
+    -> String
+    -> List ( String, ProgramTest model msg effect -> ProgramTest model msg effect )
+    -> ProgramTest model msg effect
+    -> ProgramTest model msg effect
+expectOneOfManyViewChecks functionDescription errorMessage checks programTest =
+    let
+        oneOf items =
+            case items of
+                [] ->
+                    failWithViewError functionDescription
+                        (String.join "\n" <|
+                            List.concat
+                                [ [ errorMessage ++ ":" ]
+                                , List.map (\check_ -> "- " ++ Tuple.first check_) checks
+                                ]
+                        )
+                        programTest
+
+                next :: rest ->
+                    let
+                        newProgramTest =
+                            next programTest
+                    in
+                    case Test.Runner.getFailureReason (done newProgramTest) of
+                        Nothing ->
+                            -- the check passed
+                            newProgramTest
+
+                        Just _ ->
+                            oneOf rest
+    in
+    oneOf (List.map Tuple.second checks)
 
 
 {-| Simulates a custom DOM event.
@@ -2304,6 +2364,44 @@ fail assertionName failureMessage programTest =
 
         Active _ ->
             Finished (CustomFailure assertionName failureMessage)
+
+
+{-| This is meant for internal use only and adds a rendering of the current view to an error message.
+-}
+failWithViewError : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
+failWithViewError functionDescription errorMessage programTest =
+    -- This is a big hack to grab the rendered HTML for the error message,
+    -- since Test.Html.Query doesn't expose a way to get the HTML as a string
+    -- or to compose custom error messages
+    case programTest of
+        Finished err ->
+            Finished err
+
+        Active state ->
+            let
+                renderHtml unique =
+                    case
+                        state.currentModel
+                            |> state.program.view
+                            |> Query.has [ Selector.text ("HTML expected by the call to: " ++ functionDescription ++ unique) ]
+                            |> Test.Runner.getFailureReason
+                    of
+                        Nothing ->
+                            -- We expect the fake query to fail -- if it doesn't for some reason, just try recursing with a different fake matchin string until it does fail
+                            renderHtml (unique ++ "_")
+
+                        Just reason ->
+                            reason.description
+            in
+            programTest
+                |> fail functionDescription
+                    (String.join "\n"
+                        [ ""
+                        , renderHtml ""
+                        , ""
+                        , errorMessage
+                        ]
+                    )
 
 
 {-| `createFailed` can be used to report custom errors if you are writing your own convenience functions to _create_ program tests.

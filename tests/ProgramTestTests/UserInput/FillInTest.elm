@@ -6,6 +6,7 @@ import Html.Attributes exposing (attribute, for, id)
 import Html.Events
 import ProgramTest exposing (ProgramTest)
 import Test exposing (..)
+import Test.Expect exposing (expectFailure)
 
 
 handleInput : String -> Html.Attribute String
@@ -74,4 +75,40 @@ all =
                     ]
                     |> ProgramTest.fillIn "" "Field 1" "value99"
                     |> ProgramTest.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
+        , test "can find input with aria-label and an id" <|
+            \() ->
+                start
+                    [ Html.input
+                        [ handleInput "field-1"
+                        , attribute "aria-label" "Field 1"
+                        , id "field-id"
+                        ]
+                        []
+                    ]
+                    |> ProgramTest.fillIn "field-id" "Field 1" "value99"
+                    |> ProgramTest.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
+        , test "shows a useful error when the input doesn't exist" <|
+            \() ->
+                start [ Html.text "no input" ]
+                    |> ProgramTest.fillIn "field-id" "Field 1" "value99"
+                    |> ProgramTest.done
+                    |> expectFailure
+                        [ """fillIn "Field 1": """
+                        , "▼ Query.fromHtml"
+                        , ""
+                        , "    <body>"
+                        , "        no input"
+                        , "    </body>"
+                        , ""
+                        , ""
+                        , """▼ Query.has [ text "HTML expected by the call to: fillIn "Field 1"" ]"""
+                        , ""
+                        , """✗ has text "HTML expected by the call to: fillIn "Field 1\"\""""
+                        , ""
+                        , "Expected one of the following to exist and have an \"oninput\" handler:"
+                        , """- <label for="field-id"> with text "Field 1" and an <input id="field-id">"""
+                        , """- <input aria-label="Field 1" id="field-id">"""
+                        , """- <label for="field-id"> with text "Field 1" and a <textarea id="field-id">"""
+                        , """- <textarea aria-label="Field 1" id="field-id">"""
+                        ]
         ]
