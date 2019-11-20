@@ -1,3 +1,10 @@
+## 3.2.0
+
+New features:
+  - added `ProgramTest.expectBrowserUrl`
+  - added `ProgramTest.expectBrowserHistory`
+
+
 ## 3.1.0
 
 New features:
