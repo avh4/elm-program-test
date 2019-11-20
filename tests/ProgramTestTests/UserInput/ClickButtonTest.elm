@@ -2,8 +2,8 @@ module ProgramTestTests.UserInput.ClickButtonTest exposing (all)
 
 import Expect exposing (Expectation)
 import Html
-import Html.Attributes
-import Html.Events exposing (onClick)
+import Html.Attributes exposing (type_, value)
+import Html.Events exposing (onClick, onSubmit)
 import ProgramTest exposing (ProgramTest)
 import Test exposing (..)
 import Test.Expect exposing (expectFailure)
@@ -33,6 +33,73 @@ all =
                     )
                     |> ProgramTest.clickButton "Click Me"
                     |> ProgramTest.expectModel (Expect.equal [ "CLICK" ])
+        , test "can click a submit button (no type attribute) in a form to submit the form" <|
+            \() ->
+                TestingProgram.startView
+                    (Html.form
+                        [ onSubmit (Log "SUBMIT")
+                        ]
+                        [ Html.button [] [ Html.text "Click Me" ]
+                        ]
+                    )
+                    |> ProgramTest.clickButton "Click Me"
+                    |> ProgramTest.expectModel (Expect.equal [ "SUBMIT" ])
+        , test "can click a submit button (type=submit) in a form to submit the form" <|
+            \() ->
+                TestingProgram.startView
+                    (Html.form
+                        [ onSubmit (Log "SUBMIT")
+                        ]
+                        [ Html.button [ type_ "submit" ] [ Html.text "Click Me" ]
+                        ]
+                    )
+                    |> ProgramTest.clickButton "Click Me"
+                    |> ProgramTest.expectModel (Expect.equal [ "SUBMIT" ])
+        , test "can click a submit button (input type=submit) in a form to submit the form" <|
+            \() ->
+                TestingProgram.startView
+                    (Html.form
+                        [ onSubmit (Log "SUBMIT")
+                        ]
+                        [ Html.input [ type_ "submit", value "Click Me" ] []
+                        ]
+                    )
+                    |> ProgramTest.clickButton "Click Me"
+                    |> ProgramTest.expectModel (Expect.equal [ "SUBMIT" ])
+        , test "clicking a <button type=button> does not submit the form" <|
+            \() ->
+                TestingProgram.startView
+                    (Html.form
+                        [ onSubmit (Log "SUBMIT")
+                        ]
+                        [ Html.button [ type_ "button" ] [ Html.text "Click Me" ]
+                        ]
+                    )
+                    |> ProgramTest.clickButton "Click Me"
+                    |> ProgramTest.done
+                    |> expectFailure
+                        [ "clickButton \"Click Me\": "
+                        , "▼ Query.fromHtml"
+                        , ""
+                        , "    <body>"
+                        , "        <form>"
+                        , "            <button type=\"button\">"
+                        , "                Click Me"
+                        , "            </button>"
+                        , "        </form>"
+                        , "    </body>"
+                        , ""
+                        , ""
+                        , "▼ Query.has [ text \"HTML expected by the call to: clickButton \"Click Me\"\" ]"
+                        , ""
+                        , "✗ has text \"HTML expected by the call to: clickButton \"Click Me\"\""
+                        , ""
+                        , "Expected one of the following to exist:"
+                        , "- <button> (not disabled) with text \"Click Me\""
+                        , "- an element with role=\"button\" (not disabled) and text \"Click Me\""
+                        , "- a <form> with onSubmit containing a <button> (not disabled, not type=button) with text \"Click Me\""
+                        , "- a <form> with onSubmit containing an <input type=submit value=\"Click Me\"> (not disabled)"
+                        ]
         , test "fails when clicking a disabled button" <|
             \() ->
                 TestingProgram.startView
@@ -62,5 +129,7 @@ all =
                         , "Expected one of the following to exist:"
                         , "- <button> (not disabled) with text \"Click Me\""
                         , "- an element with role=\"button\" (not disabled) and text \"Click Me\""
+                        , "- a <form> with onSubmit containing a <button> (not disabled, not type=button) with text \"Click Me\""
+                        , "- a <form> with onSubmit containing an <input type=submit value=\"Click Me\"> (not disabled)"
                         ]
         ]

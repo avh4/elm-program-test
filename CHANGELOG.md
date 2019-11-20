@@ -4,6 +4,7 @@ New features:
 
   - added `ProgramTest.expectBrowserUrl`
   - added `ProgramTest.expectBrowserHistory`
+  - `clickButton` on a submit button in a form will now trigger the onSubmit of the form
   
 Bug fixes:
 
