@@ -1,8 +1,13 @@
 ## 3.2.0
 
 New features:
+
   - added `ProgramTest.expectBrowserUrl`
   - added `ProgramTest.expectBrowserHistory`
+  
+Bug fixes:
+
+  - `fillIn` will now work when the target input has both an `aria-label` and an `id`
 
 
 ## 3.1.0
