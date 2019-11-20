@@ -17,8 +17,10 @@ The list items throughout this document starting with "👉" are a checklist of 
 The central module in elm-program-test has been renamed from `TestContext` to `ProgramTest`.
 The new name is meant to be a more conrete and meaningful term,
 and is meant to be easier to remember, as it now matches the package name (elm-program-test).
+The order of the type arguments has also changed to more closely match [elm/core's `Platform.Program`](https://package.elm-lang.org/packages/elm/core/latest/Platform#Program).
 
 - 👉 Rename all references to `TestContext` -> `ProgramTest`
+- 👉 swap the order of the first two type arguments of any references to the `ProgramTest` type (`TestContext msg model effect` becomes `ProgramTest model msg effect`)
 
 
 ## Updated API for starting tests
