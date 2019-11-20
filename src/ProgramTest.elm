@@ -695,54 +695,52 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
                 checks_ "an" "input"
 
         checks_ article inputTag =
-            List.concat
-                [ if fieldId == "" then
-                    [ ( "a <label> with text " ++ escapeString label ++ " containing " ++ article ++ " <" ++ inputTag ++ ">"
-                      , simulateHelper functionDescription
-                            (Query.find
-                                [ Selector.tag "label"
-                                , Selector.containing [ Selector.text label ]
-                                ]
-                                >> Query.find [ Selector.tag inputTag ]
-                            )
-                            event
-                      )
-                    , ( "<" ++ inputTag ++ " aria-label=" ++ escapeString label ++ ">"
-                      , simulateHelper functionDescription
-                            (Query.find
-                                [ Selector.tag inputTag
-                                , Selector.attribute (attribute "aria-label" label)
-                                ]
-                            )
-                            event
-                      )
-                    ]
+            if fieldId == "" then
+                [ ( "a <label> with text " ++ escapeString label ++ " containing " ++ article ++ " <" ++ inputTag ++ ">"
+                  , simulateHelper functionDescription
+                        (Query.find
+                            [ Selector.tag "label"
+                            , Selector.containing [ Selector.text label ]
+                            ]
+                            >> Query.find [ Selector.tag inputTag ]
+                        )
+                        event
+                  )
+                , ( "<" ++ inputTag ++ " aria-label=" ++ escapeString label ++ ">"
+                  , simulateHelper functionDescription
+                        (Query.find
+                            [ Selector.tag inputTag
+                            , Selector.attribute (attribute "aria-label" label)
+                            ]
+                        )
+                        event
+                  )
+                ]
 
-                  else
-                    [ ( "<label for=" ++ escapeString fieldId ++ "> with text " ++ escapeString label ++ " and " ++ article ++ " <" ++ inputTag ++ " id=" ++ escapeString fieldId ++ ">"
-                      , associatedLabel
-                            >> simulateHelper functionDescription
-                                (Query.find <|
-                                    List.concat
-                                        [ [ Selector.tag inputTag
-                                          , Selector.id fieldId
-                                          ]
-                                        , additionalInputSelectors
-                                        ]
-                                )
-                                event
-                      )
-                    , ( "<" ++ inputTag ++ " aria-label=" ++ escapeString label ++ " id=" ++ escapeString fieldId ++ ">"
-                      , simulateHelper functionDescription
-                            (Query.find
-                                [ Selector.tag inputTag
-                                , Selector.id fieldId
-                                , Selector.attribute (attribute "aria-label" label)
-                                ]
+            else
+                [ ( "<label for=" ++ escapeString fieldId ++ "> with text " ++ escapeString label ++ " and " ++ article ++ " <" ++ inputTag ++ " id=" ++ escapeString fieldId ++ ">"
+                  , associatedLabel
+                        >> simulateHelper functionDescription
+                            (Query.find <|
+                                List.concat
+                                    [ [ Selector.tag inputTag
+                                      , Selector.id fieldId
+                                      ]
+                                    , additionalInputSelectors
+                                    ]
                             )
                             event
-                      )
-                    ]
+                  )
+                , ( "<" ++ inputTag ++ " aria-label=" ++ escapeString label ++ " id=" ++ escapeString fieldId ++ ">"
+                  , simulateHelper functionDescription
+                        (Query.find
+                            [ Selector.tag inputTag
+                            , Selector.id fieldId
+                            , Selector.attribute (attribute "aria-label" label)
+                            ]
+                        )
+                        event
+                  )
                 ]
     in
     expectOneOfManyViewChecks
