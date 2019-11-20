@@ -753,10 +753,11 @@ escapeString s =
 
 {-| Simulates clicking a button.
 
-Currently, this function will find and click a `<button>` HTML node containing the given `buttonText`.
+This function will find and click a `<button>` HTML node containing the given `buttonText`.
 
-NOTE: In the future, this function will be generalized to find buttons with accessibility attributes
-matching the given `buttonText`.
+It will also try to find and click elements with the accessibility label `role="button"`.
+
+If the button is disabled the test will fail.
 
 -}
 clickButton : String -> ProgramTest model msg effect -> ProgramTest model msg effect
