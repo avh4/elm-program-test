@@ -45,7 +45,7 @@ all =
                     |> ProgramTest.clickButton "Click Me"
                     |> ProgramTest.done
                     |> expectFailure
-                        [ "clickButton \"Click Me\":"
+                        [ "clickButton \"Click Me\": "
                         , "▼ Query.fromHtml"
                         , ""
                         , "    <body>"
@@ -55,11 +55,12 @@ all =
                         , "    </body>"
                         , ""
                         , ""
-                        , "▼ Query.find [ attribute \"role\" \"button\", containing [ text \"Click Me\" ]  ]"
+                        , "▼ Query.has [ text \"HTML expected by the call to: clickButton \"Click Me\"\" ]"
                         , ""
-                        , "0 matches found for this query."
+                        , "✗ has text \"HTML expected by the call to: clickButton \"Click Me\"\""
                         , ""
-                        , ""
-                        , "✗ Query.find always expects to find 1 element, but it found 0 instead."
+                        , "Expected one of the following to exist:"
+                        , "- <button> (not disabled) with text \"Click Me\""
+                        , "- an element with role=\"button\" (not disabled) and text \"Click Me\""
                         ]
         ]

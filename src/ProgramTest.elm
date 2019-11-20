@@ -822,19 +822,35 @@ If the button is disabled the test will fail.
 -}
 clickButton : String -> ProgramTest model msg effect -> ProgramTest model msg effect
 clickButton buttonText programTest =
-    simulateHelper ("clickButton " ++ escapeString buttonText)
-        (Query.Extra.oneOf
-            [ findNotDisabled
-                [ Selector.tag "button"
-                , Selector.containing [ Selector.text buttonText ]
-                ]
-            , findNotDisabled
-                [ Selector.attribute (Html.Attributes.attribute "role" "button")
-                , Selector.containing [ Selector.text buttonText ]
-                ]
+    let
+        functionDescription =
+            "clickButton " ++ escapeString buttonText
+
+        checks =
+            [ ( "<button> (not disabled) with text " ++ escapeString buttonText
+              , simulateHelper functionDescription
+                    (findNotDisabled
+                        [ Selector.tag "button"
+                        , Selector.containing [ Selector.text buttonText ]
+                        ]
+                    )
+                    Test.Html.Event.click
+              )
+            , ( "an element with role=\"button\" (not disabled) and text " ++ escapeString buttonText
+              , simulateHelper functionDescription
+                    (findNotDisabled
+                        [ Selector.attribute (Html.Attributes.attribute "role" "button")
+                        , Selector.containing [ Selector.text buttonText ]
+                        ]
+                    )
+                    Test.Html.Event.click
+              )
             ]
-        )
-        Test.Html.Event.click
+    in
+    expectOneOfManyViewChecks
+        functionDescription
+        "Expected one of the following to exist"
+        checks
         programTest
 
 
