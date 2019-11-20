@@ -2131,6 +2131,10 @@ The parameter is:
 
 1.  The expected URL that the program should have navigated away to.
 
+If your program is an application that manages URL changes
+(created with [`createApplication`](#createApplication)),
+then you probably want [`expectBrowserUrl`](#expectBrowserUrl) instead.
+
 -}
 expectPageChange : String -> ProgramTest model msg effect -> Expectation
 expectPageChange expectedUrl programTest =
@@ -2149,7 +2153,11 @@ expectPageChange expectedUrl programTest =
 
 The parameter is:
 
-1.  A function that takes the URL to an expectation.
+1.  A function that asserts on the current URL. Typically you will use `Expect.equal` with the exact URL you expect.
+
+If your program is _not_ an application that manages URL changes
+and you want to assert that the user clicked a link that goes to an external web page,
+then you probably want [`expectPageChange`](#expectPageChange) instead.
 
 -}
 expectBrowserUrl : (String -> Expectation) -> ProgramTest model msg effect -> Expectation
@@ -2193,10 +2201,35 @@ expectBrowserUrlHelper functionName checkUrl programTest =
 
 
 {-| Asserts on the current browser history in the simulated test environment.
+This only makes sense if you are using [`withSimulatedEffects`](#withSimulatedEffects)
+and the function you provide to it produces
+[`SimulatedEffect.Navigation.replaceUrl`](SimulatedEffect-Navigation#replaceUrl) or
+[`SimulatedEffect.Navigation.pushUrl`](SimulatedEffect-Navigation#pushUrl)
+for one or more of your effects.
+The previous URL is added to the simulated browser history whenever a `pushUrl` effect is simulated.
 
 The parameter is:
 
-1.  A function that takes the browser history (most recent at the head) to an expectation.
+1.  A function that asserts on the current browser history (most recent at the head) to an expectation.
+
+Example: If there's only one expected item in the history or if you want check the complete history since the start of the test, use this with `Expect.equal`
+
+    createApplication { ... }
+        |> withBaseUrl "https://example.com/resource/123"
+        |> start ()
+        |> clickButton "Details"
+        |> expectBackHistory (Expect.equal [ "https://example.com/resource/123/details" ])
+
+Example: If there might be multiple items in the history and you only want to check the most recent item:
+
+    createApplication { ... }
+        |> withBaseUrl "https://example.com/resource/123"
+        |> start ()
+        |> clickButton "Details"
+        |> clickButton "Calendar"
+        |> expectBackHistory (List.head >> Expect.equal (Just "https://example.com/resource/123/calendar"))
+
+If you need to assert on the current URL, see [`expectBrowserUrl`](#expectBrowserUrl).
 
 -}
 expectBrowserHistory : (List String -> Expectation) -> ProgramTest model msg effect -> Expectation
