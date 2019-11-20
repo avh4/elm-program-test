@@ -18,7 +18,16 @@ The central module in elm-program-test has been renamed from `TestContext` to `P
 The new name is meant to be a more conrete and meaningful term,
 and is meant to be easier to remember, as it now matches the package name (elm-program-test).
 
-- 👉 Rename all references to `TestContext` -> `ProgramTest`
+- 👉 Rename all references to `TestContext` -> `ProgramTest` 
+Note that the order of the arguments has changed, in order to mor closely match elm-core. 
+
+`type TestContext msg model effect`
+
+becomes:
+
+`type ProgramTest model msg effect`
+
+You will have to manually update any code that passed arguments to `TestContext` previously.
 
 
 ## Updated API for starting tests
