@@ -19,8 +19,8 @@ module ProgramTest exposing
     , advanceTime
     , expectOutgoingPortValues, ensureOutgoingPortValues
     , simulateIncomingPort
-    , expectPageChange, expectBrowserUrl
-    , ensureBrowserUrl
+    , expectPageChange, expectBrowserUrl, expectBrowserHistory
+    , ensureBrowserUrl, ensureBrowserHistory
     , routeChange
     , update
     , expectModel
@@ -159,8 +159,8 @@ The following functions allow you to configure your
 
 ## Browser assertions
 
-@docs expectPageChange, expectBrowserUrl
-@docs ensureBrowserUrl
+@docs expectPageChange, expectBrowserUrl, expectBrowserHistory
+@docs ensureBrowserUrl, ensureBrowserHistory
 
 
 ## Simulating browser interactions
@@ -231,7 +231,11 @@ type ProgramTest model msg effect
         { program : TestProgram model msg effect (SimulatedSub msg)
         , currentModel : model
         , lastEffect : effect
-        , currentLocation : Maybe Url
+        , navigation :
+            Maybe
+                { currentLocation : Url
+                , browserHistory : List Url
+                }
         , effectSimulation : Maybe (EffectSimulation msg effect)
         }
     | Finished Failure
@@ -307,7 +311,16 @@ createHelper program options =
         { program = program_
         , currentModel = newModel
         , lastEffect = newEffect
-        , currentLocation = options.baseUrl
+        , navigation =
+            case options.baseUrl of
+                Nothing ->
+                    Nothing
+
+                Just baseUrl ->
+                    Just
+                        { currentLocation = baseUrl
+                        , browserHistory = []
+                        }
         , effectSimulation = Maybe.map EffectSimulation.init options.deconstructEffect
         }
         |> queueEffect newEffect
@@ -908,7 +921,7 @@ followLink functionDescription href programTest =
             Finished err
 
         Active state ->
-            case state.currentLocation of
+            case Maybe.map .currentLocation state.navigation of
                 Just location ->
                     Finished (ChangedPage functionDescription (Url.Extra.resolve location href))
 
@@ -1233,11 +1246,11 @@ queueSimulatedEffect effect programTest =
 
                         SimulatedEffect.PushUrl url ->
                             programTest
-                                |> routeChange url
+                                |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.pushUrl " ++ escapeString url) False url
 
                         SimulatedEffect.ReplaceUrl url ->
                             programTest
-                                |> routeChange url
+                                |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.replaceUrl " ++ escapeString url) True url
 
 
 drain : ProgramTest model msg effect -> ProgramTest model msg effect
@@ -1803,28 +1816,28 @@ The parameter may be an absolute URL or relative URL.
 -}
 routeChange : String -> ProgramTest model msg effect -> ProgramTest model msg effect
 routeChange url programTest =
+    routeChangeHelper "routeChange" False url programTest
+
+
+routeChangeHelper : String -> Bool -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
+routeChangeHelper functionName replace url programTest =
     case programTest of
         Finished err ->
             Finished err
 
         Active state ->
-            let
-                newLocation =
-                    case state.currentLocation of
-                        Nothing ->
-                            Url.fromString url
-
-                        Just currentLocation ->
-                            Just (Url.Extra.resolve currentLocation url)
-            in
-            case newLocation of
+            case state.navigation of
                 Nothing ->
-                    Finished (ProgramDoesNotSupportNavigation "routeChange")
+                    Finished (ProgramDoesNotSupportNavigation functionName)
 
-                Just newLocationYes ->
+                Just { currentLocation, browserHistory } ->
+                    let
+                        newLocation =
+                            Url.Extra.resolve currentLocation url
+                    in
                     let
                         processRouteChange =
-                            case state.program.onRouteChange newLocationYes of
+                            case state.program.onRouteChange newLocation of
                                 Nothing ->
                                     identity
 
@@ -1832,7 +1845,19 @@ routeChange url programTest =
                                     -- TODO: should this be set before or after?
                                     update msg
                     in
-                    Active { state | currentLocation = Just newLocationYes }
+                    Active
+                        { state
+                            | navigation =
+                                Just
+                                    { currentLocation = newLocation
+                                    , browserHistory =
+                                        if replace then
+                                            browserHistory
+
+                                        else
+                                            currentLocation :: browserHistory
+                                    }
+                        }
                         |> processRouteChange
 
 
@@ -2152,13 +2177,61 @@ expectBrowserUrlHelper functionName checkUrl programTest =
         Finished _ ->
             programTest
 
-        Active { currentLocation } ->
-            case currentLocation of
+        Active state ->
+            case Maybe.map .currentLocation state.navigation of
                 Nothing ->
                     Finished (ProgramDoesNotSupportNavigation functionName)
 
                 Just url ->
                     case Test.Runner.getFailureReason (checkUrl (Url.toString url)) of
+                        Nothing ->
+                            -- check succeeded
+                            programTest
+
+                        Just reason ->
+                            Finished (ExpectFailed functionName reason.description reason.reason)
+
+
+{-| Asserts on the current browser history in the simulated test environment.
+
+The parameter is:
+
+1.  A function that takes the browser history (most recent at the head) to an expectation.
+
+-}
+expectBrowserHistory : (List String -> Expectation) -> ProgramTest model msg effect -> Expectation
+expectBrowserHistory checkHistory programTest =
+    expectBrowserHistoryHelper "expectBrowserHistory" checkHistory programTest
+        |> done
+
+
+{-| See the documentation for [`expectBrowserHistory`](#expectBrowserHistory).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
+
+You should prefer `expectBrowserHistory` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
+
+-}
+ensureBrowserHistory : (List String -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+ensureBrowserHistory checkHistory programTest =
+    expectBrowserHistoryHelper "ensureBrowserHistory" checkHistory programTest
+
+
+expectBrowserHistoryHelper : String -> (List String -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
+expectBrowserHistoryHelper functionName checkHistory programTest =
+    case programTest of
+        Finished _ ->
+            programTest
+
+        Active state ->
+            case Maybe.map .browserHistory state.navigation of
+                Nothing ->
+                    -- TODO: use withBaseUrl error
+                    Finished (ProgramDoesNotSupportNavigation functionName)
+
+                Just browserHistoryYes ->
+                    case Test.Runner.getFailureReason (checkHistory (List.map Url.toString browserHistoryYes)) of
                         Nothing ->
                             -- check succeeded
                             programTest

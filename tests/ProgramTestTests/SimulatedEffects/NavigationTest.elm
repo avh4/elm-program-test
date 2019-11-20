@@ -47,13 +47,21 @@ all =
                     |> ProgramTest.withBaseUrl "https://example.com/start"
                     |> ProgramTest.start ()
                     |> ProgramTest.expectBrowserUrl (Expect.equal "https://example.com/start")
-        , test "with no base url, simulating a pushUrl with an absolute path changes the browser URL" <|
-            \() ->
-                TestingProgram.startEffects (SimulatedEffect.Navigation.pushUrl "https://example.com/new")
-                    |> ProgramTest.expectBrowserUrl (Expect.equal "https://example.com/new")
         , test "routeChange changes browser URL" <|
             \() ->
                 TestingProgram.application SimulatedEffect.Cmd.none
                     |> ProgramTest.routeChange "https://example.com/new"
                     |> ProgramTest.expectBrowserUrl (Expect.equal "https://example.com/new")
+        , test "browser history is intially empty" <|
+            \() ->
+                TestingProgram.application SimulatedEffect.Cmd.none
+                    |> ProgramTest.expectBrowserHistory (Expect.equal [])
+        , test "simulating pushUrl adds to the browser history" <|
+            \() ->
+                TestingProgram.application (SimulatedEffect.Navigation.pushUrl "https://example.com/new")
+                    |> ProgramTest.expectBrowserHistory (Expect.equal [ "https://example.com/path" ])
+        , test "simulating replaceUrl does NOT add to the browser history" <|
+            \() ->
+                TestingProgram.application (SimulatedEffect.Navigation.replaceUrl "https://example.com/new")
+                    |> ProgramTest.expectBrowserHistory (Expect.equal [])
         ]
