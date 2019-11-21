@@ -2395,7 +2395,7 @@ Example: If there's only one expected item in the history or if you want check t
         |> withBaseUrl "https://example.com/resource/123"
         |> start ()
         |> clickButton "Details"
-        |> expectBackHistory (Expect.equal [ "https://example.com/resource/123/details" ])
+        |> expectBrowserHistory (Expect.equal [ "https://example.com/resource/123/details" ])
 
 Example: If there might be multiple items in the history and you only want to check the most recent item:
 
@@ -2404,7 +2404,7 @@ Example: If there might be multiple items in the history and you only want to ch
         |> start ()
         |> clickButton "Details"
         |> clickButton "Calendar"
-        |> expectBackHistory (List.head >> Expect.equal (Just "https://example.com/resource/123/calendar"))
+        |> expectBrowserHistory (List.head >> Expect.equal (Just "https://example.com/resource/123/calendar"))
 
 If you need to assert on the current URL, see [`expectBrowserUrl`](#expectBrowserUrl).
 
