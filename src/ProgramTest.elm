@@ -827,7 +827,7 @@ clickButton buttonText programTest =
             "clickButton " ++ escapeString buttonText
 
         checks =
-            [ ( "<button> (not disabled) with text " ++ escapeString buttonText
+            [ ( "<button> (not disabled) with onClick and text " ++ escapeString buttonText
               , simulateHelper functionDescription
                     (findNotDisabled
                         [ Selector.tag "button"
@@ -836,7 +836,7 @@ clickButton buttonText programTest =
                     )
                     Test.Html.Event.click
               )
-            , ( "an element with role=\"button\" (not disabled) and text " ++ escapeString buttonText
+            , ( "an element with role=\"button\" (not disabled) and onClick and text " ++ escapeString buttonText
               , simulateHelper functionDescription
                     (findNotDisabled
                         [ Selector.attribute (Html.Attributes.attribute "role" "button")
