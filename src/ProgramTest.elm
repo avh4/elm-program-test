@@ -822,19 +822,108 @@ If the button is disabled the test will fail.
 -}
 clickButton : String -> ProgramTest model msg effect -> ProgramTest model msg effect
 clickButton buttonText programTest =
-    simulateHelper ("clickButton " ++ escapeString buttonText)
-        (Query.Extra.oneOf
-            [ findNotDisabled
-                [ Selector.tag "button"
-                , Selector.containing [ Selector.text buttonText ]
-                ]
-            , findNotDisabled
-                [ Selector.attribute (Html.Attributes.attribute "role" "button")
-                , Selector.containing [ Selector.text buttonText ]
-                ]
+    let
+        functionDescription =
+            "clickButton " ++ escapeString buttonText
+
+        checks =
+            [ ( "<button> (not disabled) with onClick and text " ++ escapeString buttonText
+              , simulateHelper functionDescription
+                    (findNotDisabled
+                        [ Selector.tag "button"
+                        , Selector.containing [ Selector.text buttonText ]
+                        ]
+                    )
+                    Test.Html.Event.click
+              )
+            , ( "an element with role=\"button\" (not disabled) and onClick and text " ++ escapeString buttonText
+              , simulateHelper functionDescription
+                    (findNotDisabled
+                        [ Selector.attribute (Html.Attributes.attribute "role" "button")
+                        , Selector.containing [ Selector.text buttonText ]
+                        ]
+                    )
+                    Test.Html.Event.click
+              )
+            , ( "a <form> with onSubmit containing a <button> (not disabled, not type=button) with text " ++ escapeString buttonText
+              , simulateHelper functionDescription
+                    (findButNot
+                        { good =
+                            [ Selector.tag "form"
+                            , Selector.containing
+                                [ Selector.tag "button"
+                                , Selector.containing [ Selector.text buttonText ]
+                                ]
+                            ]
+                        , bads =
+                            [ [ Selector.tag "form"
+                              , Selector.containing
+                                    [ Selector.tag "button"
+                                    , Selector.attribute (Html.Attributes.type_ "button")
+                                    , Selector.containing [ Selector.text buttonText ]
+                                    ]
+                              ]
+                            , [ Selector.tag "form"
+                              , Selector.containing
+                                    [ Selector.tag "button"
+                                    , Selector.attribute (Html.Attributes.disabled True)
+                                    , Selector.containing [ Selector.text buttonText ]
+                                    ]
+                              ]
+                            ]
+                        , onError =
+                            [ Selector.tag "form"
+                            , Selector.containing
+                                [ Selector.tag "button"
+                                , Selector.attribute (Html.Attributes.disabled False)
+                                , Selector.attribute (Html.Attributes.type_ "submit")
+                                , Selector.containing [ Selector.text buttonText ]
+                                ]
+                            ]
+                        }
+                    )
+                    Test.Html.Event.submit
+              )
+            , ( "a <form> with onSubmit containing an <input type=submit value=" ++ escapeString buttonText ++ "> (not disabled)"
+              , simulateHelper functionDescription
+                    (findButNot
+                        { good =
+                            [ Selector.tag "form"
+                            , Selector.containing
+                                [ Selector.tag "input"
+                                , Selector.attribute (Html.Attributes.type_ "submit")
+                                , Selector.attribute (Html.Attributes.value buttonText)
+                                ]
+                            ]
+                        , bads =
+                            [ [ Selector.tag "form"
+                              , Selector.containing
+                                    [ Selector.tag "input"
+                                    , Selector.attribute (Html.Attributes.type_ "submit")
+                                    , Selector.attribute (Html.Attributes.disabled True)
+                                    , Selector.attribute (Html.Attributes.value buttonText)
+                                    ]
+                              ]
+                            ]
+                        , onError =
+                            [ Selector.tag "form"
+                            , Selector.containing
+                                [ Selector.tag "input"
+                                , Selector.attribute (Html.Attributes.type_ "submit")
+                                , Selector.attribute (Html.Attributes.disabled False)
+                                , Selector.attribute (Html.Attributes.value buttonText)
+                                ]
+                            ]
+                        }
+                    )
+                    Test.Html.Event.submit
+              )
             ]
-        )
-        Test.Html.Event.click
+    in
+    expectOneOfManyViewChecks
+        functionDescription
+        "Expected one of the following to exist"
+        checks
         programTest
 
 
@@ -843,23 +932,50 @@ findNotDisabled selectors source =
     -- This is tricky because Test.Html doesn't provide a way to search for an attribute being *not* present.
     -- So we have to check if "disabled=True" *is* present, and manually force a failure if it is.
     -- (We can't just search for "disabled=False" because we need to allow elements that don't specify "disabled" at all.)
-    Query.find selectors source
-        |> (\found ->
-                let
-                    isDisabled =
-                        Query.has [ Selector.disabled True ] found
-                in
-                case Test.Runner.getFailureReason isDisabled of
-                    Nothing ->
-                        -- the element is disabled; produce a Query that will fail that will show a reasonable failure message
-                        Query.find
-                            (Selector.disabled False :: selectors)
-                            source
+    findButNot
+        { good = selectors
+        , bads = [ Selector.disabled True :: selectors ]
+        , onError = Selector.disabled False :: selectors
+        }
+        source
 
-                    Just _ ->
-                        -- the element we found is not disabled; return it
-                        found
-           )
+
+{-| PRIVATE
+
+  - `good`: the primary selector that must match
+  - `bads`: a list of selectors that must NOT match
+  - `onError`: the selector to use to produce an error message if any of the checks fail
+
+-}
+findButNot : { good : List Selector, bads : List (List Selector), onError : List Selector } -> Query.Single msg -> Query.Single msg
+findButNot { good, bads, onError } source =
+    -- This is tricky because Test.Html doesn't provide a way to search for an attribute being *not* present.
+    -- So we have to check if a selector we don't want *is* present, and manually force a failure if it is.
+    let
+        checkBads bads_ found =
+            case bads_ of
+                [] ->
+                    found
+
+                next :: rest ->
+                    let
+                        isBad =
+                            Query.find next source
+                                |> Query.has []
+                    in
+                    case Test.Runner.getFailureReason isBad of
+                        Nothing ->
+                            -- the element matches the bad selectors; produce a Query using the onError selectors that will fail that will show a reasonable failure message
+                            Query.find
+                                onError
+                                source
+
+                        Just _ ->
+                            -- the element we found is good; continue on to the next check
+                            checkBads rest found
+    in
+    Query.find good source
+        |> checkBads bads
 
 
 {-| Simulates clicking a `<a href="...">` link.
