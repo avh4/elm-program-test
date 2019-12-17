@@ -77,7 +77,7 @@ It's typical to call this definition `start` in your test file, but it can be ca
 Here's the `start` definition for our example program:
 
 ```elm
-module VoteRegratistrationExampleTest exposing (..)
+module VoterRegistrationExampleTest exposing (..)
 
 import ProgramTest exposing (ProgramTest)
 import VoterRegistrationExample as Main
