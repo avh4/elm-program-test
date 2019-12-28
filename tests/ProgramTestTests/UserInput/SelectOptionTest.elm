@@ -5,7 +5,7 @@ import Html exposing (Html)
 import Html.Attributes exposing (for, id, value)
 import Html.Events exposing (on)
 import ProgramTest exposing (ProgramTest)
-import Test exposing (..)
+import Test exposing (Test, describe, test)
 import Test.Runner
 
 
@@ -20,7 +20,7 @@ start =
 
 
 testView : String -> Html String
-testView model =
+testView _ =
     Html.div []
         [ Html.label [ for "pet-select" ] [ Html.text "Choose a pet" ]
         , Html.select
