@@ -39,6 +39,15 @@ testView model =
             [ Html.option [ value "hamster-value" ] [ Html.text "Hamster" ]
             , Html.option [ value "george-value" ] [ Html.text "George" ]
             ]
+        , Html.label [ for "no-text-select" ]
+            [ Html.select
+                [ id "no-text-select"
+                , on "change" Html.Events.targetValue
+                ]
+                [ Html.option [ value "foo-value" ] [ Html.text "Foo" ]
+                , Html.option [ value "bar-value" ] [ Html.text "Bar" ]
+                ]
+            ]
         ]
 
 
@@ -50,6 +59,13 @@ all =
                 start
                     |> ProgramTest.selectOption "pet-select" "Choose a pet" "hamster-value" "Hamster"
                     |> ProgramTest.expectModel (Expect.equal "<INIT>;hamster-value")
+        , test "it finds only elements that match all the query criteria" <|
+            \() ->
+                start
+                    |> ProgramTest.selectOption "no-text-select" "" "foo-value" "Foo"
+                    |> ProgramTest.done
+                    |> Test.Runner.getFailureReason
+                    |> Expect.equal Maybe.Nothing
         , test "fails if there is no onChange handler" <|
             \() ->
                 start
