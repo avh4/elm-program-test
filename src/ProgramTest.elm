@@ -204,8 +204,7 @@ import Json.Decode
 import Json.Encode
 import PairingHeap
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
-import Query.Extra
-import SimulatedEffect exposing (SimulatedEffect, SimulatedSub, SimulatedTask)
+import SimulatedEffect exposing (SimulatedEffect, SimulatedSub)
 import Test.Html.Event
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector exposing (Selector)
