@@ -1,3 +1,10 @@
+## master
+
+New features:
+
+  - added `SimulatedEffect.Navigation.back`
+
+
 ## 3.2.0
 
 New features:
@@ -5,7 +12,7 @@ New features:
   - added `ProgramTest.expectBrowserUrl`
   - added `ProgramTest.expectBrowserHistory`
   - `clickButton` on a submit button in a form will now trigger the onSubmit of the form
-  
+
 Bug fixes:
 
   - `fillIn` will now work when the target input has both an `aria-label` and an `id`

@@ -37,7 +37,7 @@ start initialEffect html =
 application : SimulatedEffect Msg -> ProgramTest
 application initialEffects =
     ProgramTest.createApplication
-        { onUrlChange = \location -> Log (Url.toString location)
+        { onUrlChange = \location -> Log ("OnUrlChange: " ++ Url.toString location)
         , onUrlRequest = \_ -> Debug.todo "ProgramTestTests-2:onUrlRequest"
         , init = \() location key -> ( [], initialEffects )
         , update = update

@@ -10,8 +10,10 @@ type SimulatedEffect msg
     | Batch (List (SimulatedEffect msg))
     | Task (SimulatedTask msg msg)
     | PortEffect String Json.Encode.Value
+      -- Navigation
     | PushUrl String
     | ReplaceUrl String
+    | Back Int
 
 
 type SimulatedTask x a
