@@ -1423,11 +1423,31 @@ queueSimulatedEffect effect programTest =
 
                         SimulatedEffect.PushUrl url ->
                             programTest
-                                |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.pushUrl " ++ escapeString url) False url
+                                |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.pushUrl " ++ escapeString url) 0 url
 
                         SimulatedEffect.ReplaceUrl url ->
                             programTest
-                                |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.replaceUrl " ++ escapeString url) True url
+                                |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.replaceUrl " ++ escapeString url) 1 url
+
+                        SimulatedEffect.Back n ->
+                            case state.navigation of
+                                Nothing ->
+                                    programTest
+
+                                Just { currentLocation, browserHistory } ->
+                                    if n <= 0 then
+                                        programTest
+
+                                    else
+                                        case List.head (List.drop (n - 1) browserHistory) of
+                                            Nothing ->
+                                                -- n is bigger than the history;
+                                                -- in this case, browsers ignore the request
+                                                programTest
+
+                                            Just first ->
+                                                programTest
+                                                    |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.Back " ++ String.fromInt n) 2 (Url.toString first)
 
 
 drain : ProgramTest model msg effect -> ProgramTest model msg effect
@@ -1993,11 +2013,11 @@ The parameter may be an absolute URL or relative URL.
 -}
 routeChange : String -> ProgramTest model msg effect -> ProgramTest model msg effect
 routeChange url programTest =
-    routeChangeHelper "routeChange" False url programTest
+    routeChangeHelper "routeChange" 0 url programTest
 
 
-routeChangeHelper : String -> Bool -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
-routeChangeHelper functionName replace url programTest =
+routeChangeHelper : String -> Int -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
+routeChangeHelper functionName removeFromBackStack url programTest =
     case programTest of
         Finished err ->
             Finished err
@@ -2011,8 +2031,7 @@ routeChangeHelper functionName replace url programTest =
                     let
                         newLocation =
                             Url.Extra.resolve currentLocation url
-                    in
-                    let
+
                         processRouteChange =
                             case state.program.onRouteChange newLocation of
                                 Nothing ->
@@ -2028,11 +2047,8 @@ routeChangeHelper functionName replace url programTest =
                                 Just
                                     { currentLocation = newLocation
                                     , browserHistory =
-                                        if replace then
-                                            browserHistory
-
-                                        else
-                                            currentLocation :: browserHistory
+                                        (currentLocation :: browserHistory)
+                                            |> List.drop removeFromBackStack
                                     }
                         }
                         |> processRouteChange

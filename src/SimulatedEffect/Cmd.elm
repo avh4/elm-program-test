@@ -57,3 +57,6 @@ map f effect =
 
         SimulatedEffect.ReplaceUrl url ->
             SimulatedEffect.ReplaceUrl url
+
+        SimulatedEffect.Back n ->
+            SimulatedEffect.Back n
