@@ -33,6 +33,18 @@ all =
                     )
                     |> ProgramTest.clickButton "Close"
                     |> ProgramTest.expectModel (Expect.equal [ "CLICK" ])
+        , test "can click a role=\"button\" with an aria-label attribute" <|
+            \() ->
+                TestingProgram.startView
+                    (Html.div
+                        [ onClick (Log "CLICK")
+                        , attribute "role" "button"
+                        , attribute "aria-label" "Close"
+                        ]
+                        [ Html.text "X" ]
+                    )
+                    |> ProgramTest.clickButton "Close"
+                    |> ProgramTest.expectModel (Expect.equal [ "CLICK" ])
         , test "can click an elm-ui button" <|
             \() ->
                 TestingProgram.startView
@@ -119,6 +131,7 @@ all =
                         , "- <button> (not disabled) with onClick and text \"Click Me\""
                         , "- <button> (not disabled) with onClick and attribute aria-label=\"Click Me\""
                         , "- an element with role=\"button\" (not disabled) and onClick and text \"Click Me\""
+                        , "- an element with role=\"button\" (not disabled) and onClick and aria-label=\"Click Me\""
                         , "- a <form> with onSubmit containing a <button> (not disabled, not type=button) with text \"Click Me\""
                         , "- a <form> with onSubmit containing an <input type=submit value=\"Click Me\"> (not disabled)"
                         ]

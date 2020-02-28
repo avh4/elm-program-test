@@ -854,6 +854,15 @@ clickButton buttonText programTest =
                     )
                     Test.Html.Event.click
               )
+            , ( "an element with role=\"button\" (not disabled) and onClick and aria-label=" ++ escapeString buttonText
+              , simulateHelper functionDescription
+                    (findNotDisabled
+                        [ Selector.attribute (Html.Attributes.attribute "role" "button")
+                        , Selector.attribute (Html.Attributes.attribute "aria-label" buttonText)
+                        ]
+                    )
+                    Test.Html.Event.click
+              )
             , ( "a <form> with onSubmit containing a <button> (not disabled, not type=button) with text " ++ escapeString buttonText
               , simulateHelper functionDescription
                     (findButNot
