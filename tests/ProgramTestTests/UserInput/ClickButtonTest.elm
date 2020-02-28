@@ -2,7 +2,7 @@ module ProgramTestTests.UserInput.ClickButtonTest exposing (all)
 
 import Expect exposing (Expectation)
 import Html
-import Html.Attributes exposing (disabled, type_, value)
+import Html.Attributes exposing (attribute, disabled, type_, value)
 import Html.Events exposing (onClick, onSubmit)
 import ProgramTest exposing (ProgramTest)
 import Test exposing (..)
@@ -21,6 +21,17 @@ all =
                         [ Html.text "Click Me" ]
                     )
                     |> ProgramTest.clickButton "Click Me"
+                    |> ProgramTest.expectModel (Expect.equal [ "CLICK" ])
+        , test "can click a button with an aria-label attribute" <|
+            \() ->
+                TestingProgram.startView
+                    (Html.button
+                        [ onClick (Log "CLICK")
+                        , attribute "aria-label" "Close"
+                        ]
+                        [ Html.text "X" ]
+                    )
+                    |> ProgramTest.clickButton "Close"
                     |> ProgramTest.expectModel (Expect.equal [ "CLICK" ])
         , test "can click an elm-ui button" <|
             \() ->
@@ -106,6 +117,7 @@ all =
                         , ""
                         , "Expected one of the following to exist:"
                         , "- <button> (not disabled) with onClick and text \"Click Me\""
+                        , "- <button> (not disabled) with onClick and attribute aria-label=\"Click Me\""
                         , "- an element with role=\"button\" (not disabled) and onClick and text \"Click Me\""
                         , "- a <form> with onSubmit containing a <button> (not disabled, not type=button) with text \"Click Me\""
                         , "- a <form> with onSubmit containing an <input type=submit value=\"Click Me\"> (not disabled)"
