@@ -836,11 +836,29 @@ clickButton buttonText programTest =
                     )
                     Test.Html.Event.click
               )
+            , ( "<button> (not disabled) with onClick and attribute aria-label=" ++ escapeString buttonText
+              , simulateHelper functionDescription
+                    (findNotDisabled
+                        [ Selector.tag "button"
+                        , Selector.attribute (Html.Attributes.attribute "aria-label" buttonText)
+                        ]
+                    )
+                    Test.Html.Event.click
+              )
             , ( "an element with role=\"button\" (not disabled) and onClick and text " ++ escapeString buttonText
               , simulateHelper functionDescription
                     (findNotDisabled
                         [ Selector.attribute (Html.Attributes.attribute "role" "button")
                         , Selector.containing [ Selector.text buttonText ]
+                        ]
+                    )
+                    Test.Html.Event.click
+              )
+            , ( "an element with role=\"button\" (not disabled) and onClick and aria-label=" ++ escapeString buttonText
+              , simulateHelper functionDescription
+                    (findNotDisabled
+                        [ Selector.attribute (Html.Attributes.attribute "role" "button")
+                        , Selector.attribute (Html.Attributes.attribute "aria-label" buttonText)
                         ]
                     )
                     Test.Html.Event.click
