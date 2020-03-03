@@ -98,4 +98,27 @@ all =
                 TestingProgram.application (SimulatedEffect.Navigation.pushUrl "https://example.com/new")
                     |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.back 0))
                     |> ProgramTest.expectBrowserUrl (Expect.equal "https://example.com/new")
+        , test "simulating forward undoes a back" <|
+            \() ->
+                TestingProgram.application (SimulatedEffect.Navigation.pushUrl "https://example.com/new")
+                    |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.back 1))
+                    |> ProgramTest.update Clear
+                    |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.forward 1))
+                    |> ProgramTest.expectModel (Expect.equal [ "OnUrlChange: https://example.com/new" ])
+        , test "simulating forward 2 only does one URL change" <|
+            \() ->
+                TestingProgram.application (SimulatedEffect.Navigation.pushUrl "https://example.com/new")
+                    |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.pushUrl "https://example.com/new2"))
+                    -- back: [new, path], current: new2, forward: []
+                    |> Debug.log "A"
+                    |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.back 2))
+                    -- back: [], current: path, forward: [new, new2]
+                    |> Debug.log "B"
+                    |> ProgramTest.update Clear
+                    |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.forward 2))
+                    -- back: [new, path], current: new2, forward: []
+                    |> Debug.log "C"
+                    |> ProgramTest.expectModel (Expect.equal [ "OnUrlChange: https://example.com/new2" ])
+        , todo "forward 1 after back 2?"
+        , todo "what happens for real with invalid n?"
         ]

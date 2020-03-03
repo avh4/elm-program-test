@@ -1,4 +1,4 @@
-module SimulatedEffect.Navigation exposing (pushUrl, replaceUrl, back)
+module SimulatedEffect.Navigation exposing (pushUrl, replaceUrl, back, forward)
 
 {-| This module parallels [elm/browsers's `Browser.Navigation` module](https://package.elm-lang.org/packages/elm/browser/1.0.1/Browser-Navigation).
 _Pull requests are welcome to add any functions that are missing._
@@ -9,7 +9,7 @@ to help you implement the function to provide when using [`ProgramTest.withSimul
 
 # Navigate within Page
 
-@docs pushUrl, replaceUrl, back
+@docs pushUrl, replaceUrl, back, forward
 
 -}
 
@@ -37,3 +37,10 @@ replaceUrl =
 back : Int -> SimulatedEffect msg
 back =
     SimulatedEffect.Back
+
+
+{-| Go forward some number of pages.
+-}
+forward : Int -> SimulatedEffect msg
+forward =
+    SimulatedEffect.Forward
