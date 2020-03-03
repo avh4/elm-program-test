@@ -235,6 +235,7 @@ type ProgramTest model msg effect
             Maybe
                 { currentLocation : Url
                 , browserHistory : List Url
+                , browserForward : List Url
                 }
         , effectSimulation : Maybe (EffectSimulation msg effect)
         }
@@ -320,6 +321,7 @@ createHelper program options =
                     Just
                         { currentLocation = baseUrl
                         , browserHistory = []
+                        , browserForward = []
                         }
         , effectSimulation = Maybe.map EffectSimulation.init options.deconstructEffect
         }
@@ -1467,6 +1469,21 @@ queueSimulatedEffect effect programTest =
                                                 programTest
                                                     |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.Back " ++ String.fromInt n) 2 (Url.toString first)
 
+                        SimulatedEffect.Forward n ->
+                            case state.navigation of
+                                Nothing ->
+                                    programTest
+
+                                Just navigation ->
+                                    case List.head navigation.browserForward of
+                                        Nothing ->
+                                            -- there's nothing to go forward to
+                                            programTest
+
+                                        Just first ->
+                                            programTest
+                                                |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.Forward " ++ String.fromInt n) 0 (Url.toString first)
+
 
 drain : ProgramTest model msg effect -> ProgramTest model msg effect
 drain =
@@ -2045,10 +2062,10 @@ routeChangeHelper functionName removeFromBackStack url programTest =
                 Nothing ->
                     Finished (ProgramDoesNotSupportNavigation functionName)
 
-                Just { currentLocation, browserHistory } ->
+                Just navigation ->
                     let
                         newLocation =
-                            Url.Extra.resolve currentLocation url
+                            Url.Extra.resolve navigation.currentLocation url
 
                         processRouteChange =
                             case state.program.onRouteChange newLocation of
@@ -2063,10 +2080,14 @@ routeChangeHelper functionName removeFromBackStack url programTest =
                         { state
                             | navigation =
                                 Just
-                                    { currentLocation = newLocation
-                                    , browserHistory =
-                                        (currentLocation :: browserHistory)
-                                            |> List.drop removeFromBackStack
+                                    { navigation
+                                        | currentLocation = newLocation
+                                        , browserHistory =
+                                            (navigation.currentLocation :: navigation.browserHistory)
+                                                |> List.drop removeFromBackStack
+                                        , browserForward =
+                                            (navigation.currentLocation :: navigation.browserHistory)
+                                                |> List.take 1
                                     }
                         }
                         |> processRouteChange
