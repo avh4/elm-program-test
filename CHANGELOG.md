@@ -3,6 +3,7 @@
 New features:
 
   - added `SimulatedEffect.Navigation.back`
+  - `clickButton` can now match `<button>` and `role=button` elements via their `aria-label`
 
 
 ## 3.2.0
