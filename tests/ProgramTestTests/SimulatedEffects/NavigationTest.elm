@@ -98,4 +98,8 @@ all =
                 TestingProgram.application (SimulatedEffect.Navigation.pushUrl "https://example.com/new")
                     |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.back 0))
                     |> ProgramTest.expectBrowserUrl (Expect.equal "https://example.com/new")
+        , test "simulate loading a page" <|
+            \() ->
+                TestingProgram.application (SimulatedEffect.Navigation.load "https://example.com")
+                    |> ProgramTest.expectPageChange "https://example.com/"
         ]

@@ -60,3 +60,6 @@ map f effect =
 
         SimulatedEffect.Back n ->
             SimulatedEffect.Back n
+
+        SimulatedEffect.Load url ->
+            SimulatedEffect.Load url

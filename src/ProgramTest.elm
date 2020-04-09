@@ -1088,11 +1088,11 @@ clickLink linkText href programTest =
             (findLinkTag
                 >> Query.has []
             )
-        |> tryClicking { otherwise = followLink functionDescription href }
+        |> tryClicking { otherwise = simulateLoadUrlHelper functionDescription href }
 
 
-followLink : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
-followLink functionDescription href programTest =
+simulateLoadUrlHelper : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
+simulateLoadUrlHelper functionDescription href programTest =
     case programTest of
         Finished err ->
             Finished err
@@ -1105,7 +1105,7 @@ followLink functionDescription href programTest =
                 Nothing ->
                     case Url.fromString href of
                         Nothing ->
-                            Finished (NoBaseUrl "clickLink" href)
+                            Finished (NoBaseUrl functionDescription href)
 
                         Just location ->
                             Finished (ChangedPage functionDescription location)
@@ -1448,6 +1448,9 @@ queueSimulatedEffect effect programTest =
                                             Just first ->
                                                 programTest
                                                     |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.Back " ++ String.fromInt n) 2 (Url.toString first)
+
+                        SimulatedEffect.Load url ->
+                            simulateLoadUrlHelper ("simulating effect: SimulatedEffect.Navigation.load " ++ url) url programTest
 
 
 drain : ProgramTest model msg effect -> ProgramTest model msg effect

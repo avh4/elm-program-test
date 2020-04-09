@@ -14,6 +14,7 @@ type SimulatedEffect msg
     | PushUrl String
     | ReplaceUrl String
     | Back Int
+    | Load String
 
 
 type SimulatedTask x a
