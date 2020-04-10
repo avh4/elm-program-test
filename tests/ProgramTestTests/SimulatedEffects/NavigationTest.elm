@@ -6,6 +6,7 @@ import ProgramTest
 import SimulatedEffect.Cmd
 import SimulatedEffect.Navigation
 import Test exposing (..)
+import Test.Expect exposing (expectFailure)
 import TestingProgram exposing (Msg(..))
 
 
@@ -106,8 +107,22 @@ all =
             \() ->
                 TestingProgram.application SimulatedEffect.Navigation.reload
                     |> ProgramTest.expectPageReload
+        , test "reloading a page with cache and asserting the cache was skipped" <|
+            \() ->
+                TestingProgram.application SimulatedEffect.Navigation.reload
+                    |> ProgramTest.expectPageReloadWithoutCache
+                    |> expectFailure
+                        [ "expectPageReloadWithoutCache: the page was reloaded, but the cache was not skipped! If this was intentional, use ProgramTest.expectPageReload instead."
+                        ]
         , test "reloading a page and skipping the cache" <|
             \() ->
                 TestingProgram.application SimulatedEffect.Navigation.reloadAndSkipCache
                     |> ProgramTest.expectPageReloadWithoutCache
+        , test "reloading a page wthout cache and asserting the cache was not skipped" <|
+            \() ->
+                TestingProgram.application SimulatedEffect.Navigation.reloadAndSkipCache
+                    |> ProgramTest.expectPageReload
+                    |> expectFailure
+                        [ "expectPageReload: the page was reloaded, but the cache was skipped! If this was intentional, use ProgramTest.expectPageReloadWithoutCache instead."
+                        ]
         ]
