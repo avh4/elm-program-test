@@ -1,6 +1,6 @@
 module SimulatedEffect.Navigation exposing
     ( pushUrl, replaceUrl, back
-    , load
+    , load, reload, reloadAndSkipCache
     )
 
 {-| This module parallels [elm/browsers's `Browser.Navigation` module](https://package.elm-lang.org/packages/elm/browser/1.0.1/Browser-Navigation).
@@ -17,7 +17,7 @@ to help you implement the function to provide when using [`ProgramTest.withSimul
 
 # Navigate to other Pages
 
-@docs load
+@docs load, reload, reloadAndSkipCache
 
 -}
 
@@ -52,3 +52,17 @@ back =
 load : String -> SimulatedEffect msg
 load =
     SimulatedEffect.Load
+
+
+{-| Reload the current page.
+-}
+reload : SimulatedEffect msg
+reload =
+    SimulatedEffect.Reload False
+
+
+{-| Reload the current page without using the browser cache.
+-}
+reloadAndSkipCache : SimulatedEffect msg
+reloadAndSkipCache =
+    SimulatedEffect.Reload True

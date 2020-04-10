@@ -63,3 +63,6 @@ map f effect =
 
         SimulatedEffect.Load url ->
             SimulatedEffect.Load url
+
+        SimulatedEffect.Reload skipCache ->
+            SimulatedEffect.Reload skipCache

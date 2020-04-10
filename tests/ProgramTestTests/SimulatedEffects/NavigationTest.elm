@@ -102,4 +102,12 @@ all =
             \() ->
                 TestingProgram.application (SimulatedEffect.Navigation.load "https://example.com")
                     |> ProgramTest.expectPageChange "https://example.com/"
+        , test "reloading a page" <|
+            \() ->
+                TestingProgram.application SimulatedEffect.Navigation.reload
+                    |> ProgramTest.expectPageReload
+        , test "reloading a page and skipping the cache" <|
+            \() ->
+                TestingProgram.application SimulatedEffect.Navigation.reloadAndSkipCache
+                    |> ProgramTest.expectPageReloadWithoutCache
         ]
