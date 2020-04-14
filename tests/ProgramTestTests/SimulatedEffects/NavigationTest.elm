@@ -118,7 +118,7 @@ all =
             \() ->
                 TestingProgram.application SimulatedEffect.Navigation.reloadAndSkipCache
                     |> ProgramTest.expectPageReloadWithoutCache
-        , test "reloading a page wthout cache and asserting the cache was not skipped" <|
+        , test "reloading a page without cache and asserting the cache was not skipped" <|
             \() ->
                 TestingProgram.application SimulatedEffect.Navigation.reloadAndSkipCache
                     |> ProgramTest.expectPageReload
