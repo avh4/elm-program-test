@@ -20,7 +20,6 @@ module ProgramTest exposing
     , expectOutgoingPortValues, ensureOutgoingPortValues
     , simulateIncomingPort
     , expectPageChange, expectBrowserUrl, expectBrowserHistory
-    , expectPageReload, expectPageReloadWithoutCache
     , ensureBrowserUrl, ensureBrowserHistory
     , routeChange
     , update
@@ -161,7 +160,6 @@ The following functions allow you to configure your
 ## Browser assertions
 
 @docs expectPageChange, expectBrowserUrl, expectBrowserHistory
-@docs expectPageReload, expectPageReloadWithoutCache
 @docs ensureBrowserUrl, ensureBrowserHistory
 
 
@@ -253,7 +251,6 @@ type alias TestProgram model msg effect sub =
 
 type Failure
     = ChangedPage String Url
-    | ReloadedPage String Bool
       -- Errors
     | ExpectFailed String String Test.Runner.Failure.Reason
     | SimulateFailed String String
@@ -1482,7 +1479,12 @@ queueSimulatedEffect effect programTest =
                                     else
                                         "reload"
                             in
-                            Finished (ReloadedPage ("simulating effect: SimulatedEffect.Navigation." ++ functionName) skipCache)
+                            case state.navigation of
+                                Nothing ->
+                                    Finished (ProgramDoesNotSupportNavigation functionName)
+
+                                Just { currentLocation } ->
+                                    Finished (ChangedPage ("simulating effect: SimulatedEffect.Navigation." ++ functionName) currentLocation)
 
 
 drain : ProgramTest model msg effect -> ProgramTest model msg effect
@@ -2300,9 +2302,6 @@ done programTest =
         Finished (ChangedPage cause finalLocation) ->
             Expect.fail (cause ++ " caused the program to end by navigating to " ++ escapeString (Url.toString finalLocation) ++ ".  NOTE: If this is what you intended, use ProgramTest.expectPageChange to end your test.")
 
-        Finished (ReloadedPage cause _) ->
-            Expect.fail (cause ++ " caused the program to end by reloading. NOTE: If this is what you intended, use ProgramTest.expectPageReload to end your test.")
-
         Finished (ExpectFailed expectationName description reason) ->
             Expect.fail (expectationName ++ ":\n" ++ Test.Runner.Failure.format description reason)
 
@@ -2377,47 +2376,7 @@ expectPageChange expectedUrl programTest =
             programTest |> done
 
         Active _ ->
-            Expect.fail "expectPageChange: expected to have navigated to a different URL, but no links were clicked"
-
-
-{-| Asserts that the program ended by reloading the current page.
--}
-expectPageReload : ProgramTest model msg effect -> Expectation
-expectPageReload programTest =
-    case programTest of
-        Finished (ReloadedPage _ False) ->
-            Expect.pass
-
-        Finished (ReloadedPage _ True) ->
-            Expect.fail "expectPageReload: the page was reloaded, but the cache was skipped! If this was intentional, use ProgramTest.expectPageReloadWithoutCache instead."
-
-        Finished _ ->
-            programTest |> done
-
-        Active _ ->
-            Expect.fail "expectPageReload: expected to have reloaded the page, but no cmd was sent"
-
-
-{-| Asserts that the program ended by reloading the current page, without using the browser cache.
-
-It is more likely that you want [`expectPageReload`](#expectPageReload), unless you know that you want
-to be skipping the cache.
-
--}
-expectPageReloadWithoutCache : ProgramTest model msg effect -> Expectation
-expectPageReloadWithoutCache programTest =
-    case programTest of
-        Finished (ReloadedPage _ True) ->
-            Expect.pass
-
-        Finished (ReloadedPage _ False) ->
-            Expect.fail "expectPageReloadWithoutCache: the page was reloaded, but the cache was not skipped! If this was intentional, use ProgramTest.expectPageReload instead."
-
-        Finished _ ->
-            programTest |> done
-
-        Active _ ->
-            Expect.fail "expectPageReloadWithoutCache: expected to have reloaded the page, but no cmd was sent"
+            Expect.fail "expectPageChange: expected to have navigated to a different URL, but no links were clicked and no browser navigation was simulated"
 
 
 {-| Asserts on the current value of the browser URL bar in the simulated test environment.
