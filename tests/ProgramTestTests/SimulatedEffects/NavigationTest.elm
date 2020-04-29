@@ -6,6 +6,7 @@ import ProgramTest
 import SimulatedEffect.Cmd
 import SimulatedEffect.Navigation
 import Test exposing (..)
+import Test.Expect exposing (expectFailure)
 import TestingProgram exposing (Msg(..))
 
 
@@ -98,4 +99,21 @@ all =
                 TestingProgram.application (SimulatedEffect.Navigation.pushUrl "https://example.com/new")
                     |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.back 0))
                     |> ProgramTest.expectBrowserUrl (Expect.equal "https://example.com/new")
+        , test "simulate loading a page" <|
+            \() ->
+                TestingProgram.application (SimulatedEffect.Navigation.load "https://example.com")
+                    |> ProgramTest.expectPageChange "https://example.com/"
+        , test "simulate reloading a page" <|
+            \() ->
+                TestingProgram.application SimulatedEffect.Navigation.reload
+                    |> ProgramTest.expectPageChange "https://example.com/path"
+        , test "simulate reloading a page with skipped cache" <|
+            \() ->
+                TestingProgram.application SimulatedEffect.Navigation.reloadAndSkipCache
+                    |> ProgramTest.expectPageChange "https://example.com/path"
+        , test "expecting a page change without simulating one results in failure" <|
+            \() ->
+                TestingProgram.application SimulatedEffect.Cmd.none
+                    |> ProgramTest.expectPageChange "https://example.com/"
+                    |> expectFailure [ "expectPageChange: expected to have navigated to a different URL, but no links were clicked and no browser navigation was simulated" ]
         ]
