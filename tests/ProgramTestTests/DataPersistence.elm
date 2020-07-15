@@ -43,9 +43,6 @@ all =
                     |> expectFailure
                         [ "TEST SETUP ERROR: In order to use getPortValues, you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start"
                         ]
-
-        -- TODO: Is this needed?
-        , todo "no values for port?"
         ]
 
 
