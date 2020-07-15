@@ -5,6 +5,7 @@ import Json.Encode as Encode
 import ProgramTest exposing (ProgramTest, SimulatedEffect, SimulatedTask)
 import SimulatedEffect.Ports as Ports
 import Test exposing (..)
+import Test.Expect exposing (expectFailureContaining)
 import TestingProgram exposing (Msg(..))
 
 
@@ -15,11 +16,29 @@ all =
             \() ->
                 TestingProgram.startEffects (Ports.send "myPort" (Encode.string "Foo"))
                     |> ProgramTest.getPortValues "myPort"
-                    |> List.map (Encode.encode 0)
-                    |> Expect.equal [ "\"Foo\"" ]
-        , todo "getPortValues but program has already errored"
+                    |> Result.map (List.map (Encode.encode 0))
+                    |> Expect.equal (Ok [ "\"Foo\"" ])
+        , test "getPortValues but program has already errored" <|
+            \() ->
+                TestingProgram.startEffects (Ports.send "myPort" (Encode.string "Foo"))
+                    |> ProgramTest.clickButton "Not found button"
+                    |> ProgramTest.getPortValues "myPort"
+                    |> Result.mapError ProgramTest.done
+                    |> Result.map (\_ -> Expect.pass)
+                    |> joinResult
+                    |> expectFailureContaining "Not found button"
         , todo "when effect simulation isn't configured"
 
         -- TODO: Is this needed?
         , todo "no values for port?"
         ]
+
+
+joinResult : Result a a -> a
+joinResult result =
+    case result of
+        Err a ->
+            a
+
+        Ok a ->
+            a

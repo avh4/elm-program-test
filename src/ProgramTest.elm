@@ -2580,17 +2580,18 @@ createFailed functionName failureMessage =
 
 
 {-| -}
-getPortValues : String -> ProgramTest model msg effect -> List Json.Encode.Value
+getPortValues : String -> ProgramTest model msg effect -> Result (ProgramTest model msg effect) (List Json.Encode.Value)
 getPortValues portName programTest =
     case programTest of
         Finished err ->
-            []
+            Err programTest
 
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    []
+                    Ok []
 
                 Just effects ->
                     Dict.get portName effects.outgoingPortValues
                         |> Maybe.withDefault []
+                        |> Ok
