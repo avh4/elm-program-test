@@ -1,11 +1,12 @@
 module ProgramTestTests.DataPersistence exposing (all)
 
 import Expect
+import Html
 import Json.Encode as Encode
 import ProgramTest exposing (ProgramTest, SimulatedEffect, SimulatedTask)
 import SimulatedEffect.Ports as Ports
 import Test exposing (..)
-import Test.Expect exposing (expectFailureContaining)
+import Test.Expect exposing (expectFailure, expectFailureContaining)
 import TestingProgram exposing (Msg(..))
 
 
@@ -27,7 +28,21 @@ all =
                     |> Result.map (\_ -> Expect.pass)
                     |> joinResult
                     |> expectFailureContaining "Not found button"
-        , todo "when effect simulation isn't configured"
+        , test "when effect simulation isn't configured" <|
+            \() ->
+                ProgramTest.createElement
+                    { init = \() -> ( [], () )
+                    , update = \() _ -> ( [], () )
+                    , view = \_ -> Html.node "body" [] []
+                    }
+                    |> ProgramTest.start ()
+                    |> ProgramTest.getPortValues "myPort"
+                    |> Result.mapError ProgramTest.done
+                    |> Result.map (\_ -> Expect.pass)
+                    |> joinResult
+                    |> expectFailure
+                        [ "TEST SETUP ERROR: In order to use getPortValues, you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start"
+                        ]
 
         -- TODO: Is this needed?
         , todo "no values for port?"

@@ -2589,7 +2589,7 @@ getPortValues portName programTest =
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Ok []
+                    Err (Finished (EffectSimulationNotConfigured "getPortValues"))
 
                 Just effects ->
                     Dict.get portName effects.outgoingPortValues
