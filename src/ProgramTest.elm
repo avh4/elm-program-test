@@ -838,11 +838,29 @@ clickButton buttonText programTest =
                     )
                     Test.Html.Event.click
               )
+            , ( "<button> (not disabled) with onClick and attribute aria-label=" ++ escapeString buttonText
+              , simulateHelper functionDescription
+                    (findNotDisabled
+                        [ Selector.tag "button"
+                        , Selector.attribute (Html.Attributes.attribute "aria-label" buttonText)
+                        ]
+                    )
+                    Test.Html.Event.click
+              )
             , ( "an element with role=\"button\" (not disabled) and onClick and text " ++ escapeString buttonText
               , simulateHelper functionDescription
                     (findNotDisabled
                         [ Selector.attribute (Html.Attributes.attribute "role" "button")
                         , Selector.containing [ Selector.text buttonText ]
+                        ]
+                    )
+                    Test.Html.Event.click
+              )
+            , ( "an element with role=\"button\" (not disabled) and onClick and aria-label=" ++ escapeString buttonText
+              , simulateHelper functionDescription
+                    (findNotDisabled
+                        [ Selector.attribute (Html.Attributes.attribute "role" "button")
+                        , Selector.attribute (Html.Attributes.attribute "aria-label" buttonText)
                         ]
                     )
                     Test.Html.Event.click
@@ -1090,11 +1108,11 @@ clickLink linkText href programTest =
             (findLinkTag
                 >> Query.has []
             )
-        |> tryClicking { otherwise = followLink functionDescription href }
+        |> tryClicking { otherwise = simulateLoadUrlHelper functionDescription href }
 
 
-followLink : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
-followLink functionDescription href programTest =
+simulateLoadUrlHelper : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
+simulateLoadUrlHelper functionDescription href programTest =
     case programTest of
         Finished err ->
             Finished err
@@ -1107,7 +1125,7 @@ followLink functionDescription href programTest =
                 Nothing ->
                     case Url.fromString href of
                         Nothing ->
-                            Finished (NoBaseUrl "clickLink" href)
+                            Finished (NoBaseUrl functionDescription href)
 
                         Just location ->
                             Finished (ChangedPage functionDescription location)
@@ -1450,6 +1468,25 @@ queueSimulatedEffect effect programTest =
                                             Just first ->
                                                 programTest
                                                     |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.Back " ++ String.fromInt n) 2 (Url.toString first)
+
+                        SimulatedEffect.Load url ->
+                            simulateLoadUrlHelper ("simulating effect: SimulatedEffect.Navigation.load " ++ url) url programTest
+
+                        SimulatedEffect.Reload skipCache ->
+                            let
+                                functionName =
+                                    if skipCache then
+                                        "reloadAndSkipCache"
+
+                                    else
+                                        "reload"
+                            in
+                            case state.navigation of
+                                Nothing ->
+                                    Finished (ProgramDoesNotSupportNavigation functionName)
+
+                                Just { currentLocation } ->
+                                    Finished (ChangedPage ("simulating effect: SimulatedEffect.Navigation." ++ functionName) currentLocation)
 
 
 drain : ProgramTest model msg effect -> ProgramTest model msg effect
@@ -2341,7 +2378,7 @@ expectPageChange expectedUrl programTest =
             programTest |> done
 
         Active _ ->
-            Expect.fail "expectPageChange: expected to have navigated to a different URL, but no links were clicked"
+            Expect.fail "expectPageChange: expected to have navigated to a different URL, but no links were clicked and no browser navigation was simulated"
 
 
 {-| Asserts on the current value of the browser URL bar in the simulated test environment.
