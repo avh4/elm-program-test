@@ -16,14 +16,14 @@ all =
         [ test "can retrieve a value from outgoing port" <|
             \() ->
                 TestingProgram.startEffects (Ports.send "myPort" (Encode.string "Foo"))
-                    |> ProgramTest.getPortValues "myPort"
+                    |> ProgramTest.getOutgoingPortValues "myPort"
                     |> Result.map (List.map (Encode.encode 0))
                     |> Expect.equal (Ok [ "\"Foo\"" ])
         , test "getPortValues but program has already errored" <|
             \() ->
                 TestingProgram.startEffects (Ports.send "myPort" (Encode.string "Foo"))
                     |> ProgramTest.clickButton "Not found button"
-                    |> ProgramTest.getPortValues "myPort"
+                    |> ProgramTest.getOutgoingPortValues "myPort"
                     |> Result.mapError ProgramTest.done
                     |> Result.map (\_ -> Expect.pass)
                     |> joinResult
@@ -36,7 +36,7 @@ all =
                     , view = \_ -> Html.node "body" [] []
                     }
                     |> ProgramTest.start ()
-                    |> ProgramTest.getPortValues "myPort"
+                    |> ProgramTest.getOutgoingPortValues "myPort"
                     |> Result.mapError ProgramTest.done
                     |> Result.map (\_ -> Expect.pass)
                     |> joinResult
