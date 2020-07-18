@@ -1,4 +1,4 @@
-module Test.Expect exposing (expectAnyFailure, expectFailure, expectSuccess)
+module Test.Expect exposing (expectAnyFailure, expectFailure, expectFailureContaining, expectSuccess)
 
 {-| Functions for asserting things about expectations.
 -}
@@ -36,3 +36,19 @@ expectAnyFailure actualResult =
 
         Just actualInfo ->
             Expect.pass
+
+
+expectFailureContaining : String -> Expectation -> Expectation
+expectFailureContaining expectedSubstring actualResult =
+    case Test.Runner.getFailureReason actualResult of
+        Nothing ->
+            Expect.fail "Expected a failure, but got a pass"
+
+        Just actualInfo ->
+            Expect.true
+                ("Expected failure message to contain: "
+                    ++ expectedSubstring
+                    ++ "but got\n\n"
+                    ++ actualInfo.description
+                )
+                (String.contains expectedSubstring actualInfo.description)

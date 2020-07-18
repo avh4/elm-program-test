@@ -1,9 +1,10 @@
-## master
+## main
 
 New features:
 
-  - added `SimulatedEffect.Navigation.back`
   - `clickButton` can now match `<button>` and `role=button` elements via their `aria-label`
+  - added `SimulatedEffect.Navigation.back`
+  - added `ProgramTest.getOutgoingPortValues` for use in advanced helper functions
 
 
 ## 3.2.0

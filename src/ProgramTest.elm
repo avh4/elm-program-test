@@ -27,6 +27,7 @@ module ProgramTest exposing
     , expectLastEffect, ensureLastEffect
     , simulateLastEffect
     , fail, createFailed
+    , getOutgoingPortValues
     )
 
 {-| A `ProgramTest` simulates the execution of an Elm program
@@ -191,6 +192,7 @@ but you may find them useful to test things that are not yet directly supported 
 These functions may be useful if you are writing your own custom assertion functions.
 
 @docs fail, createFailed
+@docs getOutgoingPortValues
 
 -}
 
@@ -2612,3 +2614,27 @@ For example:
 createFailed : String -> String -> ProgramTest model msg effect
 createFailed functionName failureMessage =
     Finished (CustomFailure functionName failureMessage)
+
+
+{-| This can be used for advanced helper functions where you want to continue a test but need the data
+sent out through ports later in your test.
+
+NOTE: If you do not need this advanced functionality,
+prefer [`expectOutgoingPortValues`](#expectOutgoingPortValues) instead.
+
+-}
+getOutgoingPortValues : String -> ProgramTest model msg effect -> Result (ProgramTest model msg effect) (List Json.Encode.Value)
+getOutgoingPortValues portName programTest =
+    case programTest of
+        Finished _ ->
+            Err programTest
+
+        Active state ->
+            case state.effectSimulation of
+                Nothing ->
+                    Err (Finished (EffectSimulationNotConfigured "getPortValues"))
+
+                Just effects ->
+                    Dict.get portName effects.outgoingPortValues
+                        |> Maybe.withDefault []
+                        |> Ok
