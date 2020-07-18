@@ -1,9 +1,9 @@
-## main
+## 3.3.0
 
 New features:
 
   - `clickButton` can now match `<button>` and `role=button` elements via their `aria-label`
-  - added `SimulatedEffect.Navigation.back`
+  - added API for simulating browser navigation in `SimulatedEffect.Navigation`: `back`, `load`, `reload`, `reloadAndSkipCache`
   - added `ProgramTest.getOutgoingPortValues` for use in advanced helper functions
 
 
