@@ -1,8 +1,9 @@
-## master
+## main
 
 New features:
 
   - added `SimulatedEffect.Navigation.back`
+  - added `ProgramTest.getOutgoingPortValues` for use in advanced helper functions
 
 
 ## 3.2.0
