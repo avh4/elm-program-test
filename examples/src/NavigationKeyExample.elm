@@ -1,6 +1,6 @@
 module NavigationKeyExample exposing
     ( main
-    , Model, Msg(..), init, update, view
+    , Model, Msg(..), Effect(..), init, update, view
     )
 
 {-|
@@ -10,7 +10,7 @@ module NavigationKeyExample exposing
 
 # Exposed for tests
 
-@docs Model, Msg, init, update, view
+@docs Model, Msg, Effect, init, update, view
 
 -}
 
@@ -18,6 +18,9 @@ import Browser
 import Browser.Navigation as Navigation
 import Html
 import Html.Attributes
+import Html.Events exposing (onClick)
+import Process
+import Task
 import Url exposing (Url)
 import Url.Parser exposing ((</>))
 
@@ -33,8 +36,8 @@ type Route
     | NotFound
 
 
-parseRoute : Url -> Maybe Route
-parseRoute =
+parseRoute : Url -> Route
+parseRoute url =
     let
         parser =
             Url.Parser.oneOf
@@ -43,7 +46,8 @@ parseRoute =
                 , Url.Parser.map Page Url.Parser.string
                 ]
     in
-    Url.Parser.parse parser
+    Url.Parser.parse parser url
+        |> Maybe.withDefault NotFound
 
 
 type alias Model navigationKey =
@@ -54,51 +58,95 @@ type alias Model navigationKey =
 
 main : Program Flags (Model Navigation.Key) Msg
 main =
+    let
+        performEffect ( model, effect ) =
+            ( model, perform model.navigationKey effect )
+    in
     Browser.application
-        { init = init
+        { init = \flags url key -> init flags url key |> performEffect
         , view = view
-        , update = update
+        , update = \msg model -> update msg model |> performEffect
         , subscriptions = \_ -> Sub.none
         , onUrlRequest = OnUrlRequest
         , onUrlChange = OnUrlChange
         }
 
 
-init : flags -> Url -> navigationKey -> ( Model navigationKey, Cmd msg )
+init : flags -> Url -> navigationKey -> ( Model navigationKey, Effect )
 init _ url navigationKey =
-    ( { route =
-            parseRoute url
-                |> Maybe.withDefault NotFound
+    ( { route = parseRoute url
       , navigationKey = navigationKey
       }
-    , Cmd.none
+    , NoEffect
     )
 
 
 type Msg
     = OnUrlRequest Browser.UrlRequest
     | OnUrlChange Url
+    | GoHomeIn3
+    | GoHomeNow
 
 
-update : Msg -> model -> ( model, Cmd msg )
+update : Msg -> Model navigationKey -> ( Model navigationKey, Effect )
 update msg model =
     case msg of
-        OnUrlRequest urlRequest ->
-            ( model, Cmd.none )
+        OnUrlRequest (Browser.Internal url) ->
+            ( model, PushUrl (Url.toString url) )
+
+        OnUrlRequest (Browser.External string) ->
+            ( model, Load string )
 
         OnUrlChange url ->
-            ( model, Cmd.none )
+            ( { model | route = parseRoute url }
+            , NoEffect
+            )
+
+        GoHomeIn3 ->
+            ( model, Delay 3000 GoHomeNow )
+
+        GoHomeNow ->
+            ( model, PushUrl "/" )
 
 
-view : Model navigationKey -> Browser.Document msg
+type Effect
+    = NoEffect
+    | Delay Float Msg
+    | PushUrl String
+    | Load String
+
+
+perform : Navigation.Key -> Effect -> Cmd Msg
+perform navigationKey effect =
+    case effect of
+        NoEffect ->
+            Cmd.none
+
+        Delay ms msg ->
+            Process.sleep ms
+                |> Task.perform (\() -> msg)
+
+        PushUrl string ->
+            Navigation.pushUrl navigationKey string
+
+        Load string ->
+            Navigation.load string
+
+
+view : Model navigationKey -> Browser.Document Msg
 view model =
     { title = "elm-program-test: NavigationKey example"
     , body =
         [ Html.header []
             [ Html.a [ Html.Attributes.href "/users/2" ] [ Html.text "User 2" ]
             ]
-        , Html.h1 []
-            [ Html.text (Debug.toString model.route)
+        , Html.main_ []
+            [ Html.h1 []
+                [ Html.text (Debug.toString model.route)
+                ]
+            ]
+        , Html.footer []
+            [ Html.button [ onClick GoHomeIn3 ] [ Html.text "Go Home in 3 seconds" ]
             ]
         ]
     }
