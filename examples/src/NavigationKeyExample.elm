@@ -17,6 +17,7 @@ module NavigationKeyExample exposing
 import Browser
 import Browser.Navigation as Navigation
 import Html
+import Html.Attributes
 import Url exposing (Url)
 import Url.Parser exposing ((</>))
 
@@ -93,7 +94,10 @@ view : Model navigationKey -> Browser.Document msg
 view model =
     { title = "elm-program-test: NavigationKey example"
     , body =
-        [ Html.h1 []
+        [ Html.header []
+            [ Html.a [ Html.Attributes.href "/users/2" ] [ Html.text "User 2" ]
+            ]
+        , Html.h1 []
             [ Html.text (Debug.toString model.route)
             ]
         ]
