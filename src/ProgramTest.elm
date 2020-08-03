@@ -519,18 +519,9 @@ See other `create*` functions if the program you want to test does not use `Brow
 If your program has subscriptions that you want to simulate, see [`withSimulatedSubscriptions`](#withSimulatedSubscriptions).
 
 Note that Elm currently does not provide any way to create a [`Browser.Navigation.Key`](https://package.elm-lang.org/packages/elm/browser/latest/Browser-Navigation#Key) in tests, so this function uses `()` as the key type instead.
-It should be possible to test programs that make use of navigation keys,
-but this is not well documented yet.
-(As a point in the right direction, you will probably need to generalize
-all your functions that use the key like this:)
-
-    update : (key -> String -> Cmd msg) -> Msg -> Model key -> (Model, Cmd msg)
-    update pushUrl msg model =
-        case msg of
-            ... ->
-                ( model
-                , pushUrl model.key
-                )
+For an example of how to test such a program, see
+[NavigationKeyExample.elm](https://github.com/avh4/elm-program-test/blob/main/examples/src/NavigationKeyExample.elm)
+and [NavigationKeyExampleTest.elm](https://github.com/avh4/elm-program-test/blob/main/examples/tests/NavigationKeyExampleTest.elm).
 
 -}
 createApplication :
