@@ -13,7 +13,7 @@ for testing your Elm programs as complete units.
 1. Install the [elm-explorations/test](https://package.elm-lang.org/packages/elm-explorations/test/latest/).
 2. Install the elm-program-test using the command
 
-    ```elm-test install avh4/elm-program-test```
+    ```elm install avh4/elm-program-test```
 
 
 ## [Guidebooks](https://elm-program-test.netlify.com/#guidebooks)
