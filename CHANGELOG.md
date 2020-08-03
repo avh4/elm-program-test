@@ -1,3 +1,10 @@
+## main
+
+Documentation:
+
+  - Added [NavigationKeyExample](https://github.com/avh4/elm-program-test/blob/main/examples/tests/NavigationKeyExampleTest.elm) showing how to test programs that require the use of `Browser.Navigation.Key`
+
+
 ## 3.3.0
 
 New features:
