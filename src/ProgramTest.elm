@@ -1169,7 +1169,7 @@ see [`simulateDomEvent`](#simulateDomEvent).
 -}
 fillIn : String -> String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
 fillIn fieldId label newContent programTest =
-    simulateLabeledInputHelper ("fillIn " ++ escapeString label)
+    simulateLabeledInputHelper ("fillIn " ++ escapeString fieldId ++ " " ++ escapeString label)
         fieldId
         label
         True

@@ -93,7 +93,7 @@ all =
                     |> ProgramTest.fillIn "field-id" "Field 1" "value99"
                     |> ProgramTest.done
                     |> expectFailure
-                        [ """fillIn "Field 1": """
+                        [ """fillIn "field-id" "Field 1": """
                         , "▼ Query.fromHtml"
                         , ""
                         , "    <body>"
@@ -101,9 +101,9 @@ all =
                         , "    </body>"
                         , ""
                         , ""
-                        , """▼ Query.has [ text "HTML expected by the call to: fillIn "Field 1"" ]"""
+                        , """▼ Query.has [ text "HTML expected by the call to: fillIn "field-id" "Field 1"" ]"""
                         , ""
-                        , """✗ has text "HTML expected by the call to: fillIn "Field 1\"\""""
+                        , """✗ has text "HTML expected by the call to: fillIn "field-id" "Field 1\"\""""
                         , ""
                         , "Expected one of the following to exist and have an \"oninput\" handler:"
                         , """- <label for="field-id"> with text "Field 1" and an <input id="field-id">"""
