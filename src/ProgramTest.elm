@@ -28,6 +28,7 @@ module ProgramTest exposing
     , simulateLastEffect
     , fail, createFailed
     , getOutgoingPortValues
+    , toLog
     )
 
 {-| A `ProgramTest` simulates the execution of an Elm program
@@ -193,6 +194,7 @@ These functions may be useful if you are writing your own custom assertion funct
 
 @docs fail, createFailed
 @docs getOutgoingPortValues
+@docs toLog
 
 -}
 
@@ -232,6 +234,7 @@ type ProgramTest model msg effect
     = Active
         { program : TestProgram model msg effect (SimulatedSub msg)
         , currentModel : model
+        , history : List model
         , lastEffect : effect
         , navigation :
             Maybe
@@ -240,12 +243,19 @@ type ProgramTest model msg effect
                 }
         , effectSimulation : Maybe (EffectSimulation msg effect)
         }
-    | Finished Failure
+    | Finished (TestLog model msg) Failure
+
+
+type alias TestLog model msg =
+    { view : model -> Html msg
+    , history : List model
+    }
 
 
 type alias TestProgram model msg effect sub =
     { update : msg -> model -> ( model, effect )
     , view : model -> Query.Single msg
+    , debugView : model -> Html msg
     , onRouteChange : Url -> Maybe msg
     , subscriptions : Maybe (model -> sub)
     }
@@ -302,6 +312,7 @@ createHelper program options =
         program_ =
             { update = program.update
             , view = program.view >> Query.fromHtml
+            , debugView = program.view
             , onRouteChange = program.onRouteChange
             , subscriptions = options.subscriptions
             }
@@ -312,6 +323,7 @@ createHelper program options =
     Active
         { program = program_
         , currentModel = newModel
+        , history = []
         , lastEffect = newEffect
         , navigation =
             case options.baseUrl of
@@ -420,7 +432,14 @@ withBaseUrl : String -> ProgramDefinition flags model msg effect -> ProgramDefin
 withBaseUrl baseUrl (ProgramDefinition options program) =
     case Url.fromString baseUrl of
         Nothing ->
-            ProgramDefinition options (\_ _ _ -> Finished (InvalidLocationUrl "startWithBaseUrl" baseUrl))
+            ProgramDefinition options
+                (\_ _ _ ->
+                    Finished
+                        { view = \_ -> Html.text "withBaseUrl failed! TODO better error message"
+                        , history = []
+                        }
+                        (InvalidLocationUrl "withBaseUrl" baseUrl)
+                )
 
         Just url ->
             ProgramDefinition { options | baseUrl = Just url } program
@@ -442,7 +461,12 @@ withJsonStringFlags decoder (ProgramDefinition options program) =
                     program location flags
 
                 Err message ->
-                    \_ -> Finished (InvalidFlags "withJsonStringFlags" (Json.Decode.errorToString message))
+                    \_ ->
+                        Finished
+                            { view = \_ -> Html.text "withJsonStringFlags failed! TODO better error message"
+                            , history = []
+                            }
+                            (InvalidFlags "withJsonStringFlags" (Json.Decode.errorToString message))
 
 
 {-| This allows you to provide a function that lets `ProgramTest` simulate effects that would become `Cmd`s and `Task`s
@@ -537,7 +561,12 @@ createApplication program =
         \location flags ->
             case location of
                 Nothing ->
-                    \_ -> Finished (NoBaseUrl "createApplication" "")
+                    \_ ->
+                        Finished
+                            { view = \_ -> Html.text "TODO: support Browser.Document test logs"
+                            , history = []
+                            }
+                            (NoBaseUrl "createApplication" "")
 
                 Just url ->
                     createHelper
@@ -606,8 +635,8 @@ as doing so will make your tests more resilient to changes in your program's imp
 update : msg -> ProgramTest model msg effect -> ProgramTest model msg effect
 update msg programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             let
@@ -617,6 +646,7 @@ update msg programTest =
             Active
                 { state
                     | currentModel = newModel
+                    , history = state.currentModel :: state.history
                     , lastEffect = newEffect
                 }
                 |> queueEffect newEffect
@@ -626,8 +656,8 @@ update msg programTest =
 simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateHelper functionDescription findTarget event programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             let
@@ -642,7 +672,11 @@ simulateHelper functionDescription findTarget event programTest =
                     |> Test.Runner.getFailureReason
             of
                 Just reason ->
-                    Finished (SimulateFailedToFindTarget functionDescription reason.description)
+                    Finished
+                        { view = state.program.debugView
+                        , history = state.currentModel :: state.history
+                        }
+                        (SimulateFailedToFindTarget functionDescription reason.description)
 
                 Nothing ->
                     -- Try to simulate the event, now that we know the target exists
@@ -652,7 +686,11 @@ simulateHelper functionDescription findTarget event programTest =
                             |> Test.Html.Event.toResult
                     of
                         Err message ->
-                            Finished (SimulateFailed functionDescription message)
+                            Finished
+                                { view = state.program.debugView
+                                , history = state.currentModel :: state.history
+                                }
+                                (SimulateFailed functionDescription message)
 
                         Ok msg ->
                             update msg programTest
@@ -1048,8 +1086,8 @@ clickLink linkText href programTest =
 
         tryClicking { otherwise } tryClickingProgramTest =
             case tryClickingProgramTest of
-                Finished err ->
-                    Finished err
+                Finished testLog err ->
+                    Finished testLog err
 
                 Active state ->
                     let
@@ -1105,21 +1143,33 @@ clickLink linkText href programTest =
 simulateLoadUrlHelper : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateLoadUrlHelper functionDescription href programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             case Maybe.map .currentLocation state.navigation of
                 Just location ->
-                    Finished (ChangedPage functionDescription (Url.Extra.resolve location href))
+                    Finished
+                        { view = state.program.debugView
+                        , history = state.currentModel :: state.history
+                        }
+                        (ChangedPage functionDescription (Url.Extra.resolve location href))
 
                 Nothing ->
                     case Url.fromString href of
                         Nothing ->
-                            Finished (NoBaseUrl functionDescription href)
+                            Finished
+                                { view = state.program.debugView
+                                , history = state.currentModel :: state.history
+                                }
+                                (NoBaseUrl functionDescription href)
 
                         Just location ->
-                            Finished (ChangedPage functionDescription location)
+                            Finished
+                                { view = state.program.debugView
+                                , history = state.currentModel :: state.history
+                                }
+                                (ChangedPage functionDescription location)
 
 
 {-| Simulates replacing the text in an input field labeled with the given label.
@@ -1357,8 +1407,8 @@ then the following will allow you to simulate clicking the "Submit" button in th
 within : (Query.Single msg -> Query.Single msg) -> (ProgramTest model msg effect -> ProgramTest model msg effect) -> (ProgramTest model msg effect -> ProgramTest model msg effect)
 within findTarget onScopedTest programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             programTest
@@ -1370,8 +1420,8 @@ within findTarget onScopedTest programTest =
 withSimulation : (EffectSimulation msg effect -> EffectSimulation msg effect) -> ProgramTest model msg effect -> ProgramTest model msg effect
 withSimulation f programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             Active
@@ -1381,7 +1431,7 @@ withSimulation f programTest =
 queueEffect : effect -> ProgramTest model msg effect -> ProgramTest model msg effect
 queueEffect effect programTest =
     case programTest of
-        Finished _ ->
+        Finished _ _ ->
             programTest
 
         Active state ->
@@ -1396,7 +1446,7 @@ queueEffect effect programTest =
 queueSimulatedEffect : SimulatedEffect msg -> ProgramTest model msg effect -> ProgramTest model msg effect
 queueSimulatedEffect effect programTest =
     case programTest of
-        Finished _ ->
+        Finished _ _ ->
             programTest
 
         Active state ->
@@ -1474,10 +1524,18 @@ queueSimulatedEffect effect programTest =
                             in
                             case state.navigation of
                                 Nothing ->
-                                    Finished (ProgramDoesNotSupportNavigation functionName)
+                                    Finished
+                                        { view = state.program.debugView
+                                        , history = state.currentModel :: state.history
+                                        }
+                                        (ProgramDoesNotSupportNavigation functionName)
 
                                 Just { currentLocation } ->
-                                    Finished (ChangedPage ("simulating effect: SimulatedEffect.Navigation." ++ functionName) currentLocation)
+                                    Finished
+                                        { view = state.program.debugView
+                                        , history = state.currentModel :: state.history
+                                        }
+                                        (ChangedPage ("simulating effect: SimulatedEffect.Navigation." ++ functionName) currentLocation)
 
 
 drain : ProgramTest model msg effect -> ProgramTest model msg effect
@@ -1485,7 +1543,7 @@ drain =
     let
         advanceTimeIfSimulating t programTest =
             case programTest of
-                Finished _ ->
+                Finished _ _ ->
                     programTest
 
                 Active state ->
@@ -1503,8 +1561,8 @@ drain =
 drainWorkQueue : ProgramTest model msg effect -> ProgramTest model msg effect
 drainWorkQueue programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             case state.effectSimulation of
@@ -1627,13 +1685,17 @@ expectHttpRequestHelper :
     -> ProgramTest model msg effect
 expectHttpRequestHelper functionName method url checkRequest programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished (EffectSimulationNotConfigured functionName)
+                    Finished
+                        { view = state.program.debugView
+                        , history = state.currentModel :: state.history
+                        }
+                        (EffectSimulationNotConfigured functionName)
 
                 Just simulation ->
                     case Dict.get ( method, url ) simulation.state.http of
@@ -1644,10 +1706,18 @@ expectHttpRequestHelper functionName method url checkRequest programTest =
                                     programTest
 
                                 Just reason ->
-                                    Finished (ExpectFailed functionName reason.description reason.reason)
+                                    Finished
+                                        { view = state.program.debugView
+                                        , history = state.currentModel :: state.history
+                                        }
+                                        (ExpectFailed functionName reason.description reason.reason)
 
                         Nothing ->
-                            Finished (NoMatchingHttpRequest functionName { method = method, url = url } (Dict.keys simulation.state.http))
+                            Finished
+                                { view = state.program.debugView
+                                , history = state.currentModel :: state.history
+                                }
+                                (NoMatchingHttpRequest functionName { method = method, url = url } (Dict.keys simulation.state.http))
 
 
 {-| Simulates an HTTP 200 response to a pending request with the given method and url.
@@ -1726,18 +1796,26 @@ NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you ca
 simulateHttpResponse : String -> String -> Http.Response String -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateHttpResponse method url response programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished (EffectSimulationNotConfigured "simulateHttpResponse")
+                    Finished
+                        { view = state.program.debugView
+                        , history = state.currentModel :: state.history
+                        }
+                        (EffectSimulationNotConfigured "simulateHttpResponse")
 
                 Just simulation ->
                     case Dict.get ( method, url ) simulation.state.http of
                         Nothing ->
-                            Finished (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulation.state.http))
+                            Finished
+                                { view = state.program.debugView
+                                , history = state.currentModel :: state.history
+                                }
+                                (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulation.state.http))
 
                         Just actualRequest ->
                             let
@@ -1766,13 +1844,17 @@ NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you ca
 advanceTime : Int -> ProgramTest model msg effect -> ProgramTest model msg effect
 advanceTime delta programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished (EffectSimulationNotConfigured "advanceTime")
+                    Finished
+                        { view = state.program.debugView
+                        , history = state.currentModel :: state.history
+                        }
+                        (EffectSimulationNotConfigured "advanceTime")
 
                 Just simulation ->
                     advanceTo "advanceTime" (simulation.state.nowMs + delta) programTest
@@ -1781,13 +1863,17 @@ advanceTime delta programTest =
 advanceTo : String -> Int -> ProgramTest model msg effect -> ProgramTest model msg effect
 advanceTo functionName end programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished (EffectSimulationNotConfigured functionName)
+                    Finished
+                        { view = state.program.debugView
+                        , history = state.currentModel :: state.history
+                        }
+                        (EffectSimulationNotConfigured functionName)
 
                 Just simulation ->
                     let
@@ -1884,18 +1970,26 @@ ensureOutgoingPortValues portName decoder checkValues programTest =
 expectOutgoingPortValuesHelper : String -> String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
 expectOutgoingPortValuesHelper functionName portName decoder checkValues programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished (EffectSimulationNotConfigured functionName)
+                    Finished
+                        { view = state.program.debugView
+                        , history = state.currentModel :: state.history
+                        }
+                        (EffectSimulationNotConfigured functionName)
 
                 Just simulation ->
                     case allOk <| List.map (Json.Decode.decodeValue decoder) <| EffectSimulation.outgoingPortValues portName simulation of
                         Err errs ->
-                            Finished (CustomFailure (functionName ++ ": failed to decode port values") (List.map Json.Decode.errorToString errs |> String.join "\n"))
+                            Finished
+                                { view = state.program.debugView
+                                , history = state.currentModel :: state.history
+                                }
+                                (CustomFailure (functionName ++ ": failed to decode port values") (List.map Json.Decode.errorToString errs |> String.join "\n"))
 
                         Ok values ->
                             case Test.Runner.getFailureReason (checkValues values) of
@@ -1909,6 +2003,9 @@ expectOutgoingPortValuesHelper functionName portName decoder checkValues program
 
                                 Just reason ->
                                     Finished
+                                        { view = state.program.debugView
+                                        , history = state.currentModel :: state.history
+                                        }
                                         (ExpectFailed (functionName ++ ": values sent to port \"" ++ portName ++ "\" did not match")
                                             reason.description
                                             reason.reason
@@ -1966,8 +2063,8 @@ simulateIncomingPort portName value programTest =
             fail ("simulateIncomingPort \"" ++ portName ++ "\"")
     in
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             case state.program.subscriptions of
@@ -2021,8 +2118,8 @@ simulateIncomingPort portName value programTest =
 replaceView : (model -> Query.Single msg) -> ProgramTest model msg effect -> ProgramTest model msg effect
 replaceView newView programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             let
@@ -2049,13 +2146,17 @@ routeChange url programTest =
 routeChangeHelper : String -> Int -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
 routeChangeHelper functionName removeFromBackStack url programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             case state.navigation of
                 Nothing ->
-                    Finished (ProgramDoesNotSupportNavigation functionName)
+                    Finished
+                        { view = state.program.debugView
+                        , history = state.currentModel :: state.history
+                        }
+                        (ProgramDoesNotSupportNavigation functionName)
 
                 Just { currentLocation, browserHistory } ->
                     let
@@ -2096,8 +2197,8 @@ expectModel : (model -> Expectation) -> ProgramTest model msg effect -> Expectat
 expectModel assertion programTest =
     done <|
         case programTest of
-            Finished err ->
-                Finished err
+            Finished testLog err ->
+                Finished testLog err
 
             Active state ->
                 case assertion state.currentModel |> Test.Runner.getFailureReason of
@@ -2105,7 +2206,11 @@ expectModel assertion programTest =
                         programTest
 
                     Just reason ->
-                        Finished (ExpectFailed "expectModel" reason.description reason.reason)
+                        Finished
+                            { view = state.program.debugView
+                            , history = state.currentModel :: state.history
+                            }
+                            (ExpectFailed "expectModel" reason.description reason.reason)
 
 
 {-| Simulate the outcome of the last effect produced by the program being tested
@@ -2124,8 +2229,8 @@ You can find links to the relevant documentation in the [documentation index](#d
 simulateLastEffect : (effect -> Result String (List msg)) -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateLastEffect toMsgs programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             case toMsgs state.lastEffect of
@@ -2133,14 +2238,18 @@ simulateLastEffect toMsgs programTest =
                     List.foldl update programTest msgs
 
                 Err message ->
-                    Finished (SimulateLastEffectFailed message)
+                    Finished
+                        { view = state.program.debugView
+                        , history = state.currentModel :: state.history
+                        }
+                        (SimulateLastEffectFailed message)
 
 
 expectLastEffectHelper : String -> (effect -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
 expectLastEffectHelper functionName assertion programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             case assertion state.lastEffect |> Test.Runner.getFailureReason of
@@ -2148,7 +2257,11 @@ expectLastEffectHelper functionName assertion programTest =
                     programTest
 
                 Just reason ->
-                    Finished (ExpectFailed functionName reason.description reason.reason)
+                    Finished
+                        { view = state.program.debugView
+                        , history = state.currentModel :: state.history
+                        }
+                        (ExpectFailed functionName reason.description reason.reason)
 
 
 {-| See the documentation for [`expectLastEffect`](#expectLastEffect).
@@ -2183,8 +2296,8 @@ expectLastEffect assertion programTest =
 expectViewHelper : String -> (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
 expectViewHelper functionName assertion programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             case
@@ -2197,7 +2310,11 @@ expectViewHelper functionName assertion programTest =
                     programTest
 
                 Just reason ->
-                    Finished (ExpectFailed functionName reason.description reason.reason)
+                    Finished
+                        { view = state.program.debugView
+                        , history = state.currentModel :: state.history
+                        }
+                        (ExpectFailed functionName reason.description reason.reason)
 
 
 {-| See the documentation for [`expectView`](#expectView).
@@ -2292,34 +2409,34 @@ done programTest =
         Active _ ->
             Expect.pass
 
-        Finished (ChangedPage cause finalLocation) ->
+        Finished _ (ChangedPage cause finalLocation) ->
             Expect.fail (cause ++ " caused the program to end by navigating to " ++ escapeString (Url.toString finalLocation) ++ ".  NOTE: If this is what you intended, use ProgramTest.expectPageChange to end your test.")
 
-        Finished (ExpectFailed expectationName description reason) ->
+        Finished _ (ExpectFailed expectationName description reason) ->
             Expect.fail (expectationName ++ ":\n" ++ Test.Runner.Failure.format description reason)
 
-        Finished (SimulateFailed functionName message) ->
+        Finished _ (SimulateFailed functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
 
-        Finished (SimulateFailedToFindTarget functionName message) ->
+        Finished _ (SimulateFailedToFindTarget functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
 
-        Finished (SimulateLastEffectFailed message) ->
+        Finished _ (SimulateLastEffectFailed message) ->
             Expect.fail ("simulateLastEffect failed: " ++ message)
 
-        Finished (InvalidLocationUrl functionName invalidUrl) ->
+        Finished _ (InvalidLocationUrl functionName invalidUrl) ->
             Expect.fail (functionName ++ ": " ++ "Not a valid absolute URL:\n" ++ escapeString invalidUrl)
 
-        Finished (InvalidFlags functionName message) ->
+        Finished _ (InvalidFlags functionName message) ->
             Expect.fail (functionName ++ ":\n" ++ message)
 
-        Finished (ProgramDoesNotSupportNavigation functionName) ->
+        Finished _ (ProgramDoesNotSupportNavigation functionName) ->
             Expect.fail (functionName ++ ": Program does not support navigation.  Use ProgramTest.createApplication to create a ProgramTest that supports navigation.")
 
-        Finished (NoBaseUrl functionName relativeUrl) ->
+        Finished _ (NoBaseUrl functionName relativeUrl) ->
             Expect.fail (functionName ++ ": The ProgramTest does not have a base URL and cannot resolve the relative URL " ++ escapeString relativeUrl ++ ".  Use ProgramTest.withBaseUrl before calling ProgramTest.start to create a ProgramTest that can resolve relative URLs.")
 
-        Finished (NoMatchingHttpRequest functionName request pendingRequests) ->
+        Finished _ (NoMatchingHttpRequest functionName request pendingRequests) ->
             Expect.fail <|
                 String.concat
                     [ functionName
@@ -2341,10 +2458,10 @@ done programTest =
                                 ]
                     ]
 
-        Finished (EffectSimulationNotConfigured functionName) ->
+        Finished _ (EffectSimulationNotConfigured functionName) ->
             Expect.fail ("TEST SETUP ERROR: In order to use " ++ functionName ++ ", you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start")
 
-        Finished (CustomFailure assertionName message) ->
+        Finished _ (CustomFailure assertionName message) ->
             Expect.fail (assertionName ++ ": " ++ message)
 
 
@@ -2362,10 +2479,10 @@ then you probably want [`expectBrowserUrl`](#expectBrowserUrl) instead.
 expectPageChange : String -> ProgramTest model msg effect -> Expectation
 expectPageChange expectedUrl programTest =
     case programTest of
-        Finished (ChangedPage cause finalLocation) ->
+        Finished _ (ChangedPage cause finalLocation) ->
             Url.toString finalLocation |> Expect.equal expectedUrl
 
-        Finished _ ->
+        Finished _ _ ->
             programTest |> done
 
         Active _ ->
@@ -2405,13 +2522,17 @@ ensureBrowserUrl checkUrl programTest =
 expectBrowserUrlHelper : String -> (String -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
 expectBrowserUrlHelper functionName checkUrl programTest =
     case programTest of
-        Finished _ ->
+        Finished _ _ ->
             programTest
 
         Active state ->
             case Maybe.map .currentLocation state.navigation of
                 Nothing ->
-                    Finished (ProgramDoesNotSupportNavigation functionName)
+                    Finished
+                        { view = state.program.debugView
+                        , history = state.currentModel :: state.history
+                        }
+                        (ProgramDoesNotSupportNavigation functionName)
 
                 Just url ->
                     case Test.Runner.getFailureReason (checkUrl (Url.toString url)) of
@@ -2420,7 +2541,11 @@ expectBrowserUrlHelper functionName checkUrl programTest =
                             programTest
 
                         Just reason ->
-                            Finished (ExpectFailed functionName reason.description reason.reason)
+                            Finished
+                                { view = state.program.debugView
+                                , history = state.currentModel :: state.history
+                                }
+                                (ExpectFailed functionName reason.description reason.reason)
 
 
 {-| Asserts on the current browser history in the simulated test environment.
@@ -2477,14 +2602,18 @@ ensureBrowserHistory checkHistory programTest =
 expectBrowserHistoryHelper : String -> (List String -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
 expectBrowserHistoryHelper functionName checkHistory programTest =
     case programTest of
-        Finished _ ->
+        Finished _ _ ->
             programTest
 
         Active state ->
             case Maybe.map .browserHistory state.navigation of
                 Nothing ->
                     -- TODO: use withBaseUrl error
-                    Finished (ProgramDoesNotSupportNavigation functionName)
+                    Finished
+                        { view = state.program.debugView
+                        , history = state.currentModel :: state.history
+                        }
+                        (ProgramDoesNotSupportNavigation functionName)
 
                 Just browserHistoryYes ->
                     case Test.Runner.getFailureReason (checkHistory (List.map Url.toString browserHistoryYes)) of
@@ -2493,7 +2622,11 @@ expectBrowserHistoryHelper functionName checkHistory programTest =
                             programTest
 
                         Just reason ->
-                            Finished (ExpectFailed functionName reason.description reason.reason)
+                            Finished
+                                { view = state.program.debugView
+                                , history = state.currentModel :: state.history
+                                }
+                                (ExpectFailed functionName reason.description reason.reason)
 
 
 {-| `fail` can be used to report custom errors if you are writing your own convenience functions to deal with program tests.
@@ -2521,11 +2654,15 @@ If you are writing a convenience function that is creating a program test, see [
 fail : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
 fail assertionName failureMessage programTest =
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
-        Active _ ->
-            Finished (CustomFailure assertionName failureMessage)
+        Active state ->
+            Finished
+                { view = state.program.debugView
+                , history = state.currentModel :: state.history
+                }
+                (CustomFailure assertionName failureMessage)
 
 
 {-| This is meant for internal use only and adds a rendering of the current view to an error message.
@@ -2536,8 +2673,8 @@ failWithViewError functionDescription errorMessage programTest =
     -- since Test.Html.Query doesn't expose a way to get the HTML as a string
     -- or to compose custom error messages
     case programTest of
-        Finished err ->
-            Finished err
+        Finished testLog err ->
+            Finished testLog err
 
         Active state ->
             let
@@ -2604,7 +2741,11 @@ For example:
 -}
 createFailed : String -> String -> ProgramTest model msg effect
 createFailed functionName failureMessage =
-    Finished (CustomFailure functionName failureMessage)
+    Finished
+        { view = \_ -> Html.text failureMessage
+        , history = []
+        }
+        (CustomFailure functionName failureMessage)
 
 
 {-| This can be used for advanced helper functions where you want to continue a test but need the data
@@ -2617,15 +2758,34 @@ prefer [`expectOutgoingPortValues`](#expectOutgoingPortValues) instead.
 getOutgoingPortValues : String -> ProgramTest model msg effect -> Result (ProgramTest model msg effect) (List Json.Encode.Value)
 getOutgoingPortValues portName programTest =
     case programTest of
-        Finished _ ->
+        Finished _ _ ->
             Err programTest
 
         Active state ->
             case state.effectSimulation of
                 Nothing ->
-                    Err (Finished (EffectSimulationNotConfigured "getPortValues"))
+                    Err
+                        (Finished
+                            { view = state.program.debugView
+                            , history = state.currentModel :: state.history
+                            }
+                            (EffectSimulationNotConfigured "getPortValues")
+                        )
 
                 Just effects ->
                     Dict.get portName effects.outgoingPortValues
                         |> Maybe.withDefault []
                         |> Ok
+
+
+{-| -}
+toLog : ProgramTest model msg effect -> TestLog model msg
+toLog programTest =
+    case programTest of
+        Active state ->
+            { view = state.program.debugView
+            , history = List.reverse (state.currentModel :: state.history)
+            }
+
+        Finished testLog _ ->
+            testLog
