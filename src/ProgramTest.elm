@@ -758,11 +758,7 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
 expectOneOfManyViewChecks :
     String
     -> String
-    ->
-        List
-            ( String
-            , TestProgram model msg effect (SimulatedSub msg) -> TestState model msg effect -> Result Failure (TestState model msg effect)
-            )
+    -> List ( String, TestProgram model msg effect (SimulatedSub msg) -> TestState model msg effect -> Result Failure (TestState model msg effect) )
     -> ProgramTest model msg effect
     -> ProgramTest model msg effect
 expectOneOfManyViewChecks functionDescription errorMessage checks programTest =
