@@ -1,6 +1,6 @@
 module TestResult exposing (TestResult, andThen, fail)
 
-import Failure exposing (Failure)
+import ProgramTest.Failure exposing (Failure)
 import TestState exposing (TestState)
 
 

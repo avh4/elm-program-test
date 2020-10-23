@@ -199,13 +199,13 @@ These functions may be useful if you are writing your own custom assertion funct
 import Browser
 import Dict exposing (Dict)
 import Expect exposing (Expectation)
-import Failure exposing (Failure(..))
 import Html exposing (Html)
 import Html.Attributes exposing (attribute)
 import Http
 import Json.Decode
 import Json.Encode
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
+import ProgramTest.Failure as Failure exposing (Failure(..))
 import ProgramTest.Program exposing (Program)
 import SimulatedEffect exposing (SimulatedEffect, SimulatedSub, SimulatedTask)
 import String.Extra

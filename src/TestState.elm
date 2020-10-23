@@ -1,9 +1,9 @@
 module TestState exposing (TestState, advanceTime, drain, queueEffect, routeChangeHelper, simulateLoadUrlHelper, update, withSimulation)
 
 import Dict
-import Failure exposing (Failure(..))
 import PairingHeap
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
+import ProgramTest.Failure exposing (Failure(..))
 import ProgramTest.Program exposing (Program)
 import SimulatedEffect exposing (SimulatedEffect, SimulatedSub)
 import String.Extra

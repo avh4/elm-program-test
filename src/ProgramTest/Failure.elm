@@ -1,4 +1,4 @@
-module Failure exposing (Failure(..), toString)
+module ProgramTest.Failure exposing (Failure(..), toString)
 
 import String.Extra
 import Test.Runner.Failure
