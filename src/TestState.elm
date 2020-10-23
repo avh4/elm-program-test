@@ -1,4 +1,4 @@
-module TestState exposing (History, TestState, advanceTime, drain, queueEffect, routeChangeHelper, simulateLoadUrlHelper, update, withSimulation)
+module TestState exposing (TestState, advanceTime, drain, queueEffect, routeChangeHelper, simulateLoadUrlHelper, update, withSimulation)
 
 import Dict
 import Failure exposing (Failure(..))
@@ -21,10 +21,6 @@ type alias TestState model msg effect =
             }
     , effectSimulation : Maybe (EffectSimulation msg effect)
     }
-
-
-type alias History model =
-    List model
 
 
 update : msg -> TestProgram model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)

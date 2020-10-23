@@ -1,7 +1,7 @@
 module TestResult exposing (TestResult, andThen, fail)
 
 import Failure exposing (Failure)
-import TestState exposing (History, TestState)
+import TestState exposing (TestState)
 
 
 type alias TestResult model msg effect =
