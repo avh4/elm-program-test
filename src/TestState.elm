@@ -4,9 +4,9 @@ import Dict
 import Failure exposing (Failure(..))
 import PairingHeap
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
+import ProgramTest.Program exposing (Program)
 import SimulatedEffect exposing (SimulatedEffect, SimulatedSub)
 import String.Extra
-import TestProgram exposing (TestProgram)
 import Url exposing (Url)
 import Url.Extra
 
@@ -23,7 +23,7 @@ type alias TestState model msg effect =
     }
 
 
-update : msg -> TestProgram model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
+update : msg -> Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
 update msg program state =
     let
         ( newModel, newEffect ) =
@@ -37,7 +37,7 @@ update msg program state =
         |> Result.andThen (drain program)
 
 
-queueEffect : TestProgram model msg effect sub -> effect -> TestState model msg effect -> Result Failure (TestState model msg effect)
+queueEffect : Program model msg effect sub -> effect -> TestState model msg effect -> Result Failure (TestState model msg effect)
 queueEffect program effect state =
     case state.effectSimulation of
         Nothing ->
@@ -47,7 +47,7 @@ queueEffect program effect state =
             queueSimulatedEffect program (simulation.deconstructEffect effect) state
 
 
-queueSimulatedEffect : TestProgram model msg effect sub -> SimulatedEffect msg -> TestState model msg effect -> Result Failure (TestState model msg effect)
+queueSimulatedEffect : Program model msg effect sub -> SimulatedEffect msg -> TestState model msg effect -> Result Failure (TestState model msg effect)
 queueSimulatedEffect program effect state =
     case state.effectSimulation of
         Nothing ->
@@ -141,7 +141,7 @@ simulateLoadUrlHelper functionDescription href state =
                     ChangedPage functionDescription location
 
 
-routeChangeHelper : String -> Int -> String -> TestProgram model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
+routeChangeHelper : String -> Int -> String -> Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
 routeChangeHelper functionName removeFromBackStack url program state =
     case state.navigation of
         Nothing ->
@@ -173,7 +173,7 @@ routeChangeHelper functionName removeFromBackStack url program state =
                 |> processRouteChange
 
 
-drain : TestProgram model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
+drain : Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
 drain program =
     let
         advanceTimeIfSimulating t state =
@@ -188,7 +188,7 @@ drain program =
         >> Result.andThen (drainWorkQueue program)
 
 
-drainWorkQueue : TestProgram model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
+drainWorkQueue : Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
 drainWorkQueue program state =
     case state.effectSimulation of
         Nothing ->
@@ -215,7 +215,7 @@ drainWorkQueue program state =
                         |> Result.andThen (drain program)
 
 
-advanceTime : String -> Int -> TestProgram model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
+advanceTime : String -> Int -> Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
 advanceTime functionName delta program state =
     case state.effectSimulation of
         Nothing ->
@@ -225,7 +225,7 @@ advanceTime functionName delta program state =
             advanceTo program functionName (simulation.state.nowMs + delta) state
 
 
-advanceTo : TestProgram model msg effect sub -> String -> Int -> TestState model msg effect -> Result Failure (TestState model msg effect)
+advanceTo : Program model msg effect sub -> String -> Int -> TestState model msg effect -> Result Failure (TestState model msg effect)
 advanceTo program functionName end state =
     case state.effectSimulation of
         Nothing ->

@@ -206,6 +206,7 @@ import Http
 import Json.Decode
 import Json.Encode
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
+import ProgramTest.Program exposing (Program)
 import SimulatedEffect exposing (SimulatedEffect, SimulatedSub, SimulatedTask)
 import String.Extra
 import Test.Html.Event
@@ -213,7 +214,6 @@ import Test.Html.Query as Query
 import Test.Html.Selector as Selector exposing (Selector)
 import Test.Http
 import Test.Runner
-import TestProgram exposing (TestProgram)
 import TestResult exposing (TestResult)
 import TestState exposing (TestState)
 import Url exposing (Url)
@@ -231,14 +231,14 @@ and a log of any errors that have occurred while simulating interaction with the
 -}
 type ProgramTest model msg effect
     = Created
-        { program : TestProgram model msg effect (SimulatedSub msg)
+        { program : Program model msg effect (SimulatedSub msg)
         , state : TestResult model msg effect
         }
     | FailedToCreate Failure
 
 
 andThen :
-    (TestProgram model msg effect (SimulatedSub msg) -> TestState model msg effect -> Result Failure (TestState model msg effect))
+    (Program model msg effect (SimulatedSub msg) -> TestState model msg effect -> Result Failure (TestState model msg effect))
     -> ProgramTest model msg effect
     -> ProgramTest model msg effect
 andThen f programTest =
@@ -631,7 +631,7 @@ simulateHelper :
     String
     -> (Query.Single msg -> Query.Single msg)
     -> ( String, Json.Encode.Value )
-    -> TestProgram model msg effect sub
+    -> Program model msg effect sub
     -> TestState model msg effect
     -> Result Failure (TestState model msg effect)
 simulateHelper functionDescription findTarget event program state =
@@ -675,7 +675,7 @@ a future release of this package will remove the `fieldId` parameter.
 simulateLabeledInputHelper : String -> String -> String -> Bool -> List Selector -> ( String, Json.Encode.Value ) -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateLabeledInputHelper functionDescription fieldId label allowTextArea additionalInputSelectors event programTest =
     let
-        associatedLabel : TestProgram model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
+        associatedLabel : Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
         associatedLabel =
             expectViewHelper functionDescription
                 (Query.find
@@ -758,7 +758,7 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
 expectOneOfManyViewChecks :
     String
     -> String
-    -> List ( String, TestProgram model msg effect (SimulatedSub msg) -> TestState model msg effect -> Result Failure (TestState model msg effect) )
+    -> List ( String, Program model msg effect (SimulatedSub msg) -> TestState model msg effect -> Result Failure (TestState model msg effect) )
     -> ProgramTest model msg effect
     -> ProgramTest model msg effect
 expectOneOfManyViewChecks functionDescription errorMessage checks programTest =
@@ -824,7 +824,7 @@ clickButton buttonText programTest =
         functionDescription =
             "clickButton " ++ String.Extra.escape buttonText
 
-        checks : List ( String, TestProgram model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect) )
+        checks : List ( String, Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect) )
         checks =
             [ ( "<button> (not disabled) with onClick and text " ++ String.Extra.escape buttonText
               , simulateHelper functionDescription
@@ -1055,7 +1055,7 @@ clickLink linkText href programTest =
 
         tryClicking :
             { otherwise :
-                TestProgram model msg effect (SimulatedSub msg)
+                Program model msg effect (SimulatedSub msg)
                 -> TestState model msg effect
                 -> Result Failure (TestState model msg effect)
             }
@@ -1906,7 +1906,7 @@ expectLastEffect assertion programTest =
 expectViewHelper :
     String
     -> (Query.Single msg -> Expectation)
-    -> TestProgram model msg effect sub
+    -> Program model msg effect sub
     -> TestState model msg effect
     -> Result Failure (TestState model msg effect)
 expectViewHelper functionName assertion program state =
