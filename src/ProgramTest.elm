@@ -206,18 +206,19 @@ import Html.Attributes exposing (attribute)
 import Http
 import Json.Decode
 import Json.Encode
-import PairingHeap
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
-import Query.Extra
+import ProgramTest.Failure as Failure exposing (Failure(..))
+import ProgramTest.Program exposing (Program)
 import SimulatedEffect exposing (SimulatedEffect, SimulatedSub, SimulatedTask)
+import String.Extra
 import Test.Html.Event
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector exposing (Selector)
 import Test.Http
 import Test.Runner
-import Test.Runner.Failure
+import TestResult exposing (TestResult)
+import TestState exposing (TestState)
 import Url exposing (Url)
-import Url.Extra
 
 
 {-| A `ProgramTest` represents an Elm program,
@@ -231,50 +232,48 @@ and a log of any errors that have occurred while simulating interaction with the
 
 -}
 type ProgramTest model msg effect
-    = Active
-        { program : TestProgram model msg effect (SimulatedSub msg)
-        , currentModel : model
-        , history : List model
-        , lastEffect : effect
-        , navigation :
-            Maybe
-                { currentLocation : Url
-                , browserHistory : List Url
-                }
-        , effectSimulation : Maybe (EffectSimulation msg effect)
+    = Created
+        { program : Program model msg effect (SimulatedSub msg)
+        , state : TestResult model msg effect
         }
-    | Finished (TestLog model msg) Failure
+    | FailedToCreate Failure
+
+
+andThen :
+    (Program model msg effect (SimulatedSub msg) -> TestState model msg effect -> Result Failure (TestState model msg effect))
+    -> ProgramTest model msg effect
+    -> ProgramTest model msg effect
+andThen f programTest =
+    case programTest of
+        Created created ->
+            Created
+                { created
+                    | state = TestResult.andThen (f created.program) created.state
+                }
+
+        FailedToCreate failure ->
+            FailedToCreate failure
+
+
+toFailure : ProgramTest model msg effect -> Maybe Failure
+toFailure programTest =
+    case programTest of
+        Created created ->
+            case created.state of
+                Err f ->
+                    Just f.reason
+
+                Ok _ ->
+                    Nothing
+
+        FailedToCreate f ->
+            Just f
 
 
 type alias TestLog model msg =
     { view : model -> Html msg
     , history : List model
     }
-
-
-type alias TestProgram model msg effect sub =
-    { update : msg -> model -> ( model, effect )
-    , view : model -> Query.Single msg
-    , debugView : model -> Html msg
-    , onRouteChange : Url -> Maybe msg
-    , subscriptions : Maybe (model -> sub)
-    }
-
-
-type Failure
-    = ChangedPage String Url
-      -- Errors
-    | ExpectFailed String String Test.Runner.Failure.Reason
-    | SimulateFailed String String
-    | SimulateFailedToFindTarget String String
-    | SimulateLastEffectFailed String
-    | InvalidLocationUrl String String
-    | InvalidFlags String String
-    | ProgramDoesNotSupportNavigation String
-    | NoBaseUrl String String
-    | NoMatchingHttpRequest String { method : String, url : String } (List ( String, String ))
-    | EffectSimulationNotConfigured String
-    | CustomFailure String String
 
 
 type alias ProgramOptions model msg effect =
@@ -320,25 +319,32 @@ createHelper program options =
         ( newModel, newEffect ) =
             program.init
     in
-    Active
+    Created
         { program = program_
-        , currentModel = newModel
-        , history = []
-        , lastEffect = newEffect
-        , navigation =
-            case options.baseUrl of
-                Nothing ->
-                    Nothing
+        , state =
+            Ok
+                -- TODO: move to TestState.init after pulling deconstructEffect out of EffectSimulation
+                { currentModel = newModel
+                , history = []
+                , lastEffect = newEffect
+                , navigation =
+                    case options.baseUrl of
+                        Nothing ->
+                            Nothing
 
-                Just baseUrl ->
-                    Just
-                        { currentLocation = baseUrl
-                        , browserHistory = []
-                        }
-        , effectSimulation = Maybe.map EffectSimulation.init options.deconstructEffect
+                        Just baseUrl ->
+                            Just
+                                { currentLocation = baseUrl
+                                , browserHistory = []
+                                }
+                , effectSimulation = Maybe.map EffectSimulation.init options.deconstructEffect
+                }
         }
-        |> queueEffect newEffect
-        |> drain
+        |> andThen
+            (\_ ->
+                TestState.queueEffect program_ newEffect
+                    >> Result.andThen (TestState.drain program_)
+            )
 
 
 {-| Creates a `ProgramDefinition` from the parts of a [`Browser.sandbox`](https://package.elm-lang.org/packages/elm/browser/latest/Browser#sandbox) program.
@@ -354,7 +360,7 @@ createSandbox :
     -> ProgramDefinition () model msg ()
 createSandbox program =
     ProgramDefinition emptyOptions <|
-        \location () ->
+        \_ () ->
             createHelper
                 { init = ( program.init, () )
                 , update = \msg model -> ( program.update msg model, () )
@@ -377,7 +383,7 @@ createWorker :
     -> ProgramDefinition flags model msg effect
 createWorker program =
     ProgramDefinition emptyOptions <|
-        \location flags ->
+        \_ flags ->
             createHelper
                 { init = program.init flags
                 , update = program.update
@@ -401,7 +407,7 @@ createElement :
     -> ProgramDefinition flags model msg effect
 createElement program =
     ProgramDefinition emptyOptions <|
-        \location flags ->
+        \_ flags ->
             createHelper
                 { init = program.init flags
                 , update = program.update
@@ -434,11 +440,7 @@ withBaseUrl baseUrl (ProgramDefinition options program) =
         Nothing ->
             ProgramDefinition options
                 (\_ _ _ ->
-                    Finished
-                        { view = \_ -> Html.text "withBaseUrl failed! TODO better error message"
-                        , history = []
-                        }
-                        (InvalidLocationUrl "withBaseUrl" baseUrl)
+                    FailedToCreate (InvalidLocationUrl "withBaseUrl" baseUrl)
                 )
 
         Just url ->
@@ -462,11 +464,7 @@ withJsonStringFlags decoder (ProgramDefinition options program) =
 
                 Err message ->
                     \_ ->
-                        Finished
-                            { view = \_ -> Html.text "withJsonStringFlags failed! TODO better error message"
-                            , history = []
-                            }
-                            (InvalidFlags "withJsonStringFlags" (Json.Decode.errorToString message))
+                        FailedToCreate (InvalidFlags "withJsonStringFlags" (Json.Decode.errorToString message))
 
 
 {-| This allows you to provide a function that lets `ProgramTest` simulate effects that would become `Cmd`s and `Task`s
@@ -527,7 +525,7 @@ createDocument :
     -> ProgramDefinition flags model msg effect
 createDocument program =
     ProgramDefinition emptyOptions <|
-        \location flags ->
+        \_ flags ->
             createHelper
                 { init = program.init flags
                 , update = program.update
@@ -562,11 +560,7 @@ createApplication program =
             case location of
                 Nothing ->
                     \_ ->
-                        Finished
-                            { view = \_ -> Html.text "TODO: support Browser.Document test logs"
-                            , history = []
-                            }
-                            (NoBaseUrl "createApplication" "")
+                        FailedToCreate (NoBaseUrl "createApplication" "")
 
                 Just url ->
                     createHelper
@@ -633,67 +627,44 @@ as doing so will make your tests more resilient to changes in your program's imp
 
 -}
 update : msg -> ProgramTest model msg effect -> ProgramTest model msg effect
-update msg programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
-
-        Active state ->
-            let
-                ( newModel, newEffect ) =
-                    state.program.update msg state.currentModel
-            in
-            Active
-                { state
-                    | currentModel = newModel
-                    , history = state.currentModel :: state.history
-                    , lastEffect = newEffect
-                }
-                |> queueEffect newEffect
-                |> drain
+update msg =
+    andThen (TestState.update msg)
 
 
-simulateHelper : String -> (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> ProgramTest model msg effect -> ProgramTest model msg effect
-simulateHelper functionDescription findTarget event programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
+simulateHelper :
+    String
+    -> (Query.Single msg -> Query.Single msg)
+    -> ( String, Json.Encode.Value )
+    -> Program model msg effect sub
+    -> TestState model msg effect
+    -> Result Failure (TestState model msg effect)
+simulateHelper functionDescription findTarget event program state =
+    let
+        targetQuery =
+            program.view state.currentModel
+                |> findTarget
+    in
+    -- First check the target so we can give a better error message if it doesn't exist
+    case
+        targetQuery
+            |> Query.has []
+            |> Test.Runner.getFailureReason
+    of
+        Just reason ->
+            Err (SimulateFailedToFindTarget functionDescription reason.description)
 
-        Active state ->
-            let
-                targetQuery =
-                    state.program.view state.currentModel
-                        |> findTarget
-            in
-            -- First check the target so we can give a better error message if it doesn't exist
+        Nothing ->
+            -- Try to simulate the event, now that we know the target exists
             case
                 targetQuery
-                    |> Query.has []
-                    |> Test.Runner.getFailureReason
+                    |> Test.Html.Event.simulate event
+                    |> Test.Html.Event.toResult
             of
-                Just reason ->
-                    Finished
-                        { view = state.program.debugView
-                        , history = state.currentModel :: state.history
-                        }
-                        (SimulateFailedToFindTarget functionDescription reason.description)
+                Err message ->
+                    Err (SimulateFailed functionDescription message)
 
-                Nothing ->
-                    -- Try to simulate the event, now that we know the target exists
-                    case
-                        targetQuery
-                            |> Test.Html.Event.simulate event
-                            |> Test.Html.Event.toResult
-                    of
-                        Err message ->
-                            Finished
-                                { view = state.program.debugView
-                                , history = state.currentModel :: state.history
-                                }
-                                (SimulateFailed functionDescription message)
-
-                        Ok msg ->
-                            update msg programTest
+                Ok msg ->
+                    TestState.update msg program state
 
 
 {-| **PRIVATE** helper for simulating events on input elements with associated labels.
@@ -708,6 +679,7 @@ a future release of this package will remove the `fieldId` parameter.
 simulateLabeledInputHelper : String -> String -> String -> Bool -> List Selector -> ( String, Json.Encode.Value ) -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateLabeledInputHelper functionDescription fieldId label allowTextArea additionalInputSelectors event programTest =
     let
+        associatedLabel : Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
         associatedLabel =
             expectViewHelper functionDescription
                 (Query.find
@@ -727,7 +699,7 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
 
         checks_ article inputTag =
             if fieldId == "" then
-                [ ( "a <label> with text " ++ escapeString label ++ " containing " ++ article ++ " <" ++ inputTag ++ ">"
+                [ ( "a <label> with text " ++ String.Extra.escape label ++ " containing " ++ article ++ " <" ++ inputTag ++ ">"
                   , simulateHelper functionDescription
                         (Query.find
                             [ Selector.tag "label"
@@ -737,7 +709,7 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
                         )
                         event
                   )
-                , ( "<" ++ inputTag ++ " aria-label=" ++ escapeString label ++ ">"
+                , ( "<" ++ inputTag ++ " aria-label=" ++ String.Extra.escape label ++ ">"
                   , simulateHelper functionDescription
                         (Query.find
                             [ Selector.tag inputTag
@@ -749,20 +721,24 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
                 ]
 
             else
-                [ ( "<label for=" ++ escapeString fieldId ++ "> with text " ++ escapeString label ++ " and " ++ article ++ " <" ++ inputTag ++ " id=" ++ escapeString fieldId ++ ">"
-                  , associatedLabel
-                        >> simulateHelper functionDescription
-                            (Query.find <|
-                                List.concat
-                                    [ [ Selector.tag inputTag
-                                      , Selector.id fieldId
-                                      ]
-                                    , additionalInputSelectors
-                                    ]
-                            )
-                            event
+                [ ( "<label for=" ++ String.Extra.escape fieldId ++ "> with text " ++ String.Extra.escape label ++ " and " ++ article ++ " <" ++ inputTag ++ " id=" ++ String.Extra.escape fieldId ++ ">"
+                  , \program ->
+                        associatedLabel program
+                            >> Result.andThen
+                                (simulateHelper functionDescription
+                                    (Query.find <|
+                                        List.concat
+                                            [ [ Selector.tag inputTag
+                                              , Selector.id fieldId
+                                              ]
+                                            , additionalInputSelectors
+                                            ]
+                                    )
+                                    event
+                                    program
+                                )
                   )
-                , ( "<" ++ inputTag ++ " aria-label=" ++ escapeString label ++ " id=" ++ escapeString fieldId ++ ">"
+                , ( "<" ++ inputTag ++ " aria-label=" ++ String.Extra.escape label ++ " id=" ++ String.Extra.escape fieldId ++ ">"
                   , simulateHelper functionDescription
                         (Query.find
                             [ Selector.tag inputTag
@@ -776,7 +752,7 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
     in
     expectOneOfManyViewChecks
         functionDescription
-        ("Expected one of the following to exist and have an " ++ escapeString ("on" ++ Tuple.first event) ++ " handler")
+        ("Expected one of the following to exist and have an " ++ String.Extra.escape ("on" ++ Tuple.first event) ++ " handler")
         checks
         programTest
 
@@ -786,7 +762,7 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
 expectOneOfManyViewChecks :
     String
     -> String
-    -> List ( String, ProgramTest model msg effect -> ProgramTest model msg effect )
+    -> List ( String, Program model msg effect (SimulatedSub msg) -> TestState model msg effect -> Result Failure (TestState model msg effect) )
     -> ProgramTest model msg effect
     -> ProgramTest model msg effect
 expectOneOfManyViewChecks functionDescription errorMessage checks programTest =
@@ -816,7 +792,7 @@ expectOneOfManyViewChecks functionDescription errorMessage checks programTest =
                         Just _ ->
                             oneOf rest
     in
-    oneOf (List.map Tuple.second checks)
+    oneOf (List.map (Tuple.second >> andThen) checks)
 
 
 {-| Simulates a custom DOM event.
@@ -833,13 +809,8 @@ The parameters are:
 
 -}
 simulateDomEvent : (Query.Single msg -> Query.Single msg) -> ( String, Json.Encode.Value ) -> ProgramTest model msg effect -> ProgramTest model msg effect
-simulateDomEvent findTarget ( eventName, eventValue ) programTest =
-    simulateHelper ("simulateDomEvent " ++ escapeString eventName) findTarget ( eventName, eventValue ) programTest
-
-
-escapeString : String -> String
-escapeString s =
-    "\"" ++ s ++ "\""
+simulateDomEvent findTarget ( eventName, eventValue ) =
+    andThen (simulateHelper ("simulateDomEvent " ++ String.Extra.escape eventName) findTarget ( eventName, eventValue ))
 
 
 {-| Simulates clicking a button.
@@ -855,10 +826,11 @@ clickButton : String -> ProgramTest model msg effect -> ProgramTest model msg ef
 clickButton buttonText programTest =
     let
         functionDescription =
-            "clickButton " ++ escapeString buttonText
+            "clickButton " ++ String.Extra.escape buttonText
 
+        checks : List ( String, Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect) )
         checks =
-            [ ( "<button> (not disabled) with onClick and text " ++ escapeString buttonText
+            [ ( "<button> (not disabled) with onClick and text " ++ String.Extra.escape buttonText
               , simulateHelper functionDescription
                     (findNotDisabled
                         [ Selector.tag "button"
@@ -867,7 +839,7 @@ clickButton buttonText programTest =
                     )
                     Test.Html.Event.click
               )
-            , ( "<button> (not disabled) with onClick and attribute aria-label=" ++ escapeString buttonText
+            , ( "<button> (not disabled) with onClick and attribute aria-label=" ++ String.Extra.escape buttonText
               , simulateHelper functionDescription
                     (findNotDisabled
                         [ Selector.tag "button"
@@ -876,7 +848,7 @@ clickButton buttonText programTest =
                     )
                     Test.Html.Event.click
               )
-            , ( "an element with role=\"button\" (not disabled) and onClick and text " ++ escapeString buttonText
+            , ( "an element with role=\"button\" (not disabled) and onClick and text " ++ String.Extra.escape buttonText
               , simulateHelper functionDescription
                     (findNotDisabled
                         [ Selector.attribute (Html.Attributes.attribute "role" "button")
@@ -885,7 +857,7 @@ clickButton buttonText programTest =
                     )
                     Test.Html.Event.click
               )
-            , ( "an element with role=\"button\" (not disabled) and onClick and aria-label=" ++ escapeString buttonText
+            , ( "an element with role=\"button\" (not disabled) and onClick and aria-label=" ++ String.Extra.escape buttonText
               , simulateHelper functionDescription
                     (findNotDisabled
                         [ Selector.attribute (Html.Attributes.attribute "role" "button")
@@ -894,7 +866,7 @@ clickButton buttonText programTest =
                     )
                     Test.Html.Event.click
               )
-            , ( "a <form> with onSubmit containing a <button> (not disabled, not type=button) with text " ++ escapeString buttonText
+            , ( "a <form> with onSubmit containing a <button> (not disabled, not type=button) with text " ++ String.Extra.escape buttonText
               , simulateHelper functionDescription
                     (findButNot
                         { good =
@@ -933,7 +905,7 @@ clickButton buttonText programTest =
                     )
                     Test.Html.Event.submit
               )
-            , ( "a <form> with onSubmit containing an <input type=submit value=" ++ escapeString buttonText ++ "> (not disabled)"
+            , ( "a <form> with onSubmit containing an <input type=submit value=" ++ String.Extra.escape buttonText ++ "> (not disabled)"
               , simulateHelper functionDescription
                     (findButNot
                         { good =
@@ -1001,6 +973,7 @@ findButNot { good, bads, onError } source =
     -- This is tricky because Test.Html doesn't provide a way to search for an attribute being *not* present.
     -- So we have to check if a selector we don't want *is* present, and manually force a failure if it is.
     let
+        checkBads : List (List Selector) -> Query.Single msg -> Query.Single msg
         checkBads bads_ found =
             case bads_ of
                 [] ->
@@ -1051,7 +1024,7 @@ clickLink : String -> String -> ProgramTest model msg effect -> ProgramTest mode
 clickLink linkText href programTest =
     let
         functionDescription =
-            "clickLink " ++ escapeString linkText
+            "clickLink " ++ String.Extra.escape linkText
 
         findLinkTag =
             Query.find
@@ -1084,23 +1057,28 @@ clickLink linkText href programTest =
                 ]
             )
 
-        tryClicking { otherwise } tryClickingProgramTest =
-            case tryClickingProgramTest of
-                Finished testLog err ->
-                    Finished testLog err
-
-                Active state ->
+        tryClicking :
+            { otherwise :
+                Program model msg effect (SimulatedSub msg)
+                -> TestState model msg effect
+                -> Result Failure (TestState model msg effect)
+            }
+            -> ProgramTest model msg effect
+            -> ProgramTest model msg effect
+        tryClicking { otherwise } =
+            andThen <|
+                \program state ->
                     let
                         link =
-                            state.program.view state.currentModel
+                            program.view state.currentModel
                                 |> findLinkTag
                     in
                     if respondsTo normalClick link then
                         -- there is a click handler
                         -- first make sure the handler properly respects "Open in new tab", etc
                         if respondsTo ctrlClick link || respondsTo metaClick link then
-                            tryClickingProgramTest
-                                |> fail functionDescription
+                            Err
+                                (CustomFailure functionDescription
                                     (String.concat
                                         [ "Found an `<a href=\"...\">` tag has an onClick handler, "
                                         , "but the handler is overriding ctrl-click and meta-click.\n\n"
@@ -1110,15 +1088,15 @@ clickLink linkText href programTest =
                                         , "See discussion of this issue at <https://github.com/elm-lang/navigation/issues/13>."
                                         ]
                                     )
+                                )
 
                         else
                             -- everything looks good, so simulate that event and ignore the `href`
-                            tryClickingProgramTest
-                                |> simulateHelper functionDescription findLinkTag normalClick
+                            simulateHelper functionDescription findLinkTag normalClick program state
 
                     else
                         -- the link doesn't have a click handler
-                        tryClickingProgramTest |> otherwise
+                        otherwise program state
 
         respondsTo event single =
             case
@@ -1133,43 +1111,13 @@ clickLink linkText href programTest =
                     True
     in
     programTest
-        |> expectViewHelper functionDescription
-            (findLinkTag
-                >> Query.has []
+        |> andThen
+            (expectViewHelper functionDescription
+                (findLinkTag
+                    >> Query.has []
+                )
             )
-        |> tryClicking { otherwise = simulateLoadUrlHelper functionDescription href }
-
-
-simulateLoadUrlHelper : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
-simulateLoadUrlHelper functionDescription href programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
-
-        Active state ->
-            case Maybe.map .currentLocation state.navigation of
-                Just location ->
-                    Finished
-                        { view = state.program.debugView
-                        , history = state.currentModel :: state.history
-                        }
-                        (ChangedPage functionDescription (Url.Extra.resolve location href))
-
-                Nothing ->
-                    case Url.fromString href of
-                        Nothing ->
-                            Finished
-                                { view = state.program.debugView
-                                , history = state.currentModel :: state.history
-                                }
-                                (NoBaseUrl functionDescription href)
-
-                        Just location ->
-                            Finished
-                                { view = state.program.debugView
-                                , history = state.currentModel :: state.history
-                                }
-                                (ChangedPage functionDescription location)
+        |> tryClicking { otherwise = \_ -> TestState.simulateLoadUrlHelper functionDescription href >> Err }
 
 
 {-| Simulates replacing the text in an input field labeled with the given label.
@@ -1219,7 +1167,7 @@ see [`simulateDomEvent`](#simulateDomEvent).
 -}
 fillIn : String -> String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
 fillIn fieldId label newContent programTest =
-    simulateLabeledInputHelper ("fillIn " ++ escapeString fieldId ++ " " ++ escapeString label)
+    simulateLabeledInputHelper ("fillIn " ++ String.Extra.escape fieldId ++ " " ++ String.Extra.escape label)
         fieldId
         label
         True
@@ -1241,11 +1189,12 @@ see [`simulateDomEvent`](#simulateDomEvent).
 
 -}
 fillInTextarea : String -> ProgramTest model msg effect -> ProgramTest model msg effect
-fillInTextarea newContent programTest =
-    simulateHelper "fillInTextarea"
-        (Query.find [ Selector.tag "textarea" ])
-        (Test.Html.Event.input newContent)
-        programTest
+fillInTextarea newContent =
+    andThen
+        (simulateHelper "fillInTextarea"
+            (Query.find [ Selector.tag "textarea" ])
+            (Test.Html.Event.input newContent)
+        )
 
 
 {-| Simulates setting the value of a checkbox labeled with the given label.
@@ -1273,7 +1222,7 @@ see [`simulateDomEvent`](#simulateDomEvent).
 -}
 check : String -> String -> Bool -> ProgramTest model msg effect -> ProgramTest model msg effect
 check fieldId label willBecomeChecked programTest =
-    simulateLabeledInputHelper ("check " ++ escapeString label)
+    simulateLabeledInputHelper ("check " ++ String.Extra.escape label)
         fieldId
         label
         False
@@ -1327,53 +1276,62 @@ see [`simulateDomEvent`](#simulateDomEvent).
 
 -}
 selectOption : String -> String -> String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
-selectOption fieldId label optionValue optionText programTest =
+selectOption fieldId label optionValue optionText =
     let
         functionDescription =
             String.join " "
                 [ "selectOption"
-                , escapeString fieldId
-                , escapeString label
-                , escapeString optionValue
-                , escapeString optionText
+                , String.Extra.escape fieldId
+                , String.Extra.escape label
+                , String.Extra.escape optionValue
+                , String.Extra.escape optionText
                 ]
     in
-    programTest
-        |> expectViewHelper functionDescription
-            (Query.find
-                [ Selector.tag "label"
-                , Selector.attribute (Html.Attributes.for fieldId)
-                , Selector.text label
-                ]
-                >> Query.has []
-            )
-        |> expectViewHelper functionDescription
-            (Query.find
-                [ Selector.tag "select"
-                , Selector.id fieldId
-                , Selector.containing
-                    [ Selector.tag "option"
-                    , Selector.attribute (Html.Attributes.value optionValue)
-                    , Selector.text optionText
-                    ]
-                ]
-                >> Query.has []
-            )
-        |> simulateHelper functionDescription
-            (Query.find
-                [ Selector.tag "select"
-                , Selector.id fieldId
-                ]
-            )
-            ( "change"
-            , Json.Encode.object
-                [ ( "target"
-                  , Json.Encode.object
-                        [ ( "value", Json.Encode.string optionValue )
+    andThen <|
+        \program state ->
+            state
+                |> expectViewHelper functionDescription
+                    (Query.find
+                        [ Selector.tag "label"
+                        , Selector.attribute (Html.Attributes.for fieldId)
+                        , Selector.text label
                         ]
-                  )
-                ]
-            )
+                        >> Query.has []
+                    )
+                    program
+                |> Result.andThen
+                    (expectViewHelper functionDescription
+                        (Query.find
+                            [ Selector.tag "select"
+                            , Selector.id fieldId
+                            , Selector.containing
+                                [ Selector.tag "option"
+                                , Selector.attribute (Html.Attributes.value optionValue)
+                                , Selector.text optionText
+                                ]
+                            ]
+                            >> Query.has []
+                        )
+                        program
+                    )
+                |> Result.andThen
+                    (simulateHelper functionDescription
+                        (Query.find
+                            [ Selector.tag "select"
+                            , Selector.id fieldId
+                            ]
+                        )
+                        ( "change"
+                        , Json.Encode.object
+                            [ ( "target"
+                              , Json.Encode.object
+                                    [ ( "value", Json.Encode.string optionValue )
+                                    ]
+                              )
+                            ]
+                        )
+                        program
+                    )
 
 
 {-| Focus on a part of the view for a particular operation.
@@ -1405,189 +1363,29 @@ then the following will allow you to simulate clicking the "Submit" button in th
 
 -}
 within : (Query.Single msg -> Query.Single msg) -> (ProgramTest model msg effect -> ProgramTest model msg effect) -> (ProgramTest model msg effect -> ProgramTest model msg effect)
-within findTarget onScopedTest programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
+within findTarget onScopedTest =
+    andThen <|
+        \program state ->
+            case
+                Created
+                    { state = Ok state
+                    , program =
+                        { program
+                            | view = program.view >> findTarget
+                        }
+                    }
+                    |> onScopedTest
+            of
+                Created created ->
+                    case created.state of
+                        Ok s ->
+                            Ok s
 
-        Active state ->
-            programTest
-                |> replaceView (state.program.view >> findTarget)
-                |> onScopedTest
-                |> replaceView state.program.view
+                        Err e ->
+                            Err e.reason
 
-
-withSimulation : (EffectSimulation msg effect -> EffectSimulation msg effect) -> ProgramTest model msg effect -> ProgramTest model msg effect
-withSimulation f programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
-
-        Active state ->
-            Active
-                { state | effectSimulation = Maybe.map f state.effectSimulation }
-
-
-queueEffect : effect -> ProgramTest model msg effect -> ProgramTest model msg effect
-queueEffect effect programTest =
-    case programTest of
-        Finished _ _ ->
-            programTest
-
-        Active state ->
-            case state.effectSimulation of
-                Nothing ->
-                    programTest
-
-                Just simulation ->
-                    queueSimulatedEffect (simulation.deconstructEffect effect) programTest
-
-
-queueSimulatedEffect : SimulatedEffect msg -> ProgramTest model msg effect -> ProgramTest model msg effect
-queueSimulatedEffect effect programTest =
-    case programTest of
-        Finished _ _ ->
-            programTest
-
-        Active state ->
-            case state.effectSimulation of
-                Nothing ->
-                    programTest
-
-                Just simulation ->
-                    case effect of
-                        SimulatedEffect.None ->
-                            programTest
-
-                        SimulatedEffect.Batch effects ->
-                            List.foldl queueSimulatedEffect programTest effects
-
-                        SimulatedEffect.Task t ->
-                            Active
-                                { state
-                                    | effectSimulation =
-                                        Just (EffectSimulation.queueTask t simulation)
-                                }
-
-                        SimulatedEffect.PortEffect portName value ->
-                            Active
-                                { state
-                                    | effectSimulation =
-                                        Just
-                                            { simulation
-                                                | outgoingPortValues =
-                                                    Dict.update portName
-                                                        (Maybe.withDefault [] >> (::) value >> Just)
-                                                        simulation.outgoingPortValues
-                                            }
-                                }
-
-                        SimulatedEffect.PushUrl url ->
-                            programTest
-                                |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.pushUrl " ++ escapeString url) 0 url
-
-                        SimulatedEffect.ReplaceUrl url ->
-                            programTest
-                                |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.replaceUrl " ++ escapeString url) 1 url
-
-                        SimulatedEffect.Back n ->
-                            case state.navigation of
-                                Nothing ->
-                                    programTest
-
-                                Just { currentLocation, browserHistory } ->
-                                    if n <= 0 then
-                                        programTest
-
-                                    else
-                                        case List.head (List.drop (n - 1) browserHistory) of
-                                            Nothing ->
-                                                -- n is bigger than the history;
-                                                -- in this case, browsers ignore the request
-                                                programTest
-
-                                            Just first ->
-                                                programTest
-                                                    |> routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.Back " ++ String.fromInt n) 2 (Url.toString first)
-
-                        SimulatedEffect.Load url ->
-                            simulateLoadUrlHelper ("simulating effect: SimulatedEffect.Navigation.load " ++ url) url programTest
-
-                        SimulatedEffect.Reload skipCache ->
-                            let
-                                functionName =
-                                    if skipCache then
-                                        "reloadAndSkipCache"
-
-                                    else
-                                        "reload"
-                            in
-                            case state.navigation of
-                                Nothing ->
-                                    Finished
-                                        { view = state.program.debugView
-                                        , history = state.currentModel :: state.history
-                                        }
-                                        (ProgramDoesNotSupportNavigation functionName)
-
-                                Just { currentLocation } ->
-                                    Finished
-                                        { view = state.program.debugView
-                                        , history = state.currentModel :: state.history
-                                        }
-                                        (ChangedPage ("simulating effect: SimulatedEffect.Navigation." ++ functionName) currentLocation)
-
-
-drain : ProgramTest model msg effect -> ProgramTest model msg effect
-drain =
-    let
-        advanceTimeIfSimulating t programTest =
-            case programTest of
-                Finished _ _ ->
-                    programTest
-
-                Active state ->
-                    case state.effectSimulation of
-                        Nothing ->
-                            programTest
-
-                        Just _ ->
-                            advanceTime t programTest
-    in
-    advanceTimeIfSimulating 0
-        >> drainWorkQueue
-
-
-drainWorkQueue : ProgramTest model msg effect -> ProgramTest model msg effect
-drainWorkQueue programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
-
-        Active state ->
-            case state.effectSimulation of
-                Nothing ->
-                    programTest
-
-                Just simulation ->
-                    case EffectSimulation.stepWorkQueue simulation of
-                        Nothing ->
-                            -- work queue is empty
-                            programTest
-
-                        Just ( newSimulation, msg ) ->
-                            let
-                                updateMaybe tc =
-                                    case msg of
-                                        Nothing ->
-                                            tc
-
-                                        Just m ->
-                                            update m tc
-                            in
-                            Active { state | effectSimulation = Just newSimulation }
-                                |> updateMaybe
-                                |> drain
+                FailedToCreate failure ->
+                    Err failure
 
 
 {-| Asserts that an HTTP request to the specific url and method has been made.
@@ -1612,7 +1410,7 @@ If you want to interact with the program more after this assertion, see [`ensure
 expectHttpRequestWasMade : String -> String -> ProgramTest model msg effect -> Expectation
 expectHttpRequestWasMade method url programTest =
     programTest
-        |> expectHttpRequestHelper "expectHttpRequestWasMade" method url (always Expect.pass)
+        |> andThen (\_ -> expectHttpRequestHelper "expectHttpRequestWasMade" method url (always Expect.pass))
         |> done
 
 
@@ -1626,7 +1424,7 @@ as having a single assertion per test can make the intent of your tests more cle
 -}
 ensureHttpRequestWasMade : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
 ensureHttpRequestWasMade method url =
-    expectHttpRequestHelper "ensureHttpRequestWasMade" method url (always Expect.pass)
+    andThen (\_ -> expectHttpRequestHelper "ensureHttpRequestWasMade" method url (always Expect.pass))
 
 
 {-| Allows you to check the details of a pending HTTP request.
@@ -1652,10 +1450,9 @@ expectHttpRequest :
     -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
     -> ProgramTest model msg effect
     -> Expectation
-expectHttpRequest method url checkRequest programTest =
-    programTest
-        |> expectHttpRequestHelper "expectHttpRequest" method url checkRequest
-        |> done
+expectHttpRequest method url checkRequest =
+    andThen (\_ -> expectHttpRequestHelper "expectHttpRequest" method url checkRequest)
+        >> done
 
 
 {-| See the documentation for [`expectHttpRequest`](#expectHttpRequest).
@@ -1672,8 +1469,8 @@ ensureHttpRequest :
     -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
     -> ProgramTest model msg effect
     -> ProgramTest model msg effect
-ensureHttpRequest method url checkRequest programTest =
-    expectHttpRequestHelper "ensureHttpRequest" method url checkRequest programTest
+ensureHttpRequest method url checkRequest =
+    andThen (\_ -> expectHttpRequestHelper "ensureHttpRequest" method url checkRequest)
 
 
 expectHttpRequestHelper :
@@ -1681,43 +1478,26 @@ expectHttpRequestHelper :
     -> String
     -> String
     -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
-    -> ProgramTest model msg effect
-    -> ProgramTest model msg effect
-expectHttpRequestHelper functionName method url checkRequest programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
+    -> TestState model msg effect
+    -> Result Failure (TestState model msg effect)
+expectHttpRequestHelper functionName method url checkRequest state =
+    case state.effectSimulation of
+        Nothing ->
+            Err (EffectSimulationNotConfigured functionName)
 
-        Active state ->
-            case state.effectSimulation of
-                Nothing ->
-                    Finished
-                        { view = state.program.debugView
-                        , history = state.currentModel :: state.history
-                        }
-                        (EffectSimulationNotConfigured functionName)
-
-                Just simulation ->
-                    case Dict.get ( method, url ) simulation.state.http of
-                        Just request ->
-                            case Test.Runner.getFailureReason (checkRequest request) of
-                                Nothing ->
-                                    -- check succeeded
-                                    programTest
-
-                                Just reason ->
-                                    Finished
-                                        { view = state.program.debugView
-                                        , history = state.currentModel :: state.history
-                                        }
-                                        (ExpectFailed functionName reason.description reason.reason)
-
+        Just simulation ->
+            case Dict.get ( method, url ) simulation.state.http of
+                Just request ->
+                    case Test.Runner.getFailureReason (checkRequest request) of
                         Nothing ->
-                            Finished
-                                { view = state.program.debugView
-                                , history = state.currentModel :: state.history
-                                }
-                                (NoMatchingHttpRequest functionName { method = method, url = url } (Dict.keys simulation.state.http))
+                            -- check succeeded
+                            Ok state
+
+                        Just reason ->
+                            Err (ExpectFailed functionName reason.description reason.reason)
+
+                Nothing ->
+                    Err (NoMatchingHttpRequest functionName { method = method, url = url } (Dict.keys simulation.state.http))
 
 
 {-| Simulates an HTTP 200 response to a pending request with the given method and url.
@@ -1794,28 +1574,17 @@ NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you ca
 
 -}
 simulateHttpResponse : String -> String -> Http.Response String -> ProgramTest model msg effect -> ProgramTest model msg effect
-simulateHttpResponse method url response programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
-
-        Active state ->
+simulateHttpResponse method url response =
+    andThen <|
+        \program state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished
-                        { view = state.program.debugView
-                        , history = state.currentModel :: state.history
-                        }
-                        (EffectSimulationNotConfigured "simulateHttpResponse")
+                    Err (EffectSimulationNotConfigured "simulateHttpResponse")
 
                 Just simulation ->
                     case Dict.get ( method, url ) simulation.state.http of
                         Nothing ->
-                            Finished
-                                { view = state.program.debugView
-                                , history = state.currentModel :: state.history
-                                }
-                                (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulation.state.http))
+                            Err (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulation.state.http))
 
                         Just actualRequest ->
                             let
@@ -1826,12 +1595,12 @@ simulateHttpResponse method url response programTest =
                                     in
                                     { sim | state = { st | http = Dict.remove ( method, url ) st.http } }
                             in
-                            withSimulation
-                                (resolveHttpRequest
-                                    >> EffectSimulation.queueTask (actualRequest.onRequestComplete response)
-                                )
-                                programTest
-                                |> drain
+                            state
+                                |> TestState.withSimulation
+                                    (resolveHttpRequest
+                                        >> EffectSimulation.queueTask (actualRequest.onRequestComplete response)
+                                    )
+                                |> TestState.drain program
 
 
 {-| Simulates the passing of time.
@@ -1842,84 +1611,8 @@ NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you ca
 
 -}
 advanceTime : Int -> ProgramTest model msg effect -> ProgramTest model msg effect
-advanceTime delta programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
-
-        Active state ->
-            case state.effectSimulation of
-                Nothing ->
-                    Finished
-                        { view = state.program.debugView
-                        , history = state.currentModel :: state.history
-                        }
-                        (EffectSimulationNotConfigured "advanceTime")
-
-                Just simulation ->
-                    advanceTo "advanceTime" (simulation.state.nowMs + delta) programTest
-
-
-advanceTo : String -> Int -> ProgramTest model msg effect -> ProgramTest model msg effect
-advanceTo functionName end programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
-
-        Active state ->
-            case state.effectSimulation of
-                Nothing ->
-                    Finished
-                        { view = state.program.debugView
-                        , history = state.currentModel :: state.history
-                        }
-                        (EffectSimulationNotConfigured functionName)
-
-                Just simulation ->
-                    let
-                        ss =
-                            simulation.state
-                    in
-                    case PairingHeap.findMin simulation.state.futureTasks of
-                        Nothing ->
-                            -- No future tasks to check
-                            Active
-                                { state
-                                    | effectSimulation =
-                                        Just
-                                            { simulation
-                                                | state = { ss | nowMs = end }
-                                            }
-                                }
-
-                        Just ( t, task ) ->
-                            if t <= end then
-                                Active
-                                    { state
-                                        | effectSimulation =
-                                            Just
-                                                { simulation
-                                                    | state =
-                                                        { ss
-                                                            | nowMs = t
-                                                            , futureTasks = PairingHeap.deleteMin simulation.state.futureTasks
-                                                        }
-                                                }
-                                    }
-                                    |> withSimulation (EffectSimulation.queueTask (task ()))
-                                    |> drain
-                                    |> advanceTo functionName end
-
-                            else
-                                -- next task is further in the future than we are advancing
-                                Active
-                                    { state
-                                        | effectSimulation =
-                                            Just
-                                                { simulation
-                                                    | state = { ss | nowMs = end }
-                                                }
-                                    }
+advanceTime delta =
+    andThen (TestState.advanceTime "advanceTime" delta)
 
 
 {-| Lets you assert on the values that the program being tested has sent to an outgoing port.
@@ -1968,44 +1661,30 @@ ensureOutgoingPortValues portName decoder checkValues programTest =
 
 
 expectOutgoingPortValuesHelper : String -> String -> Json.Decode.Decoder a -> (List a -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
-expectOutgoingPortValuesHelper functionName portName decoder checkValues programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
-
-        Active state ->
+expectOutgoingPortValuesHelper functionName portName decoder checkValues =
+    andThen <|
+        \_ state ->
             case state.effectSimulation of
                 Nothing ->
-                    Finished
-                        { view = state.program.debugView
-                        , history = state.currentModel :: state.history
-                        }
-                        (EffectSimulationNotConfigured functionName)
+                    Err (EffectSimulationNotConfigured functionName)
 
                 Just simulation ->
                     case allOk <| List.map (Json.Decode.decodeValue decoder) <| EffectSimulation.outgoingPortValues portName simulation of
                         Err errs ->
-                            Finished
-                                { view = state.program.debugView
-                                , history = state.currentModel :: state.history
-                                }
-                                (CustomFailure (functionName ++ ": failed to decode port values") (List.map Json.Decode.errorToString errs |> String.join "\n"))
+                            Err (CustomFailure (functionName ++ ": failed to decode port values") (List.map Json.Decode.errorToString errs |> String.join "\n"))
 
                         Ok values ->
                             case Test.Runner.getFailureReason (checkValues values) of
                                 Nothing ->
                                     -- the check passed
-                                    Active
+                                    Ok
                                         { state
                                             | effectSimulation =
                                                 Just (EffectSimulation.clearOutgoingPortValues portName simulation)
                                         }
 
                                 Just reason ->
-                                    Finished
-                                        { view = state.program.debugView
-                                        , history = state.currentModel :: state.history
-                                        }
+                                    Err
                                         (ExpectFailed (functionName ++ ": values sent to port \"" ++ portName ++ "\" did not match")
                                             reason.description
                                             reason.reason
@@ -2057,33 +1736,30 @@ NOTE: You must use [`withSimulatedSubscriptions`](#withSimulatedSubscriptions) b
 
 -}
 simulateIncomingPort : String -> Json.Encode.Value -> ProgramTest model msg effect -> ProgramTest model msg effect
-simulateIncomingPort portName value programTest =
+simulateIncomingPort portName value =
     let
-        fail_ =
-            fail ("simulateIncomingPort \"" ++ portName ++ "\"")
+        functionName =
+            "simulateIncomingPort \"" ++ portName ++ "\""
     in
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
-
-        Active state ->
-            case state.program.subscriptions of
+    andThen <|
+        \program state ->
+            case program.subscriptions of
                 Nothing ->
-                    programTest
-                        |> fail_ "you MUST use ProgramTest.withSimulatedSubscriptions to be able to use simulateIncomingPort"
+                    Err (CustomFailure functionName "you MUST use ProgramTest.withSimulatedSubscriptions to be able to use simulateIncomingPort")
 
                 Just fn ->
                     let
                         matches =
-                            match (fn state.currentModel)
+                            matchesFromSub (fn state.currentModel)
 
-                        match sub =
+                        matchesFromSub : SimulatedSub msg -> List (Result String msg)
+                        matchesFromSub sub =
                             case sub of
                                 SimulatedEffect.NoneSub ->
                                     []
 
                                 SimulatedEffect.BatchSub subs_ ->
-                                    List.concatMap match subs_
+                                    List.concatMap matchesFromSub subs_
 
                                 SimulatedEffect.PortSub pname decoder ->
                                     if pname == portName then
@@ -2094,40 +1770,40 @@ simulateIncomingPort portName value programTest =
                                     else
                                         []
 
+                        step : Result String msg -> TestState model msg effect -> Result Failure (TestState model msg effect)
                         step r tc =
                             case r of
                                 Err message ->
-                                    tc
-                                        |> fail_
+                                    Err
+                                        (CustomFailure functionName
                                             ("the value provided does not match the type that the port is expecting:\n"
                                                 ++ message
                                             )
+                                        )
 
                                 Ok msg ->
-                                    update msg tc
+                                    TestState.update msg program tc
                     in
                     if matches == [] then
-                        programTest
-                            |> fail_
-                                "the program is not currently subscribed to the port"
+                        Err (CustomFailure functionName "the program is not currently subscribed to the port")
 
                     else
-                        List.foldl step programTest matches
+                        List.foldl (\match -> Result.andThen (step match)) (Ok state) matches
 
 
 replaceView : (model -> Query.Single msg) -> ProgramTest model msg effect -> ProgramTest model msg effect
 replaceView newView programTest =
     case programTest of
-        Finished testLog err ->
-            Finished testLog err
+        FailedToCreate failure ->
+            FailedToCreate failure
 
-        Active state ->
+        Created created ->
             let
                 program =
-                    state.program
+                    created.program
             in
-            Active
-                { state
+            Created
+                { created
                     | program = { program | view = newView }
                 }
 
@@ -2139,50 +1815,8 @@ The parameter may be an absolute URL or relative URL.
 
 -}
 routeChange : String -> ProgramTest model msg effect -> ProgramTest model msg effect
-routeChange url programTest =
-    routeChangeHelper "routeChange" 0 url programTest
-
-
-routeChangeHelper : String -> Int -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
-routeChangeHelper functionName removeFromBackStack url programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
-
-        Active state ->
-            case state.navigation of
-                Nothing ->
-                    Finished
-                        { view = state.program.debugView
-                        , history = state.currentModel :: state.history
-                        }
-                        (ProgramDoesNotSupportNavigation functionName)
-
-                Just { currentLocation, browserHistory } ->
-                    let
-                        newLocation =
-                            Url.Extra.resolve currentLocation url
-
-                        processRouteChange =
-                            case state.program.onRouteChange newLocation of
-                                Nothing ->
-                                    identity
-
-                                Just msg ->
-                                    -- TODO: should this be set before or after?
-                                    update msg
-                    in
-                    Active
-                        { state
-                            | navigation =
-                                Just
-                                    { currentLocation = newLocation
-                                    , browserHistory =
-                                        (currentLocation :: browserHistory)
-                                            |> List.drop removeFromBackStack
-                                    }
-                        }
-                        |> processRouteChange
+routeChange url =
+    andThen (TestState.routeChangeHelper "routeChange" 0 url)
 
 
 {-| Make an assertion about the current state of a `ProgramTest`'s model.
@@ -2194,23 +1828,17 @@ will make your tests more resilient to changes in the private implementation of 
 
 -}
 expectModel : (model -> Expectation) -> ProgramTest model msg effect -> Expectation
-expectModel assertion programTest =
-    done <|
-        case programTest of
-            Finished testLog err ->
-                Finished testLog err
+expectModel assertion =
+    (andThen <|
+        \_ state ->
+            case assertion state.currentModel |> Test.Runner.getFailureReason of
+                Nothing ->
+                    Ok state
 
-            Active state ->
-                case assertion state.currentModel |> Test.Runner.getFailureReason of
-                    Nothing ->
-                        programTest
-
-                    Just reason ->
-                        Finished
-                            { view = state.program.debugView
-                            , history = state.currentModel :: state.history
-                            }
-                            (ExpectFailed "expectModel" reason.description reason.reason)
+                Just reason ->
+                    Err (ExpectFailed "expectModel" reason.description reason.reason)
+    )
+        >> done
 
 
 {-| Simulate the outcome of the last effect produced by the program being tested
@@ -2227,41 +1855,27 @@ You can find links to the relevant documentation in the [documentation index](#d
 
 -}
 simulateLastEffect : (effect -> Result String (List msg)) -> ProgramTest model msg effect -> ProgramTest model msg effect
-simulateLastEffect toMsgs programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
-
-        Active state ->
+simulateLastEffect toMsgs =
+    andThen <|
+        \program state ->
             case toMsgs state.lastEffect of
                 Ok msgs ->
-                    List.foldl update programTest msgs
+                    List.foldl (\msg -> Result.andThen (TestState.update msg program)) (Ok state) msgs
 
                 Err message ->
-                    Finished
-                        { view = state.program.debugView
-                        , history = state.currentModel :: state.history
-                        }
-                        (SimulateLastEffectFailed message)
+                    Err (SimulateLastEffectFailed message)
 
 
 expectLastEffectHelper : String -> (effect -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
-expectLastEffectHelper functionName assertion programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
-
-        Active state ->
+expectLastEffectHelper functionName assertion =
+    andThen <|
+        \_ state ->
             case assertion state.lastEffect |> Test.Runner.getFailureReason of
                 Nothing ->
-                    programTest
+                    Ok state
 
                 Just reason ->
-                    Finished
-                        { view = state.program.debugView
-                        , history = state.currentModel :: state.history
-                        }
-                        (ExpectFailed functionName reason.description reason.reason)
+                    Err (ExpectFailed functionName reason.description reason.reason)
 
 
 {-| See the documentation for [`expectLastEffect`](#expectLastEffect).
@@ -2293,28 +1907,24 @@ expectLastEffect assertion programTest =
         |> done
 
 
-expectViewHelper : String -> (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
-expectViewHelper functionName assertion programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
+expectViewHelper :
+    String
+    -> (Query.Single msg -> Expectation)
+    -> Program model msg effect sub
+    -> TestState model msg effect
+    -> Result Failure (TestState model msg effect)
+expectViewHelper functionName assertion program state =
+    case
+        state.currentModel
+            |> program.view
+            |> assertion
+            |> Test.Runner.getFailureReason
+    of
+        Nothing ->
+            Ok state
 
-        Active state ->
-            case
-                state.currentModel
-                    |> state.program.view
-                    |> assertion
-                    |> Test.Runner.getFailureReason
-            of
-                Nothing ->
-                    programTest
-
-                Just reason ->
-                    Finished
-                        { view = state.program.debugView
-                        , history = state.currentModel :: state.history
-                        }
-                        (ExpectFailed functionName reason.description reason.reason)
+        Just reason ->
+            Err (ExpectFailed functionName reason.description reason.reason)
 
 
 {-| See the documentation for [`expectView`](#expectView).
@@ -2326,8 +1936,8 @@ as having a single assertion per test can make the intent of your tests more cle
 
 -}
 ensureView : (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
-ensureView assertion programTest =
-    expectViewHelper "ensureView" assertion programTest
+ensureView assertion =
+    andThen (expectViewHelper "ensureView" assertion)
 
 
 {-| See the documentation for [`expectViewHas`](#expectViewHas).
@@ -2339,8 +1949,8 @@ as having a single assertion per test can make the intent of your tests more cle
 
 -}
 ensureViewHas : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
-ensureViewHas selector programTest =
-    expectViewHelper "ensureViewHas" (Query.has selector) programTest
+ensureViewHas selector =
+    andThen (expectViewHelper "ensureViewHas" (Query.has selector))
 
 
 {-| See the documentation for [`expectViewHasNot`](#expectViewHasNot).
@@ -2352,8 +1962,8 @@ as having a single assertion per test can make the intent of your tests more cle
 
 -}
 ensureViewHasNot : List Selector.Selector -> ProgramTest model msg effect -> ProgramTest model msg effect
-ensureViewHasNot selector programTest =
-    expectViewHelper "ensureViewHasNot" (Query.hasNot selector) programTest
+ensureViewHasNot selector =
+    andThen (expectViewHelper "ensureViewHasNot" (Query.hasNot selector))
 
 
 {-| Makes an assertion about the current state of a `ProgramTest`'s view.
@@ -2362,10 +1972,9 @@ If you want to interact with the program more after this assertion, see [`ensure
 
 -}
 expectView : (Query.Single msg -> Expectation) -> ProgramTest model msg effect -> Expectation
-expectView assertion programTest =
-    programTest
-        |> expectViewHelper "expectView" assertion
-        |> done
+expectView assertion =
+    andThen (expectViewHelper "expectView" assertion)
+        >> done
 
 
 {-| A simpler way to assert that a `ProgramTest`'s view matches a given selector.
@@ -2376,10 +1985,9 @@ If you want to interact with the program more after this assertion, see [`ensure
 
 -}
 expectViewHas : List Selector.Selector -> ProgramTest model msg effect -> Expectation
-expectViewHas selector programTest =
-    programTest
-        |> expectViewHelper "expectViewHas" (Query.has selector)
-        |> done
+expectViewHas selector =
+    andThen (expectViewHelper "expectViewHas" (Query.has selector))
+        >> done
 
 
 {-| A simpler way to assert that a `ProgramTest`'s view does not match a given selector.
@@ -2390,10 +1998,9 @@ If you want to interact with the program more after this assertion, see [`ensure
 
 -}
 expectViewHasNot : List Selector.Selector -> ProgramTest model msg effect -> Expectation
-expectViewHasNot selector programTest =
-    programTest
-        |> expectViewHelper "expectViewHasNot" (Query.hasNot selector)
-        |> done
+expectViewHasNot selector =
+    andThen (expectViewHelper "expectViewHasNot" (Query.hasNot selector))
+        >> done
 
 
 {-| Ends a `ProgramTest`, reporting any errors that occurred.
@@ -2405,64 +2012,12 @@ as doing so will [make the intent of your test more clear](https://www.artima.co
 -}
 done : ProgramTest model msg effect -> Expectation
 done programTest =
-    case programTest of
-        Active _ ->
+    case toFailure programTest of
+        Nothing ->
             Expect.pass
 
-        Finished _ (ChangedPage cause finalLocation) ->
-            Expect.fail (cause ++ " caused the program to end by navigating to " ++ escapeString (Url.toString finalLocation) ++ ".  NOTE: If this is what you intended, use ProgramTest.expectPageChange to end your test.")
-
-        Finished _ (ExpectFailed expectationName description reason) ->
-            Expect.fail (expectationName ++ ":\n" ++ Test.Runner.Failure.format description reason)
-
-        Finished _ (SimulateFailed functionName message) ->
-            Expect.fail (functionName ++ ":\n" ++ message)
-
-        Finished _ (SimulateFailedToFindTarget functionName message) ->
-            Expect.fail (functionName ++ ":\n" ++ message)
-
-        Finished _ (SimulateLastEffectFailed message) ->
-            Expect.fail ("simulateLastEffect failed: " ++ message)
-
-        Finished _ (InvalidLocationUrl functionName invalidUrl) ->
-            Expect.fail (functionName ++ ": " ++ "Not a valid absolute URL:\n" ++ escapeString invalidUrl)
-
-        Finished _ (InvalidFlags functionName message) ->
-            Expect.fail (functionName ++ ":\n" ++ message)
-
-        Finished _ (ProgramDoesNotSupportNavigation functionName) ->
-            Expect.fail (functionName ++ ": Program does not support navigation.  Use ProgramTest.createApplication to create a ProgramTest that supports navigation.")
-
-        Finished _ (NoBaseUrl functionName relativeUrl) ->
-            Expect.fail (functionName ++ ": The ProgramTest does not have a base URL and cannot resolve the relative URL " ++ escapeString relativeUrl ++ ".  Use ProgramTest.withBaseUrl before calling ProgramTest.start to create a ProgramTest that can resolve relative URLs.")
-
-        Finished _ (NoMatchingHttpRequest functionName request pendingRequests) ->
-            Expect.fail <|
-                String.concat
-                    [ functionName
-                    , ": "
-                    , "Expected HTTP request ("
-                    , request.method
-                    , " "
-                    , request.url
-                    , ") to have been made, but it was not.\n"
-                    , case pendingRequests of
-                        [] ->
-                            "    No requests were made."
-
-                        _ ->
-                            String.concat
-                                [ "    The following requests were made:\n"
-                                , String.join "\n" <|
-                                    List.map (\( method, url ) -> "      - " ++ method ++ " " ++ url) pendingRequests
-                                ]
-                    ]
-
-        Finished _ (EffectSimulationNotConfigured functionName) ->
-            Expect.fail ("TEST SETUP ERROR: In order to use " ++ functionName ++ ", you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start")
-
-        Finished _ (CustomFailure assertionName message) ->
-            Expect.fail (assertionName ++ ": " ++ message)
+        Just failure ->
+            Expect.fail (Failure.toString failure)
 
 
 {-| Asserts that the program ended by navigating away to another URL.
@@ -2478,14 +2033,14 @@ then you probably want [`expectBrowserUrl`](#expectBrowserUrl) instead.
 -}
 expectPageChange : String -> ProgramTest model msg effect -> Expectation
 expectPageChange expectedUrl programTest =
-    case programTest of
-        Finished _ (ChangedPage cause finalLocation) ->
+    case toFailure programTest of
+        Just (ChangedPage cause finalLocation) ->
             Url.toString finalLocation |> Expect.equal expectedUrl
 
-        Finished _ _ ->
+        Just _ ->
             programTest |> done
 
-        Active _ ->
+        Nothing ->
             Expect.fail "expectPageChange: expected to have navigated to a different URL, but no links were clicked and no browser navigation was simulated"
 
 
@@ -2520,32 +2075,21 @@ ensureBrowserUrl checkUrl programTest =
 
 
 expectBrowserUrlHelper : String -> (String -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
-expectBrowserUrlHelper functionName checkUrl programTest =
-    case programTest of
-        Finished _ _ ->
-            programTest
-
-        Active state ->
+expectBrowserUrlHelper functionName checkUrl =
+    andThen <|
+        \_ state ->
             case Maybe.map .currentLocation state.navigation of
                 Nothing ->
-                    Finished
-                        { view = state.program.debugView
-                        , history = state.currentModel :: state.history
-                        }
-                        (ProgramDoesNotSupportNavigation functionName)
+                    Err (ProgramDoesNotSupportNavigation functionName)
 
                 Just url ->
                     case Test.Runner.getFailureReason (checkUrl (Url.toString url)) of
                         Nothing ->
                             -- check succeeded
-                            programTest
+                            Ok state
 
                         Just reason ->
-                            Finished
-                                { view = state.program.debugView
-                                , history = state.currentModel :: state.history
-                                }
-                                (ExpectFailed functionName reason.description reason.reason)
+                            Err (ExpectFailed functionName reason.description reason.reason)
 
 
 {-| Asserts on the current browser history in the simulated test environment.
@@ -2600,33 +2144,22 @@ ensureBrowserHistory checkHistory programTest =
 
 
 expectBrowserHistoryHelper : String -> (List String -> Expectation) -> ProgramTest model msg effect -> ProgramTest model msg effect
-expectBrowserHistoryHelper functionName checkHistory programTest =
-    case programTest of
-        Finished _ _ ->
-            programTest
-
-        Active state ->
+expectBrowserHistoryHelper functionName checkHistory =
+    andThen <|
+        \_ state ->
             case Maybe.map .browserHistory state.navigation of
                 Nothing ->
                     -- TODO: use withBaseUrl error
-                    Finished
-                        { view = state.program.debugView
-                        , history = state.currentModel :: state.history
-                        }
-                        (ProgramDoesNotSupportNavigation functionName)
+                    Err (ProgramDoesNotSupportNavigation functionName)
 
                 Just browserHistoryYes ->
                     case Test.Runner.getFailureReason (checkHistory (List.map Url.toString browserHistoryYes)) of
                         Nothing ->
                             -- check succeeded
-                            programTest
+                            Ok state
 
                         Just reason ->
-                            Finished
-                                { view = state.program.debugView
-                                , history = state.currentModel :: state.history
-                                }
-                                (ExpectFailed functionName reason.description reason.reason)
+                            Err (ExpectFailed functionName reason.description reason.reason)
 
 
 {-| `fail` can be used to report custom errors if you are writing your own convenience functions to deal with program tests.
@@ -2652,36 +2185,24 @@ If you are writing a convenience function that is creating a program test, see [
 
 -}
 fail : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
-fail assertionName failureMessage programTest =
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
-
-        Active state ->
-            Finished
-                { view = state.program.debugView
-                , history = state.currentModel :: state.history
-                }
-                (CustomFailure assertionName failureMessage)
+fail assertionName failureMessage =
+    andThen <| \_ _ -> Err (CustomFailure assertionName failureMessage)
 
 
 {-| This is meant for internal use only and adds a rendering of the current view to an error message.
 -}
 failWithViewError : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
-failWithViewError functionDescription errorMessage programTest =
+failWithViewError functionDescription errorMessage =
     -- This is a big hack to grab the rendered HTML for the error message,
     -- since Test.Html.Query doesn't expose a way to get the HTML as a string
     -- or to compose custom error messages
-    case programTest of
-        Finished testLog err ->
-            Finished testLog err
-
-        Active state ->
+    andThen <|
+        \program state ->
             let
                 renderHtml unique =
                     case
                         state.currentModel
-                            |> state.program.view
+                            |> program.view
                             |> Query.has [ Selector.text ("HTML expected by the call to: " ++ functionDescription ++ unique) ]
                             |> Test.Runner.getFailureReason
                     of
@@ -2691,16 +2212,16 @@ failWithViewError functionDescription errorMessage programTest =
 
                         Just reason ->
                             reason.description
-            in
-            programTest
-                |> fail functionDescription
-                    (String.join "\n"
+
+                finalMessage =
+                    String.join "\n"
                         [ ""
                         , renderHtml ""
                         , ""
                         , errorMessage
                         ]
-                    )
+            in
+            Err (CustomFailure functionDescription finalMessage)
 
 
 {-| `createFailed` can be used to report custom errors if you are writing your own convenience functions to _create_ program tests.
@@ -2741,11 +2262,7 @@ For example:
 -}
 createFailed : String -> String -> ProgramTest model msg effect
 createFailed functionName failureMessage =
-    Finished
-        { view = \_ -> Html.text failureMessage
-        , history = []
-        }
-        (CustomFailure functionName failureMessage)
+    FailedToCreate (CustomFailure functionName failureMessage)
 
 
 {-| This can be used for advanced helper functions where you want to continue a test but need the data
@@ -2758,34 +2275,40 @@ prefer [`expectOutgoingPortValues`](#expectOutgoingPortValues) instead.
 getOutgoingPortValues : String -> ProgramTest model msg effect -> Result (ProgramTest model msg effect) (List Json.Encode.Value)
 getOutgoingPortValues portName programTest =
     case programTest of
-        Finished _ _ ->
+        FailedToCreate _ ->
             Err programTest
 
-        Active state ->
-            case state.effectSimulation of
-                Nothing ->
-                    Err
-                        (Finished
-                            { view = state.program.debugView
-                            , history = state.currentModel :: state.history
-                            }
-                            (EffectSimulationNotConfigured "getPortValues")
-                        )
+        Created ({ program, state } as created) ->
+            case state of
+                Err _ ->
+                    Err programTest
 
-                Just effects ->
-                    Dict.get portName effects.outgoingPortValues
-                        |> Maybe.withDefault []
-                        |> Ok
+                Ok s ->
+                    case s.effectSimulation of
+                        Nothing ->
+                            Err <|
+                                Created
+                                    { created
+                                        | state =
+                                            TestResult.fail (EffectSimulationNotConfigured "getPortValues") s
+                                    }
+
+                        Just effects ->
+                            Dict.get portName effects.outgoingPortValues
+                                |> Maybe.withDefault []
+                                |> Ok
 
 
 {-| -}
 toLog : ProgramTest model msg effect -> TestLog model msg
 toLog programTest =
     case programTest of
-        Active state ->
-            { view = state.program.debugView
-            , history = List.reverse (state.currentModel :: state.history)
+        Created { program, state } ->
+            { view = program.debugView
+            , history = TestResult.toHistory state
             }
 
-        Finished testLog _ ->
-            testLog
+        FailedToCreate failure ->
+            { view = \_ -> Html.text (Failure.toString failure)
+            , history = []
+            }
