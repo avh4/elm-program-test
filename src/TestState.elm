@@ -11,6 +11,8 @@ import Url exposing (Url)
 import Url.Extra
 
 
+{-| TODO: what's a better name?
+-}
 type alias TestState model msg effect =
     { currentModel : model
     , lastEffect : effect

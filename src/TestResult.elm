@@ -4,6 +4,8 @@ import ProgramTest.Failure exposing (Failure)
 import TestState exposing (TestState)
 
 
+{-| TODO: what's a better name?
+-}
 type alias TestResult model msg effect =
     Result
         { reason : Failure
