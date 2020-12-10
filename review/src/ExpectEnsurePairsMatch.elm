@@ -41,20 +41,15 @@ collectExpectTypes declarations context =
     ( []
     , { context
         | expectFunctionArguments =
-            -- TODO: build form the actual declarations
-            Dict.fromList
-                [ ( "Something"
-                  , [ Typed (Node emptyRange ( [], "String" )) []
-                    ]
-                  )
-                ]
+            List.filterMap (getNamedFunctionType "expect") declarations
+                |> Dict.fromList
       }
     )
 
 
-validateEnsureTypes : Node Declaration -> Context -> ( List (Rule.Error {}), Context )
-validateEnsureTypes node context =
-    ( case Node.value node of
+getNamedFunctionType : String -> Node Declaration -> Maybe ( String, List TypeAnnotation )
+getNamedFunctionType prefix declaration =
+    case Node.value declaration of
         Declaration.FunctionDeclaration function ->
             let
                 functionName =
@@ -62,16 +57,27 @@ validateEnsureTypes node context =
                         |> Node.value
                         |> .name
                         |> Node.value
-
-                ensureName =
-                    if String.startsWith "ensure" functionName then
-                        Just (String.dropLeft 6 functionName)
-
-                    else
-                        Nothing
             in
-            case ensureName of
-                Just name ->
+            if String.startsWith prefix functionName then
+                Just
+                    ( String.dropLeft (String.length prefix) functionName
+                    , -- TODO: build form the actual declarations
+                      [ Typed (Node emptyRange ( [], "String" )) [] ]
+                    )
+
+            else
+                Nothing
+
+        _ ->
+            Nothing
+
+
+validateEnsureTypes : Node Declaration -> Context -> ( List (Rule.Error {}), Context )
+validateEnsureTypes node context =
+    ( case Node.value node of
+        Declaration.FunctionDeclaration function ->
+            case getNamedFunctionType "ensure" node of
+                Just ( name, actualArgs ) ->
                     case Maybe.map (Node.value << .typeAnnotation << Node.value) function.signature of
                         Just (FunctionTypeAnnotation left right) ->
                             case Dict.get name context.expectFunctionArguments of
@@ -81,9 +87,9 @@ validateEnsureTypes node context =
 
                                     else
                                         [ Rule.error
-                                            { message = "ensureSomething should take the same arguments as expectSomething"
+                                            { message = "ensure" ++ name ++ " should take the same arguments as expect" ++ name
                                             , details =
-                                                [ "Assuming the type annotation for expectSomething is correct, the type annotation for ensureSomething should be:"
+                                                [ "Assuming the type annotation for expect" ++ name ++ " is correct, the type annotation for ensure" ++ name ++ " should be:"
                                                 , "String -> ProgramTest msg model effect -> ProgramTest msg model effect"
                                                 ]
                                             }
