@@ -9,7 +9,6 @@ module ExpectEnsurePairsMatch exposing (rule)
 import Dict exposing (Dict)
 import Elm.Syntax.Declaration as Declaration exposing (Declaration)
 import Elm.Syntax.Node as Node exposing (Node(..))
-import Elm.Syntax.Range exposing (emptyRange)
 import Elm.Syntax.TypeAnnotation exposing (TypeAnnotation(..))
 import ElmSyntaxHelper exposing (removeTypeAnnotationRange)
 import Review.Rule as Rule exposing (Rule)
@@ -49,6 +48,32 @@ collectExpectTypes declarations context =
 
 getNamedFunctionType : String -> Node Declaration -> Maybe ( String, List TypeAnnotation )
 getNamedFunctionType prefix declaration =
+    case getFunctionType declaration of
+        Ok ( functionName, args ) ->
+            if String.startsWith prefix functionName then
+                Just
+                    ( String.dropLeft (String.length prefix) functionName
+                    , List.take 1 args
+                      -- TODO: validate that return value is Expectation
+                      -- TODO: validate that last arg is ProgramTest msg model effect
+                      -- TODO: work correctly when there is more than one initial arg
+                    )
+
+            else
+                Nothing
+
+        _ ->
+            -- TODO: report if there was no type annotation
+            Nothing
+
+
+type FunctionParseError
+    = NotAFunction
+    | NoTypeAnnotation
+
+
+getFunctionType : Node Declaration -> Result FunctionParseError ( String, List TypeAnnotation )
+getFunctionType declaration =
     case Node.value declaration of
         Declaration.FunctionDeclaration function ->
             let
@@ -58,18 +83,29 @@ getNamedFunctionType prefix declaration =
                         |> .name
                         |> Node.value
             in
-            if String.startsWith prefix functionName then
-                Just
-                    ( String.dropLeft (String.length prefix) functionName
-                    , -- TODO: build form the actual declarations
-                      [ Typed (Node emptyRange ( [], "String" )) [] ]
-                    )
+            case Maybe.map (.typeAnnotation << Node.value) function.signature of
+                Just annotation ->
+                    Ok
+                        ( functionName
+                        , flattenFunctionType annotation
+                        )
 
-            else
-                Nothing
+                _ ->
+                    Err NoTypeAnnotation
 
         _ ->
-            Nothing
+            Err NotAFunction
+
+
+flattenFunctionType : Node TypeAnnotation -> List TypeAnnotation
+flattenFunctionType typeAnnotation =
+    case Node.value <| removeTypeAnnotationRange typeAnnotation of
+        FunctionTypeAnnotation left right ->
+            -- TODO: recurse into right
+            [ Node.value left, Node.value right ]
+
+        other ->
+            [ other ]
 
 
 validateEnsureTypes : Node Declaration -> Context -> ( List (Rule.Error {}), Context )
