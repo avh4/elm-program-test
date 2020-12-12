@@ -9,8 +9,10 @@ module ExpectEnsurePairsMatch exposing (rule)
 import Dict exposing (Dict)
 import Elm.Syntax.Declaration as Declaration exposing (Declaration)
 import Elm.Syntax.Node as Node exposing (Node(..))
+import Elm.Syntax.Range as Range
 import Elm.Syntax.TypeAnnotation exposing (TypeAnnotation(..))
-import ElmSyntaxHelper exposing (removeTypeAnnotationRange)
+import ElmSyntaxHelper exposing (removeTypeAnnotationRange, typeAnnotationToString)
+import List.Nonempty as Nonempty exposing (Nonempty)
 import Review.Rule as Rule exposing (Rule)
 
 
@@ -63,12 +65,14 @@ getNamedFunctionType prefix declaration =
             if String.startsWith prefix (Node.value functionName) then
                 Just
                     ( String.dropLeft (String.length prefix) (Node.value functionName)
-                    , case annotation of
-                        Just args ->
+                    , case Maybe.map (List.reverse << Nonempty.toList) annotation of
+                        Just (returnType :: programTest :: args) ->
                             -- TODO: validate that return value is Expectation
                             -- TODO: validate that last arg is ProgramTest msg model effect
-                            -- TODO: work correctly when there is more than one initial arg
-                            Ok (List.take 1 args)
+                            Ok (List.reverse args)
+
+                        Just _ ->
+                            Err NotEnoughArgs
 
                         Nothing ->
                             Err (NoTypeAnnotation functionName)
@@ -83,10 +87,11 @@ getNamedFunctionType prefix declaration =
 
 type FunctionParseError
     = NotAFunction
+    | NotEnoughArgs
     | NoTypeAnnotation (Node String)
 
 
-getFunctionType : Node Declaration -> Maybe ( Node String, Maybe (List (Node TypeAnnotation)) )
+getFunctionType : Node Declaration -> Maybe ( Node String, Maybe (Nonempty (Node TypeAnnotation)) )
 getFunctionType declaration =
     case Node.value declaration of
         Declaration.FunctionDeclaration function ->
@@ -105,24 +110,35 @@ getFunctionType declaration =
             Nothing
 
 
-flattenFunctionType : Node TypeAnnotation -> List (Node TypeAnnotation)
+flattenFunctionType : Node TypeAnnotation -> Nonempty (Node TypeAnnotation)
 flattenFunctionType typeAnnotation =
     case Node.value typeAnnotation of
         FunctionTypeAnnotation left right ->
-            -- TODO: recurse into right
-            [ left, right ]
+            Nonempty.cons left (flattenFunctionType right)
 
         _ ->
-            [ typeAnnotation ]
+            Nonempty.fromElement typeAnnotation
 
 
 validateEnsureTypes : Node Declaration -> Context -> ( List (Rule.Error {}), Context )
 validateEnsureTypes node context =
     ( case getNamedFunctionType "ensure" node of
-        Just ( name, Ok [ left ] ) ->
+        Just ( name, Ok ensureArgs ) ->
             case Dict.get name context.expectFunctionArguments of
-                Just [ first ] ->
-                    if removeTypeAnnotationRange left == removeTypeAnnotationRange first then
+                Just expectArgs ->
+                    let
+                        checkArg ensureArg expectArg =
+                            if removeTypeAnnotationRange ensureArg == removeTypeAnnotationRange expectArg then
+                                Nothing
+
+                            else
+                                Just ensureArg
+
+                        mismatchedArgs =
+                            List.map2 checkArg ensureArgs expectArgs
+                                |> List.filterMap identity
+                    in
+                    if List.isEmpty mismatchedArgs then
                         []
 
                     else
@@ -130,14 +146,14 @@ validateEnsureTypes node context =
                             { message = "ensure" ++ name ++ " should take the same arguments as expect" ++ name
                             , details =
                                 [ "Assuming the type annotation for expect" ++ name ++ " is correct, the type annotation for ensure" ++ name ++ " should be:"
-                                , "String -> ProgramTest msg model effect -> ProgramTest msg model effect"
+                                , String.join " -> " (List.map typeAnnotationToString expectArgs)
+                                    ++ " -> ProgramTest msg model effect -> ProgramTest msg model effect"
                                 ]
                             }
-                            (Node.range left)
+                            (Range.combine <| List.map Node.range mismatchedArgs)
                         ]
 
                 _ ->
-                    -- TODO: work correctly when there's more than one initial argument
                     -- TODO: report when the corresponding expect function doesn't exist
                     -- TODO: report that ensure* must be a function
                     []
