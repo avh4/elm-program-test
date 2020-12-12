@@ -25,7 +25,7 @@ rule =
 
 
 type alias Context =
-    { expectFunctionArguments : Dict String (List TypeAnnotation)
+    { expectFunctionArguments : Dict String (List (Node TypeAnnotation))
     }
 
 
@@ -56,7 +56,7 @@ collectExpectTypes declarations context =
     )
 
 
-getNamedFunctionType : String -> Node Declaration -> Maybe ( String, Result FunctionParseError (List TypeAnnotation) )
+getNamedFunctionType : String -> Node Declaration -> Maybe ( String, Result FunctionParseError (List (Node TypeAnnotation)) )
 getNamedFunctionType prefix declaration =
     case getFunctionType declaration of
         Just ( functionName, annotation ) ->
@@ -86,7 +86,7 @@ type FunctionParseError
     | NoTypeAnnotation (Node String)
 
 
-getFunctionType : Node Declaration -> Maybe ( Node String, Maybe (List TypeAnnotation) )
+getFunctionType : Node Declaration -> Maybe ( Node String, Maybe (List (Node TypeAnnotation)) )
 getFunctionType declaration =
     case Node.value declaration of
         Declaration.FunctionDeclaration function ->
@@ -105,63 +105,53 @@ getFunctionType declaration =
             Nothing
 
 
-flattenFunctionType : Node TypeAnnotation -> List TypeAnnotation
+flattenFunctionType : Node TypeAnnotation -> List (Node TypeAnnotation)
 flattenFunctionType typeAnnotation =
-    case Node.value <| removeTypeAnnotationRange typeAnnotation of
+    case Node.value typeAnnotation of
         FunctionTypeAnnotation left right ->
             -- TODO: recurse into right
-            [ Node.value left, Node.value right ]
+            [ left, right ]
 
-        other ->
-            [ other ]
+        _ ->
+            [ typeAnnotation ]
 
 
 validateEnsureTypes : Node Declaration -> Context -> ( List (Rule.Error {}), Context )
 validateEnsureTypes node context =
-    ( case Node.value node of
-        Declaration.FunctionDeclaration function ->
-            case getNamedFunctionType "ensure" node of
-                Just ( name, Ok actualArgs ) ->
-                    case Maybe.map (Node.value << .typeAnnotation << Node.value) function.signature of
-                        Just (FunctionTypeAnnotation left right) ->
-                            case Dict.get name context.expectFunctionArguments of
-                                Just [ first ] ->
-                                    if (Node.value <| removeTypeAnnotationRange left) == first then
-                                        []
+    ( case getNamedFunctionType "ensure" node of
+        Just ( name, Ok [ left ] ) ->
+            case Dict.get name context.expectFunctionArguments of
+                Just [ first ] ->
+                    if removeTypeAnnotationRange left == removeTypeAnnotationRange first then
+                        []
 
-                                    else
-                                        [ Rule.error
-                                            { message = "ensure" ++ name ++ " should take the same arguments as expect" ++ name
-                                            , details =
-                                                [ "Assuming the type annotation for expect" ++ name ++ " is correct, the type annotation for ensure" ++ name ++ " should be:"
-                                                , "String -> ProgramTest msg model effect -> ProgramTest msg model effect"
-                                                ]
-                                            }
-                                            (Node.range left)
-                                        ]
-
-                                _ ->
-                                    -- TODO: work correctly when there's more than one initial argument
-                                    -- TODO: report when the corresponding expect function doesn't exist
-                                    []
-
-                        _ ->
-                            -- TODO: report that ensure* must be a function
-                            []
-
-                Just ( name, Err (NoTypeAnnotation functionName) ) ->
-                    [ Rule.error
-                        { message = Node.value functionName ++ " must have a type annotation"
-                        , details =
-                            [ "Assuming the type annotation for expect" ++ name ++ " is correct, the type annotation for ensure" ++ name ++ " should be:"
-                            , "String -> ProgramTest msg model effect -> ProgramTest msg model effect"
-                            ]
-                        }
-                        (Node.range functionName)
-                    ]
+                    else
+                        [ Rule.error
+                            { message = "ensure" ++ name ++ " should take the same arguments as expect" ++ name
+                            , details =
+                                [ "Assuming the type annotation for expect" ++ name ++ " is correct, the type annotation for ensure" ++ name ++ " should be:"
+                                , "String -> ProgramTest msg model effect -> ProgramTest msg model effect"
+                                ]
+                            }
+                            (Node.range left)
+                        ]
 
                 _ ->
+                    -- TODO: work correctly when there's more than one initial argument
+                    -- TODO: report when the corresponding expect function doesn't exist
+                    -- TODO: report that ensure* must be a function
                     []
+
+        Just ( name, Err (NoTypeAnnotation functionName) ) ->
+            [ Rule.error
+                { message = Node.value functionName ++ " must have a type annotation"
+                , details =
+                    [ "Assuming the type annotation for expect" ++ name ++ " is correct, the type annotation for ensure" ++ name ++ " should be:"
+                    , "String -> ProgramTest msg model effect -> ProgramTest msg model effect"
+                    ]
+                }
+                (Node.range functionName)
+            ]
 
         _ ->
             []
