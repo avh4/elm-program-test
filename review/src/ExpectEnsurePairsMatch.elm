@@ -40,39 +40,53 @@ collectExpectTypes declarations context =
     ( []
     , { context
         | expectFunctionArguments =
-            List.filterMap (getNamedFunctionType "expect") declarations
+            -- TODO: report when expect functions aren't valid
+            List.filterMap
+                (\decl ->
+                    case getNamedFunctionType "expect" decl of
+                        Just ( name, Ok args ) ->
+                            Just ( name, args )
+
+                        _ ->
+                            Nothing
+                )
+                declarations
                 |> Dict.fromList
       }
     )
 
 
-getNamedFunctionType : String -> Node Declaration -> Maybe ( String, List TypeAnnotation )
+getNamedFunctionType : String -> Node Declaration -> Maybe ( String, Result FunctionParseError (List TypeAnnotation) )
 getNamedFunctionType prefix declaration =
     case getFunctionType declaration of
-        Ok ( functionName, args ) ->
-            if String.startsWith prefix functionName then
+        Just ( functionName, annotation ) ->
+            if String.startsWith prefix (Node.value functionName) then
                 Just
-                    ( String.dropLeft (String.length prefix) functionName
-                    , List.take 1 args
-                      -- TODO: validate that return value is Expectation
-                      -- TODO: validate that last arg is ProgramTest msg model effect
-                      -- TODO: work correctly when there is more than one initial arg
+                    ( String.dropLeft (String.length prefix) (Node.value functionName)
+                    , case annotation of
+                        Just args ->
+                            -- TODO: validate that return value is Expectation
+                            -- TODO: validate that last arg is ProgramTest msg model effect
+                            -- TODO: work correctly when there is more than one initial arg
+                            Ok (List.take 1 args)
+
+                        Nothing ->
+                            Err (NoTypeAnnotation functionName)
                     )
 
             else
                 Nothing
 
-        _ ->
-            -- TODO: report if there was no type annotation
+        Nothing ->
             Nothing
 
 
 type FunctionParseError
     = NotAFunction
-    | NoTypeAnnotation
+    | NoTypeAnnotation (Node String)
 
 
-getFunctionType : Node Declaration -> Result FunctionParseError ( String, List TypeAnnotation )
+getFunctionType : Node Declaration -> Maybe ( Node String, Maybe (List TypeAnnotation) )
 getFunctionType declaration =
     case Node.value declaration of
         Declaration.FunctionDeclaration function ->
@@ -81,20 +95,14 @@ getFunctionType declaration =
                     function.declaration
                         |> Node.value
                         |> .name
-                        |> Node.value
             in
-            case Maybe.map (.typeAnnotation << Node.value) function.signature of
-                Just annotation ->
-                    Ok
-                        ( functionName
-                        , flattenFunctionType annotation
-                        )
-
-                _ ->
-                    Err NoTypeAnnotation
+            Just
+                ( functionName
+                , Maybe.map (flattenFunctionType << .typeAnnotation << Node.value) function.signature
+                )
 
         _ ->
-            Err NotAFunction
+            Nothing
 
 
 flattenFunctionType : Node TypeAnnotation -> List TypeAnnotation
@@ -113,7 +121,7 @@ validateEnsureTypes node context =
     ( case Node.value node of
         Declaration.FunctionDeclaration function ->
             case getNamedFunctionType "ensure" node of
-                Just ( name, actualArgs ) ->
+                Just ( name, Ok actualArgs ) ->
                     case Maybe.map (Node.value << .typeAnnotation << Node.value) function.signature of
                         Just (FunctionTypeAnnotation left right) ->
                             case Dict.get name context.expectFunctionArguments of
@@ -138,9 +146,19 @@ validateEnsureTypes node context =
                                     []
 
                         _ ->
-                            -- TODO: report that ensure* must have type annotation
                             -- TODO: report that ensure* must be a function
                             []
+
+                Just ( name, Err (NoTypeAnnotation functionName) ) ->
+                    [ Rule.error
+                        { message = Node.value functionName ++ " must have a type annotation"
+                        , details =
+                            [ "Assuming the type annotation for expect" ++ name ++ " is correct, the type annotation for ensure" ++ name ++ " should be:"
+                            , "String -> ProgramTest msg model effect -> ProgramTest msg model effect"
+                            ]
+                        }
+                        (Node.range functionName)
+                    ]
 
                 _ ->
                     []
