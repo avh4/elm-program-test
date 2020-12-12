@@ -99,4 +99,27 @@ all =
                             }
                             |> Review.Test.atExactly { start = { row = 9, column = 1 }, end = { row = 9, column = 16 } }
                         ]
+        , test "ensure function must have a corresponding expect function" <|
+            \() ->
+                String.join "\n"
+                    [ "module ProgramTest exposing (ensureSomething)"
+                    , "import Expect exposing (Expectation)"
+                    , ""
+                    , "type alias ProgramTest msg model effect = ()"
+                    , ""
+                    , "ensureSomething : String -> ProgramTest msg model effect -> ProgramTest msg model effect"
+                    , "ensureSomething = Debug.todo \"expectSomething\""
+                    ]
+                    |> Review.Test.run rule
+                    |> Review.Test.expectErrors
+                        [ Review.Test.error
+                            { message = "ensureSomething must have a corresponding expectSomething function"
+                            , details =
+                                [ "The type for expectSomething should be:"
+                                , "String -> ProgramTest msg model effect -> Expectation"
+                                ]
+                            , under = "ensureSomething"
+                            }
+                            |> Review.Test.atExactly { start = { row = 7, column = 1 }, end = { row = 7, column = 16 } }
+                        ]
         ]
