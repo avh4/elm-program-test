@@ -1716,7 +1716,7 @@ The parameters are:
 1.  The name of the port
 2.  The JSON representation of the incoming value
 
-For example, here we are simulating the program recieving a list of strings on the incoming port
+For example, here we are simulating the program receiving a list of strings on the incoming port
 `port resultsFromJavascript : (List String -> msg) -> Sub msg`:
 
     ...
