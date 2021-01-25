@@ -573,7 +573,7 @@ your program's effects into `SimulatedEffect`s.
 (If you do not use `withSimulatedEffects`,
 then `ProgramTest` will not simulate any effects for you.)
 
-You can create `SimulatedEffect`s using the the following modules,
+You can create `SimulatedEffect`s using the following modules,
 which parallel the modules your real program would use to create `Cmd`s and `Task`s:
 
   - [`SimulatedEffect.Http`](SimulatedEffect-Http) (parallels `Http` from `elm/http`)
@@ -601,7 +601,7 @@ returns `SimulatedSub`s instead `Sub`s.
 (If you do not use `withSimulatedSubscriptions`,
 then `ProgramTest` will not simulate any subscriptions for you.)
 
-You can create `SimulatedSub`s using the the following modules:
+You can create `SimulatedSub`s using the following modules:
 
   - [`SimulatedEffect.Ports`](SimulatedEffect-Ports) (parallels the `port` keyword)
 
@@ -1618,7 +1618,7 @@ The parameters are:
 1.  The name of the port
 2.  A JSON decoder corresponding to the type of the port
 3.  A function that will receive the list of values sent to the port
-    since the the start of the test (or since the last use of `ensureOutgoingPortValues`)
+    since the start of the test (or since the last use of `ensureOutgoingPortValues`)
     and return an `Expectation`
 
 For example:
