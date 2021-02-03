@@ -224,6 +224,18 @@ mapError f task =
             SimulatedEffect.SleepTask delay (onResult >> mapError f)
 
 
+{-| Recover from a failure in a task. If the given task fails, we use the
+callback to recover.
+
+    fail "file not found"
+      |> onError (\msg -> succeed 42)
+      -- succeed 42
+
+    succeed 9
+      |> onError (\msg -> succeed 42)
+      -- succeed 9
+
+-}
 onError : (x -> SimulatedTask y a) -> SimulatedTask x a -> SimulatedTask y a
 onError f task =
     case task of
