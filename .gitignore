@@ -3,3 +3,5 @@
 /docs.json
 /package-lock.json
 /website/node_modules/
+/pnpm-lock.yaml
+/.idea/
