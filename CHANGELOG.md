@@ -1,4 +1,4 @@
-## main
+## 3.4.0
 
 New features:
 
