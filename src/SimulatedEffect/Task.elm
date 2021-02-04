@@ -101,24 +101,7 @@ map f =
     andThen (f >> SimulatedEffect.Succeed)
 
 
-{-| Put the results of two tasks together. For example, if we wanted to know
-the current month, we could use [`elm/time`][time] to ask:
-
-    import Task exposing (Task)
-    import Time
-
-
-    -- elm install elm/time
-    getMonth : Task x Int
-    getMonth =
-        Task.map2 Time.toMonth Time.here Time.now
-
-**Note:** Say we were doing HTTP requests instead. `map2` does each task in
-order, so it would try the first request and only continue after it succeeds.
-If it fails, the whole thing fails!
-
-[time]: /packages/elm/time/latest/
-
+{-| Put the results of two tasks together.
 -}
 map2 : (a -> b -> result) -> SimulatedTask x a -> SimulatedTask x b -> SimulatedTask x result
 map2 func taskA taskB =
@@ -130,7 +113,8 @@ map2 func taskA taskB =
             )
 
 
-{-| -}
+{-| Put the results of three tasks together.
+-}
 map3 : (a -> b -> c -> result) -> SimulatedTask x a -> SimulatedTask x b -> SimulatedTask x c -> SimulatedTask x result
 map3 func taskA taskB taskC =
     taskA
@@ -145,7 +129,8 @@ map3 func taskA taskB taskC =
             )
 
 
-{-| -}
+{-| Put the results of four tasks together.
+-}
 map4 :
     (a -> b -> c -> d -> result)
     -> SimulatedTask x a
@@ -170,7 +155,8 @@ map4 func taskA taskB taskC taskD =
             )
 
 
-{-| -}
+{-| Put the results of five tasks together.
+-}
 map5 :
     (a -> b -> c -> d -> e -> result)
     -> SimulatedTask x a
@@ -224,17 +210,7 @@ mapError f task =
             SimulatedEffect.SleepTask delay (onResult >> mapError f)
 
 
-{-| Recover from a failure in a task. If the given task fails, we use the
-callback to recover.
-
-    fail "file not found"
-      |> onError (\msg -> succeed 42)
-      -- succeed 42
-
-    succeed 9
-      |> onError (\msg -> succeed 42)
-      -- succeed 9
-
+{-| Recover from a failure in a task.
 -}
 onError : (x -> SimulatedTask y a) -> SimulatedTask x a -> SimulatedTask y a
 onError f task =
