@@ -1,5 +1,9 @@
 ## main
 
+New features:
+
+  - Added to `SimulatedEffect.Task`: `map2`, `map3`, `map4`, `map5`, `onError`
+
 Documentation:
 
   - Added [NavigationKeyExample](https://github.com/avh4/elm-program-test/blob/main/examples/tests/NavigationKeyExampleTest.elm) showing how to test programs that require the use of `Browser.Navigation.Key`
