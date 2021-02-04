@@ -1,8 +1,8 @@
 module SimulatedEffect.Task exposing
     ( perform, attempt
     , andThen, succeed, fail
-    , map
-    , mapError
+    , map, map2, map3, map4, map5
+    , mapError, onError
     )
 
 {-| This module parallels [elm/core's `Task` module](https://package.elm-lang.org/packages/elm/core/1.0.2/Task).
@@ -25,12 +25,12 @@ to help you implement the function to provide when using [`ProgramTest.withSimul
 
 # Maps
 
-@docs map
+@docs map, map2, map3, map4, map5
 
 
 # Errors
 
-@docs mapError
+@docs mapError, onError
 
 -}
 
@@ -101,6 +101,91 @@ map f =
     andThen (f >> SimulatedEffect.Succeed)
 
 
+{-| Put the results of two tasks together.
+-}
+map2 : (a -> b -> result) -> SimulatedTask x a -> SimulatedTask x b -> SimulatedTask x result
+map2 func taskA taskB =
+    taskA
+        |> andThen
+            (\a ->
+                taskB
+                    |> andThen (\b -> succeed (func a b))
+            )
+
+
+{-| Put the results of three tasks together.
+-}
+map3 : (a -> b -> c -> result) -> SimulatedTask x a -> SimulatedTask x b -> SimulatedTask x c -> SimulatedTask x result
+map3 func taskA taskB taskC =
+    taskA
+        |> andThen
+            (\a ->
+                taskB
+                    |> andThen
+                        (\b ->
+                            taskC
+                                |> andThen (\c -> succeed (func a b c))
+                        )
+            )
+
+
+{-| Put the results of four tasks together.
+-}
+map4 :
+    (a -> b -> c -> d -> result)
+    -> SimulatedTask x a
+    -> SimulatedTask x b
+    -> SimulatedTask x c
+    -> SimulatedTask x d
+    -> SimulatedTask x result
+map4 func taskA taskB taskC taskD =
+    taskA
+        |> andThen
+            (\a ->
+                taskB
+                    |> andThen
+                        (\b ->
+                            taskC
+                                |> andThen
+                                    (\c ->
+                                        taskD
+                                            |> andThen (\d -> succeed (func a b c d))
+                                    )
+                        )
+            )
+
+
+{-| Put the results of five tasks together.
+-}
+map5 :
+    (a -> b -> c -> d -> e -> result)
+    -> SimulatedTask x a
+    -> SimulatedTask x b
+    -> SimulatedTask x c
+    -> SimulatedTask x d
+    -> SimulatedTask x e
+    -> SimulatedTask x result
+map5 func taskA taskB taskC taskD taskE =
+    taskA
+        |> andThen
+            (\a ->
+                taskB
+                    |> andThen
+                        (\b ->
+                            taskC
+                                |> andThen
+                                    (\c ->
+                                        taskD
+                                            |> andThen
+                                                (\d ->
+                                                    taskE
+                                                        |> andThen (\e -> succeed (func a b c d e))
+                                                )
+                                    )
+                        )
+            )
+
+
 {-| Transform the error value.
 -}
 mapError : (x -> y) -> SimulatedTask x a -> SimulatedTask y a
@@ -123,3 +208,27 @@ mapError f task =
 
         SimulatedEffect.SleepTask delay onResult ->
             SimulatedEffect.SleepTask delay (onResult >> mapError f)
+
+
+{-| Recover from a failure in a task.
+-}
+onError : (x -> SimulatedTask y a) -> SimulatedTask x a -> SimulatedTask y a
+onError f task =
+    case task of
+        SimulatedEffect.Succeed a ->
+            SimulatedEffect.Succeed a
+
+        SimulatedEffect.Fail x ->
+            f x
+
+        SimulatedEffect.HttpTask request ->
+            SimulatedEffect.HttpTask
+                { method = request.method
+                , url = request.url
+                , body = request.body
+                , headers = request.headers
+                , onRequestComplete = request.onRequestComplete >> onError f
+                }
+
+        SimulatedEffect.SleepTask delay onResult ->
+            SimulatedEffect.SleepTask delay (onResult >> onError f)
