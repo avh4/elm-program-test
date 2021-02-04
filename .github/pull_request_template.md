@@ -1,0 +1,3 @@
+- [ ] ran tests locally with `npm test`
+- [ ] updated CHANGELOG.md if appropriate
+- [ ] ran CI with `./ci/run-in-docker.sh https://github.com/<your username>/elm-program-test.git <your branch>`
