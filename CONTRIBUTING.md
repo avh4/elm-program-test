@@ -32,3 +32,16 @@ This will start the following:
 
 (If you need to change any of the ports use by the local services, edit `package.json`
 -- but remember not to commit those changes!)
+
+
+# CI
+
+To do a CI run:
+
+- you will need [docker](https://docs.docker.com/get-docker/)
+- push your branch to a publicly-accessible git repo
+- Then run:
+
+```sh
+./ci/run-in-docker.sh <git repo URL> <git branch>
+```
