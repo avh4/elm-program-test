@@ -3,7 +3,7 @@ module.exports = {
   themeConfig: {
     repo: 'avh4/elm-program-test',
     docsDir: 'docs',
-    docsBranch: 'master',
+    docsBranch: 'main',
     editLinks: true,
     editLinkText: 'Suggest changes to this page',
     nav: [
