@@ -1,5 +1,5 @@
 module Test.Http exposing
-    ( expectJsonBody, hasHeader
+    ( expectJsonBody, HttpRequest, hasHeader
     , timeout, networkError, httpResponse
     )
 
@@ -11,7 +11,7 @@ _Pull requests are welcome to add more useful functions._
 
 These functions provide some convenient checks that can be used with [`ProgramTest.expectHttpRequest`](ProgramTest#expectHttpRequest).
 
-@docs expectJsonBody, hasHeader
+@docs expectJsonBody, HttpRequest, hasHeader
 
 
 ## Responses
@@ -26,7 +26,17 @@ import Dict exposing (Dict)
 import Expect exposing (Expectation)
 import Http
 import Json.Decode
-import SimulatedEffect
+import SimulatedEffect exposing (SimulatedTask)
+
+
+{-| -}
+type alias HttpRequest x a =
+    { method : String
+    , url : String
+    , body : String
+    , headers : List ( String, String )
+    , onRequestComplete : Http.Response String -> SimulatedTask x a
+    }
 
 
 {-| A convenient way to check something about the request body of a pending HTTP request.
@@ -43,7 +53,7 @@ import SimulatedEffect
 expectJsonBody :
     Json.Decode.Decoder requestBody
     -> (requestBody -> Expectation)
-    -> SimulatedEffect.HttpRequest x a
+    -> HttpRequest x a
     -> Expectation
 expectJsonBody decoder check request =
     case Json.Decode.decodeString decoder request.body of
@@ -62,7 +72,7 @@ expectJsonBody decoder check request =
             (Test.Http.hasHeader "Content-Type" "application/json")
 
 -}
-hasHeader : String -> String -> SimulatedEffect.HttpRequest x a -> Expectation
+hasHeader : String -> String -> HttpRequest x a -> Expectation
 hasHeader key value { headers } =
     let
         key_ =

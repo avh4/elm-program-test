@@ -15,7 +15,8 @@ to help you implement the function to provide when using [`ProgramTest.withSimul
 -}
 
 import Json.Decode
-import SimulatedEffect exposing (SimulatedEffect, SimulatedSub)
+import ProgramTest exposing (SimulatedEffect, SimulatedSub)
+import SimulatedEffect
 
 
 {-| Tell the runtime that there are no subscriptions.

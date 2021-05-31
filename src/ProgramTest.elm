@@ -1443,7 +1443,7 @@ If you want to interact with the program more after this assertion, see [`ensure
 expectHttpRequest :
     String
     -> String
-    -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
+    -> (Test.Http.HttpRequest msg msg -> Expectation)
     -> ProgramTest model msg effect
     -> Expectation
 expectHttpRequest method url checkRequest =
@@ -1462,7 +1462,7 @@ as having a single assertion per test can make the intent of your tests more cle
 ensureHttpRequest :
     String
     -> String
-    -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
+    -> (Test.Http.HttpRequest msg msg -> Expectation)
     -> ProgramTest model msg effect
     -> ProgramTest model msg effect
 ensureHttpRequest method url checkRequest =
@@ -1473,7 +1473,7 @@ expectHttpRequestHelper :
     String
     -> String
     -> String
-    -> (SimulatedEffect.HttpRequest msg msg -> Expectation)
+    -> (Test.Http.HttpRequest msg msg -> Expectation)
     -> TestState model msg effect
     -> Result Failure (TestState model msg effect)
 expectHttpRequestHelper functionName method url checkRequest state =

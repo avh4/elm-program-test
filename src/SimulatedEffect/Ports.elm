@@ -15,7 +15,8 @@ For a detailed example, see the [“Testing programs with ports” guidebook](ht
 
 import Json.Decode
 import Json.Encode
-import SimulatedEffect exposing (SimulatedEffect, SimulatedSub)
+import ProgramTest exposing (SimulatedEffect, SimulatedSub)
+import SimulatedEffect
 
 
 {-| Creates a `SimulatedEffect` that parallels using an outgoing Elm port.
