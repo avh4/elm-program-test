@@ -13,7 +13,8 @@ to help you implement the function to provide when using [`ProgramTest.withSimul
 
 -}
 
-import SimulatedEffect exposing (SimulatedTask)
+import ProgramTest exposing (SimulatedTask)
+import SimulatedEffect
 
 
 {-| Block progress on the current process for the given number of milliseconds.

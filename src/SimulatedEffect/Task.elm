@@ -34,7 +34,8 @@ to help you implement the function to provide when using [`ProgramTest.withSimul
 
 -}
 
-import SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
+import ProgramTest exposing (SimulatedEffect, SimulatedTask)
+import SimulatedEffect
 
 
 {-| -}

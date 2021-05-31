@@ -21,7 +21,8 @@ to help you implement the function to provide when using [`ProgramTest.withSimul
 
 -}
 
-import SimulatedEffect exposing (SimulatedEffect)
+import ProgramTest exposing (SimulatedEffect)
+import SimulatedEffect
 
 
 {-| Change the URL, but do not trigger a page load.

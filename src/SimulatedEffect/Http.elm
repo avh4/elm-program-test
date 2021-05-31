@@ -48,7 +48,8 @@ to help you implement the function to provide when using [`ProgramTest.withSimul
 import Http
 import Json.Decode exposing (Decoder)
 import Json.Encode
-import SimulatedEffect as SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
+import ProgramTest exposing (SimulatedEffect, SimulatedTask)
+import SimulatedEffect
 
 
 {-| Create a `GET` request.

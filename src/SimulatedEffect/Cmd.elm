@@ -14,7 +14,8 @@ to help you implement the function to provide when using [`ProgramTest.withSimul
 
 -}
 
-import SimulatedEffect exposing (SimulatedEffect)
+import ProgramTest exposing (SimulatedEffect)
+import SimulatedEffect
 import SimulatedEffect.Task as Task
 
 
