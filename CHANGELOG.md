@@ -1,3 +1,10 @@
+## 3.5.0
+
+Packaging:
+
+  - The `HttpRequest` type is now exposed.
+
+
 ## 3.4.0
 
 New features:
