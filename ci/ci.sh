@@ -17,6 +17,7 @@ git clone --single-branch --branch "$2" "$1" elm-program-test
 cd elm-program-test
 git pull https://github.com/avh4/elm-program-test.git main
 pnpm install
+npm run postinstall
 
 npm test
 
