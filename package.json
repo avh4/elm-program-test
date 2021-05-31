@@ -1,15 +1,15 @@
 {
   "devDependencies": {
-    "@vue/babel-preset-app": "^4.2.3",
+    "@vue/babel-preset-app": "^4.5.13",
     "chokidar-cli": "^2.1.0",
-    "concurrently": "^5.1.0",
-    "elm": "^0.19.1-3",
-    "elm-doc-preview": "^3.0.4",
-    "elm-format": "0.8.3",
+    "concurrently": "^6.2.0",
+    "elm-doc-preview": "^5.0.5",
     "elm-test": "^0.19.1",
-    "vuepress": "^1.3.1"
+    "elm-tooling": "^1.3.0",
+    "vuepress": "^1.8.2"
   },
   "scripts": {
+    "postinstall": "elm-tooling install",
     "test": "elm-test && npm run-script build-examples && elm make --docs docs.json && elm-format --validate . && elm diff",
     "build-examples": "(cd examples && elm make src/*.elm --output=/dev/null && elm-test)",
     "run-examples": "(cd examples && elm reactor --port 8002)",
