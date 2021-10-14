@@ -26,4 +26,6 @@ resolve base url =
                             |> List.reverse
                             |> (\l -> l ++ String.split "/" url)
                             |> String.join "/"
+                , query = Nothing
+                , fragment = Nothing
             }
