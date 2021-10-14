@@ -27,5 +27,40 @@ all =
             , check "https://example.com/path" "/new" "https://example.com/new"
             , check "https://example.com/path" "new" "https://example.com/new"
             , check "https://example.com/path/file" "new" "https://example.com/path/new"
+            , describe "W3 reference examples" <|
+                let
+                    baseUri =
+                        "http://a/b/c/d;p?q"
+                in
+                [ describe "5.4.1 Normal Examples"
+                    [ -- check baseUri "g:h" "g:h"
+                      check baseUri "g" "http://a/b/c/g"
+
+                    -- , check baseUri "./g" "http://a/b/c/g"
+                    , check baseUri "g/" "http://a/b/c/g/"
+                    , check baseUri "/g" "http://a/g"
+
+                    -- , check baseUri "//g" "http://g"
+                    -- , check baseUri "?y" "http://a/b/c/d;p?y"
+                    , check baseUri "g?y" "http://a/b/c/g?y"
+
+                    -- , check baseUri "#s" "http://a/b/c/d;p?q#s"
+                    , check baseUri "g#s" "http://a/b/c/g#s"
+                    , check baseUri "g?y#s" "http://a/b/c/g?y#s"
+                    , check baseUri ";x" "http://a/b/c/;x"
+                    , check baseUri "g;x" "http://a/b/c/g;x"
+                    , check baseUri "g;x?y#s" "http://a/b/c/g;x?y#s"
+
+                    -- , check baseUri "" "http://a/b/c/d;p?q"
+                    -- , check baseUri "." "http://a/b/c/"
+                    -- , check baseUri "./" "http://a/b/c/"
+                    -- , check baseUri ".." "http://a/b/"
+                    -- , check baseUri "../" "http://a/b/"
+                    -- , check baseUri "../g" "http://a/b/g"
+                    -- , check baseUri "../.." "http://a/"
+                    -- , check baseUri "../../" "http://a/"
+                    -- , check baseUri "../../g" "http://a/g"
+                    ]
+                ]
             ]
         ]
