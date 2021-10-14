@@ -1,3 +1,10 @@
+## 3.5.1
+
+Bug fixes:
+
+  - Resolving a relative URL (such as when `clickLink` is used) is correct in more cases (specifically, when the base URL has a query or fragment string)
+
+
 ## 3.5.0
 
 Packaging:
