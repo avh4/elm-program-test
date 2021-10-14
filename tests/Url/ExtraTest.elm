@@ -27,6 +27,7 @@ all =
             , check "https://example.com/path" "/new" "https://example.com/new"
             , check "https://example.com/path" "new" "https://example.com/new"
             , check "https://example.com/path/file" "new" "https://example.com/path/new"
+            , check "https://example.com/path?query#fragment" "new" "https://example.com/new"
             , describe "W3 reference examples" <|
                 let
                     baseUri =
