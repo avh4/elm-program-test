@@ -7,6 +7,7 @@ Changes:
 New features:
 
   - Added `expectHttpRequests` for checking whether multiple requests have been made to the same endpoint (or that zero requests have been made).
+  - Added `simulateHttpResponseAdvanced` for simulating HTTP responses when multiple requests have been made to the same endpoint.
 
 
 ## 3.5.1

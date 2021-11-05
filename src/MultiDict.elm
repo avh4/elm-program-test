@@ -1,4 +1,4 @@
-module MultiDict exposing (MultiDict, empty, get, insert, keys, remove)
+module MultiDict exposing (MultiDict, empty, get, insert, keys, remove, set)
 
 import Dict exposing (Dict)
 import List.Extra
@@ -41,3 +41,9 @@ remove : comparable -> v -> MultiDict comparable v -> MultiDict comparable v
 remove key value (MultiDict dict) =
     MultiDict
         (Dict.update key (Maybe.andThen (NonEmpty.toList >> List.Extra.remove value >> NonEmpty.fromList)) dict)
+
+
+set : comparable -> List v -> MultiDict comparable v -> MultiDict comparable v
+set key values (MultiDict dict) =
+    MultiDict
+        (Dict.update key (\_ -> NonEmpty.fromList values) dict)

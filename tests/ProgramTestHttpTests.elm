@@ -39,10 +39,10 @@ start initialEffect =
                         ( model, effect )
 
                     HandleFriendsResponse result ->
-                        ( Debug.toString result, SimulatedEffect.Cmd.none )
+                        ( model ++ ";" ++ Debug.toString result, SimulatedEffect.Cmd.none )
 
                     HandleStringResponse result ->
-                        ( Debug.toString result, SimulatedEffect.Cmd.none )
+                        ( model ++ ";" ++ Debug.toString result, SimulatedEffect.Cmd.none )
         , view =
             \_ ->
                 Html.div []
@@ -90,7 +90,7 @@ all =
                     start SimulatedEffect.Cmd.none
                         |> assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectFailure
-                            [ expect ++ "HttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
+                            [ expect ++ "HttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made and still be pending, but no such requests were made."
                             , "    No requests were made."
                             ]
             , testRequestWasMade "can assert that an HTTP request was made from init (success)" <|
@@ -130,7 +130,7 @@ all =
                     start (Http.get { url = "https://example.com/actualRequest", expect = Http.expectString HandleStringResponse })
                         |> assertHttpRequestWasMade "GET" "https://example.com/not-made"
                         |> expectFailure
-                            [ expect ++ "HttpRequestWasMade: Expected HTTP request (GET https://example.com/not-made) to have been made, but it was not."
+                            [ expect ++ "HttpRequestWasMade: Expected HTTP request (GET https://example.com/not-made) to have been made and still be pending, but no such requests were made."
                             , "    The following requests were made:"
                             , "      - GET https://example.com/actualRequest"
                             ]
@@ -242,7 +242,7 @@ all =
                         |> ProgramTest.simulateHttpOk "GET"
                             "https://example.com/friends"
                             """["Alex","Kelsey","Sam"]"""
-                        |> ProgramTest.expectModel (Expect.equal """Ok ["Alex","Kelsey","Sam"]""")
+                        |> ProgramTest.expectModel (Expect.equal """Init;Ok ["Alex","Kelsey","Sam"]""")
             , test "simulate error response" <|
                 \() ->
                     start (Http.get { url = "https://example.com/friends", expect = Http.expectString HandleStringResponse })
@@ -254,14 +254,14 @@ all =
                                 , body = ""
                                 }
                             )
-                        |> ProgramTest.expectModel (Expect.equal """Err (BadStatus 500)""")
+                        |> ProgramTest.expectModel (Expect.equal """Init;Err (BadStatus 500)""")
             , test "can simulate network error" <|
                 \() ->
                     start (Http.get { url = "https://example.com/friends", expect = Http.expectString HandleStringResponse })
                         |> ProgramTest.simulateHttpResponse "GET"
                             "https://example.com/friends"
                             Test.Http.networkError
-                        |> ProgramTest.expectModel (Expect.equal """Err NetworkError""")
+                        |> ProgramTest.expectModel (Expect.equal """Init;Err NetworkError""")
             , test "can resolve a chain of requests" <|
                 \() ->
                     start
@@ -306,7 +306,7 @@ all =
                         |> ProgramTest.simulateHttpOk "GET"
                             "https://example.com/C/B-return"
                             """{}"""
-                        |> ProgramTest.expectModel (Expect.equal """Ok "C-return\"""")
+                        |> ProgramTest.expectModel (Expect.equal """Init;Ok "C-return\"""")
             , testRequestWasMade "a request can only be resolved once" <|
                 \expect assertHttpRequestWasMade ->
                     start
@@ -318,7 +318,7 @@ all =
                         |> ProgramTest.simulateHttpOk "GET" "https://example.com/" """{}"""
                         |> assertHttpRequestWasMade "GET" "https://example.com/"
                         |> expectFailure
-                            [ expect ++ "HttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
+                            [ expect ++ "HttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made and still be pending, but no such requests were made."
                             , "    No requests were made."
                             ]
             , test "two identical requests give an error" <|
@@ -339,6 +339,50 @@ all =
                         |> ProgramTest.done
                         |> expectFailure
                             [ "simulateHttpOk: Expected a single HTTP request (GET https://example.com/) to have been made, but 2 such requests were made."
+                            , "    The following requests were made:"
+                            , "      - GET https://example.com/"
+                            , "      - GET https://example.com/"
+                            ]
+            , test "can resolve one of multiple identical requests" <|
+                \() ->
+                    start
+                        (SimulatedEffect.Cmd.batch
+                            [ Http.get
+                                { url = "https://example.com/"
+                                , expect = Http.expectString HandleStringResponse
+                                }
+                            , Http.get
+                                { url = "https://example.com/"
+                                , expect = Http.expectString HandleStringResponse
+                                }
+                            , Http.get
+                                { url = "https://example.com/"
+                                , expect = Http.expectString HandleStringResponse
+                                }
+                            ]
+                        )
+                        |> ProgramTest.simulateHttpResponseAdvanced "GET" "https://example.com/" 2 (Test.Http.httpResponse { statusCode = 200, headers = [], body = "A" })
+                        |> ProgramTest.simulateHttpResponseAdvanced "GET" "https://example.com/" 2 (Test.Http.httpResponse { statusCode = 200, headers = [], body = "B" })
+                        |> ProgramTest.simulateHttpResponseAdvanced "GET" "https://example.com/" 1 (Test.Http.httpResponse { statusCode = 200, headers = [], body = "C" })
+                        |> ProgramTest.expectModel (Expect.equal """Init;Ok "A";Ok "B";Ok "C\"""")
+            , test "gives an error trying to resolve one of multiple when not enough requests have been made" <|
+                \() ->
+                    start
+                        (SimulatedEffect.Cmd.batch
+                            [ Http.get
+                                { url = "https://example.com/"
+                                , expect = Http.expectString HandleStringResponse
+                                }
+                            , Http.get
+                                { url = "https://example.com/"
+                                , expect = Http.expectString HandleStringResponse
+                                }
+                            ]
+                        )
+                        |> ProgramTest.simulateHttpResponseAdvanced "GET" "https://example.com/" 4 (Test.Http.httpResponse { statusCode = 200, headers = [], body = "" })
+                        |> ProgramTest.done
+                        |> expectFailure
+                            [ "simulateHttpResponseAdvanced: Expected at least 4 HTTP requests (GET https://example.com/) to have been made and still be pending, but only 2 such requests were made."
                             , "    The following requests were made:"
                             , "      - GET https://example.com/"
                             , "      - GET https://example.com/"

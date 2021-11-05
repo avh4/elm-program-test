@@ -15,7 +15,7 @@ module ProgramTest exposing
     , within
     , expectHttpRequestWasMade, expectHttpRequest, expectHttpRequests
     , ensureHttpRequestWasMade, ensureHttpRequest, ensureHttpRequests
-    , simulateHttpOk, simulateHttpResponse
+    , simulateHttpOk, simulateHttpResponse, simulateHttpResponseAdvanced
     , advanceTime
     , expectOutgoingPortValues, ensureOutgoingPortValues
     , simulateIncomingPort
@@ -134,7 +134,7 @@ The following functions allow you to configure your
 
 ## Simulating HTTP responses
 
-@docs simulateHttpOk, simulateHttpResponse
+@docs simulateHttpOk, simulateHttpResponse, simulateHttpResponseAdvanced
 
 
 # Simulating time
@@ -204,6 +204,7 @@ import Html.Attributes exposing (attribute)
 import Http
 import Json.Decode
 import Json.Encode
+import List.Extra
 import MultiDict
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
 import ProgramTest.Failure as Failure exposing (Failure(..))
@@ -1526,7 +1527,7 @@ checkSingleHttpRequest :
 checkSingleHttpRequest checkRequest requests =
     case requests of
         [] ->
-            Err NoMatchingHttpRequest
+            Err (NoMatchingHttpRequest 1 0)
 
         [ request ] ->
             case Test.Runner.getFailureReason (checkRequest request) of
@@ -1538,7 +1539,7 @@ checkSingleHttpRequest checkRequest requests =
                     Err (\functionName _ _ -> ExpectFailed functionName reason.description reason.reason)
 
         (_ :: _ :: _) as many ->
-            Err (MultipleMatchingHttpRequest (List.length many))
+            Err (MultipleMatchingHttpRequest 1 (List.length many))
 
 
 checkMultipleHttpRequests :
@@ -1604,6 +1605,8 @@ simulateHttpOk method url responseBody =
     simulateHttpResponseHelper "simulateHttpOk"
         method
         url
+        1
+        True
         (Test.Http.httpResponse
             { statusCode = 200
             , body = responseBody
@@ -1644,16 +1647,29 @@ you can use the simpler [`simulateHttpOk`](#simulateHttpOk).
 If you want to check the request headers or request body, use [`ensureHttpRequest`](#ensureHttpRequest)
 immediately before using `simulateHttpResponse`.
 
+If your program will make multiple pending requests to the same URL, see [`simulateHttpResponseAdvanced`](#simulateHttpResponseAdvanced).
+
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 -}
 simulateHttpResponse : String -> String -> Http.Response String -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateHttpResponse method url response =
-    simulateHttpResponseHelper "simulateHttpResponse" method url response
+    simulateHttpResponseHelper "simulateHttpResponse" method url 1 True response
 
 
-simulateHttpResponseHelper : String -> String -> String -> Http.Response String -> ProgramTest model msg effect -> ProgramTest model msg effect
-simulateHttpResponseHelper functionName method url response =
+{-| Simulates a response to one of several pending HTTP requests made to a given endpoint.
+
+This is the same as [`simulateHttpResponse`](#simulateHttpResponse),
+except that the additional `Int` parameter specificies which request to resolve if multiple requests to the same method/URL are pending.
+
+-}
+simulateHttpResponseAdvanced : String -> String -> Int -> Http.Response String -> ProgramTest model msg effect -> ProgramTest model msg effect
+simulateHttpResponseAdvanced method url pendingRequestIndex response =
+    simulateHttpResponseHelper "simulateHttpResponseAdvanced" method url pendingRequestIndex False response
+
+
+simulateHttpResponseHelper : String -> String -> String -> Int -> Bool -> Http.Response String -> ProgramTest model msg effect -> ProgramTest model msg effect
+simulateHttpResponseHelper functionName method url pendingRequestIndex failIfMorePendingRequests response =
     andThen <|
         \program state ->
             case state.effectSimulation of
@@ -1661,28 +1677,32 @@ simulateHttpResponseHelper functionName method url response =
                     Err (EffectSimulationNotConfigured functionName)
 
                 Just simulation ->
-                    case MultiDict.get ( method, url ) simulation.state.http of
-                        [] ->
-                            Err (NoMatchingHttpRequest functionName { method = method, url = url } (MultiDict.keys simulation.state.http))
+                    case
+                        MultiDict.get ( method, url ) simulation.state.http
+                            |> List.Extra.splitAt (pendingRequestIndex - 1)
+                    of
+                        ( prev, [] ) ->
+                            Err (NoMatchingHttpRequest pendingRequestIndex (List.length prev) functionName { method = method, url = url } (MultiDict.keys simulation.state.http))
 
-                        [ actualRequest ] ->
-                            let
-                                resolveHttpRequest sim =
-                                    let
-                                        st =
-                                            sim.state
-                                    in
-                                    { sim | state = { st | http = MultiDict.remove ( method, url ) actualRequest st.http } }
-                            in
-                            state
-                                |> TestState.withSimulation
-                                    (resolveHttpRequest
-                                        >> EffectSimulation.queueTask (actualRequest.onRequestComplete response)
-                                    )
-                                |> TestState.drain program
+                        ( prev, actualRequest :: rest ) ->
+                            if failIfMorePendingRequests && rest /= [] then
+                                Err (MultipleMatchingHttpRequest pendingRequestIndex (List.length prev + 1 + List.length rest) functionName { method = method, url = url } (MultiDict.keys simulation.state.http))
 
-                        (_ :: _ :: _) as many ->
-                            Err (MultipleMatchingHttpRequest (List.length many) functionName { method = method, url = url } (MultiDict.keys simulation.state.http))
+                            else
+                                let
+                                    resolveHttpRequest sim =
+                                        let
+                                            st =
+                                                sim.state
+                                        in
+                                        { sim | state = { st | http = MultiDict.set ( method, url ) (prev ++ rest) st.http } }
+                                in
+                                state
+                                    |> TestState.withSimulation
+                                        (resolveHttpRequest
+                                            >> EffectSimulation.queueTask (actualRequest.onRequestComplete response)
+                                        )
+                                    |> TestState.drain program
 
 
 {-| Simulates the passing of time.
