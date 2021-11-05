@@ -4,6 +4,10 @@ Changes:
 
   - `expectHttpRequestWasMade`, `expectHttpRequest`, and `simulateHttpResponse` will now fail if multiple pending requests have been made to the relevant (method, URL) pair.
 
+New features:
+
+  - Added `expectHttpRequests` for checking whether multiple requests have been made to the same endpoint (or that zero requests have been made).
+
 
 ## 3.5.1
 

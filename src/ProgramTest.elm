@@ -13,8 +13,8 @@ module ProgramTest exposing
     , check, selectOption
     , simulateDomEvent
     , within
-    , expectHttpRequestWasMade, expectHttpRequest
-    , ensureHttpRequestWasMade, ensureHttpRequest
+    , expectHttpRequestWasMade, expectHttpRequest, expectHttpRequests
+    , ensureHttpRequestWasMade, ensureHttpRequest, ensureHttpRequests
     , simulateHttpOk, simulateHttpResponse
     , advanceTime
     , expectOutgoingPortValues, ensureOutgoingPortValues
@@ -128,8 +128,8 @@ The following functions allow you to configure your
 
 # Inspecting HTTP requests
 
-@docs expectHttpRequestWasMade, expectHttpRequest
-@docs ensureHttpRequestWasMade, ensureHttpRequest
+@docs expectHttpRequestWasMade, expectHttpRequest, expectHttpRequests
+@docs ensureHttpRequestWasMade, ensureHttpRequest, ensureHttpRequests
 
 
 ## Simulating HTTP responses
@@ -1398,6 +1398,7 @@ For example:
         |> expectHttpRequestWasMade "GET" "https://example.com/api/data"
 
 If you want to check the headers or request body, see [`expectHttpRequest`](#expectHttpRequest).
+If you expect multiple requests to have been made to the same endpoint, see [`expectHttpRequests`](#expectHttpRequests).
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
@@ -1407,7 +1408,7 @@ If you want to interact with the program more after this assertion, see [`ensure
 expectHttpRequestWasMade : String -> String -> ProgramTest model msg effect -> Expectation
 expectHttpRequestWasMade method url programTest =
     programTest
-        |> andThen (\_ -> expectHttpRequestHelper "expectHttpRequestWasMade" method url (always Expect.pass))
+        |> andThen (\_ -> expectHttpRequestHelper "expectHttpRequestWasMade" method url (checkSingleHttpRequest (always Expect.pass)))
         |> done
 
 
@@ -1421,7 +1422,7 @@ as having a single assertion per test can make the intent of your tests more cle
 -}
 ensureHttpRequestWasMade : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
 ensureHttpRequestWasMade method url =
-    andThen (\_ -> expectHttpRequestHelper "ensureHttpRequestWasMade" method url (always Expect.pass))
+    andThen (\_ -> expectHttpRequestHelper "ensureHttpRequestWasMade" method url (checkSingleHttpRequest (always Expect.pass)))
 
 
 {-| Allows you to check the details of a pending HTTP request.
@@ -1436,6 +1437,8 @@ If you only care about whether the a request was made to the correct URL, see [`
             "https://example.com/save"
             (.body >> Expect.equal """{"content":"updated!"}""")
 
+If you expect multiple requests to have been made to the same endpoint, see [`expectHttpRequests`](#expectHttpRequests).
+
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
 If you want to interact with the program more after this assertion, see [`ensureHttpRequest`](#ensureHttpRequest).
@@ -1448,7 +1451,7 @@ expectHttpRequest :
     -> ProgramTest model msg effect
     -> Expectation
 expectHttpRequest method url checkRequest =
-    andThen (\_ -> expectHttpRequestHelper "expectHttpRequest" method url checkRequest)
+    andThen (\_ -> expectHttpRequestHelper "expectHttpRequest" method url (checkSingleHttpRequest checkRequest))
         >> done
 
 
@@ -1467,37 +1470,107 @@ ensureHttpRequest :
     -> ProgramTest model msg effect
     -> ProgramTest model msg effect
 ensureHttpRequest method url checkRequest =
-    andThen (\_ -> expectHttpRequestHelper "ensureHttpRequest" method url checkRequest)
+    andThen (\_ -> expectHttpRequestHelper "ensureHttpRequest" method url (checkSingleHttpRequest checkRequest))
+
+
+{-| Allows you to check the details of pending HTTP requests.
+
+See the [“Expectations” section of `Test.Http`](Test-Http#expectations) for functions that might be helpful
+in create an expectation on the request.
+
+If your program will only have a single pending request to any particular URL, you can use the simpler [`expectHttpRequest`](#expectHttpRequest) (singular) or [`expectHttpRequestWasMade`](#expectHttpRequestWasMade) instead.
+
+    ...
+        |> expectHttpRequests "POST"
+            "https://example.com/save"
+            (List.map .body >> Expect.equal ["""body1""", """body2"""])
+
+NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
+
+If you want to interact with the program more after this assertion, see [`ensureHttpRequests`](#ensureHttpRequests).
+
+-}
+expectHttpRequests :
+    String
+    -> String
+    -> (List (Test.Http.HttpRequest msg msg) -> Expectation)
+    -> ProgramTest model msg effect
+    -> Expectation
+expectHttpRequests method url checkRequests =
+    andThen (\_ -> expectHttpRequestHelper "expectHttpRequests" method url (checkMultipleHttpRequests checkRequests))
+        >> done
+
+
+{-| See the documentation for [`expectHttpRequests`](#expectHttpRequests).
+This is the same except that it returns a `ProgramTest` instead of an `Expectation`
+so that you can interact with the program further after this assertion.
+
+You should prefer `expectHttpRequests` when possible,
+as having a single assertion per test can make the intent of your tests more clear.
+
+-}
+ensureHttpRequests :
+    String
+    -> String
+    -> (List (Test.Http.HttpRequest msg msg) -> Expectation)
+    -> ProgramTest model msg effect
+    -> ProgramTest model msg effect
+ensureHttpRequests method url checkRequests =
+    andThen (\_ -> expectHttpRequestHelper "ensureHttpRequests" method url (checkMultipleHttpRequests checkRequests))
+
+
+checkSingleHttpRequest :
+    (Test.Http.HttpRequest msg msg -> Expectation)
+    -> List (Test.Http.HttpRequest msg msg)
+    -> Result (String -> { method : String, url : String } -> List ( String, String ) -> Failure) ()
+checkSingleHttpRequest checkRequest requests =
+    case requests of
+        [] ->
+            Err NoMatchingHttpRequest
+
+        [ request ] ->
+            case Test.Runner.getFailureReason (checkRequest request) of
+                Nothing ->
+                    -- check succeeded
+                    Ok ()
+
+                Just reason ->
+                    Err (\functionName _ _ -> ExpectFailed functionName reason.description reason.reason)
+
+        (_ :: _ :: _) as many ->
+            Err (MultipleMatchingHttpRequest (List.length many))
+
+
+checkMultipleHttpRequests :
+    (List (Test.Http.HttpRequest msg msg) -> Expectation)
+    -> List (Test.Http.HttpRequest msg msg)
+    -> Result (String -> { method : String, url : String } -> List ( String, String ) -> Failure) ()
+checkMultipleHttpRequests checkRequests requests =
+    case Test.Runner.getFailureReason (checkRequests requests) of
+        Nothing ->
+            -- check succeeded
+            Ok ()
+
+        Just reason ->
+            Err (\functionName _ _ -> ExpectFailed functionName reason.description reason.reason)
 
 
 expectHttpRequestHelper :
     String
     -> String
     -> String
-    -> (Test.Http.HttpRequest msg msg -> Expectation)
+    -> (List (Test.Http.HttpRequest msg msg) -> Result (String -> { method : String, url : String } -> List ( String, String ) -> Failure) ())
     -> TestState model msg effect
     -> Result Failure (TestState model msg effect)
-expectHttpRequestHelper functionName method url checkRequest state =
+expectHttpRequestHelper functionName method url checkRequests state =
     case state.effectSimulation of
         Nothing ->
             Err (EffectSimulationNotConfigured functionName)
 
         Just simulation ->
-            case MultiDict.get ( method, url ) simulation.state.http of
-                [] ->
-                    Err (NoMatchingHttpRequest functionName { method = method, url = url } (MultiDict.keys simulation.state.http))
-
-                [ request ] ->
-                    case Test.Runner.getFailureReason (checkRequest request) of
-                        Nothing ->
-                            -- check succeeded
-                            Ok state
-
-                        Just reason ->
-                            Err (ExpectFailed functionName reason.description reason.reason)
-
-                (_ :: _ :: _) as many ->
-                    Err (MultipleMatchingHttpRequest functionName { method = method, url = url } (List.length many) (MultiDict.keys simulation.state.http))
+            checkRequests (MultiDict.get ( method, url ) simulation.state.http)
+                |> Result.map (\() -> state)
+                |> Result.mapError (\f -> f functionName { method = method, url = url } (MultiDict.keys simulation.state.http))
 
 
 {-| Simulates an HTTP 200 response to a pending request with the given method and url.
@@ -1609,7 +1682,7 @@ simulateHttpResponseHelper functionName method url response =
                                 |> TestState.drain program
 
                         (_ :: _ :: _) as many ->
-                            Err (MultipleMatchingHttpRequest functionName { method = method, url = url } (List.length many) (MultiDict.keys simulation.state.http))
+                            Err (MultipleMatchingHttpRequest (List.length many) functionName { method = method, url = url } (MultiDict.keys simulation.state.http))
 
 
 {-| Simulates the passing of time.

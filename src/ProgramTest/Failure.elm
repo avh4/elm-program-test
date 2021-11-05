@@ -17,7 +17,7 @@ type Failure
     | ProgramDoesNotSupportNavigation String
     | NoBaseUrl String String
     | NoMatchingHttpRequest String { method : String, url : String } (List ( String, String ))
-    | MultipleMatchingHttpRequest String { method : String, url : String } Int (List ( String, String ))
+    | MultipleMatchingHttpRequest Int String { method : String, url : String } (List ( String, String ))
     | EffectSimulationNotConfigured String
     | CustomFailure String String
 
@@ -73,7 +73,7 @@ toString failure =
                             ]
                 ]
 
-        MultipleMatchingHttpRequest functionName request n pendingRequests ->
+        MultipleMatchingHttpRequest n functionName request pendingRequests ->
             String.concat
                 [ functionName
                 , ": "

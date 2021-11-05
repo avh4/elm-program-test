@@ -78,6 +78,11 @@ all =
                 testAssertion3
                     ProgramTest.expectHttpRequest
                     ProgramTest.ensureHttpRequest
+
+            testRequests =
+                testAssertion3
+                    ProgramTest.expectHttpRequests
+                    ProgramTest.ensureHttpRequests
         in
         [ describe "assertHttpRequest"
             [ testRequestWasMade "can assert that an HTTP request was made from init (failure)" <|
@@ -203,8 +208,25 @@ all =
                             , "      - GET https://example.com/"
                             , "      - GET https://example.com/"
                             ]
-
-            -- TODO: how to handle multiple requests made to the same method/URL?
+            , testRequests "can assert that no requests were made" <|
+                \expect assertHttpRequests ->
+                    start SimulatedEffect.Cmd.none
+                        |> assertHttpRequests "GET" "https://example.com/" (Expect.equal [])
+            , testRequests "can assert multiple requests were made to the same endpoint" <|
+                \expect assertHttpRequests ->
+                    start
+                        (SimulatedEffect.Cmd.batch
+                            [ Http.get
+                                { url = "https://example.com/"
+                                , expect = Http.expectString HandleStringResponse
+                                }
+                            , Http.get
+                                { url = "https://example.com/"
+                                , expect = Http.expectString HandleStringResponse
+                                }
+                            ]
+                        )
+                        |> assertHttpRequests "GET" "https://example.com/" (List.length >> Expect.equal 2)
             ]
         , describe "simulateHttpResponse"
             [ test "simulate OK response with valid JSON" <|
