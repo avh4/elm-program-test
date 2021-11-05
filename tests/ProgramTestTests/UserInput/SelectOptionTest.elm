@@ -60,7 +60,7 @@ all =
                     |> Maybe.withDefault "<Expected selectOption to fail, but it succeeded>"
                     |> Expect.all
                         [ expectContains "selectOption"
-                        , expectContains "The event change does not exist on the found node."
+                        , expectContains "it does not listen for \"change\" events like I expected it would."
                         ]
         ]
 
