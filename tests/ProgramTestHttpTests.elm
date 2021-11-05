@@ -182,6 +182,27 @@ all =
                                     , ( "X-Elm-Test", "Value 99" )
                                     ]
                             )
+            , testRequestWasMade "two identical requests give an error" <|
+                \expect assertHttpRequestWasMade ->
+                    start
+                        (SimulatedEffect.Cmd.batch
+                            [ Http.get
+                                { url = "https://example.com/"
+                                , expect = Http.expectString HandleStringResponse
+                                }
+                            , Http.get
+                                { url = "https://example.com/"
+                                , expect = Http.expectString HandleStringResponse
+                                }
+                            ]
+                        )
+                        |> assertHttpRequestWasMade "GET" "https://example.com/"
+                        |> expectFailure
+                            [ expect ++ "HttpRequestWasMade: Expected a single HTTP request (GET https://example.com/) to have been made, but 2 such requests were made."
+                            , "    The following requests were made:"
+                            , "      - GET https://example.com/"
+                            , "      - GET https://example.com/"
+                            ]
 
             -- TODO: how to handle multiple requests made to the same method/URL?
             ]
@@ -277,6 +298,28 @@ all =
                         |> expectFailure
                             [ expect ++ "HttpRequestWasMade: Expected HTTP request (GET https://example.com/) to have been made, but it was not."
                             , "    No requests were made."
+                            ]
+            , test "two identical requests give an error" <|
+                \() ->
+                    start
+                        (SimulatedEffect.Cmd.batch
+                            [ Http.get
+                                { url = "https://example.com/"
+                                , expect = Http.expectString HandleStringResponse
+                                }
+                            , Http.get
+                                { url = "https://example.com/"
+                                , expect = Http.expectString HandleStringResponse
+                                }
+                            ]
+                        )
+                        |> ProgramTest.simulateHttpOk "GET" "https://example.com/" """{}"""
+                        |> ProgramTest.done
+                        |> expectFailure
+                            [ "simulateHttpOk: Expected a single HTTP request (GET https://example.com/) to have been made, but 2 such requests were made."
+                            , "    The following requests were made:"
+                            , "      - GET https://example.com/"
+                            , "      - GET https://example.com/"
                             ]
             ]
         ]

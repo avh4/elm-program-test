@@ -17,6 +17,7 @@ type Failure
     | ProgramDoesNotSupportNavigation String
     | NoBaseUrl String String
     | NoMatchingHttpRequest String { method : String, url : String } (List ( String, String ))
+    | MultipleMatchingHttpRequest String { method : String, url : String } Int (List ( String, String ))
     | EffectSimulationNotConfigured String
     | CustomFailure String String
 
@@ -60,6 +61,29 @@ toString failure =
                 , " "
                 , request.url
                 , ") to have been made, but it was not.\n"
+                , case pendingRequests of
+                    [] ->
+                        "    No requests were made."
+
+                    _ ->
+                        String.concat
+                            [ "    The following requests were made:\n"
+                            , String.join "\n" <|
+                                List.map (\( method, url ) -> "      - " ++ method ++ " " ++ url) pendingRequests
+                            ]
+                ]
+
+        MultipleMatchingHttpRequest functionName request n pendingRequests ->
+            String.concat
+                [ functionName
+                , ": "
+                , "Expected a single HTTP request ("
+                , request.method
+                , " "
+                , request.url
+                , ") to have been made, but "
+                , String.fromInt n
+                , " such requests were made.\n"
                 , case pendingRequests of
                     [] ->
                         "    No requests were made."

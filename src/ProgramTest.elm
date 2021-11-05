@@ -204,6 +204,7 @@ import Html.Attributes exposing (attribute)
 import Http
 import Json.Decode
 import Json.Encode
+import MultiDict
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
 import ProgramTest.Failure as Failure exposing (Failure(..))
 import ProgramTest.Program exposing (Program)
@@ -1482,8 +1483,11 @@ expectHttpRequestHelper functionName method url checkRequest state =
             Err (EffectSimulationNotConfigured functionName)
 
         Just simulation ->
-            case Dict.get ( method, url ) simulation.state.http of
-                Just request ->
+            case MultiDict.get ( method, url ) simulation.state.http of
+                [] ->
+                    Err (NoMatchingHttpRequest functionName { method = method, url = url } (MultiDict.keys simulation.state.http))
+
+                [ request ] ->
                     case Test.Runner.getFailureReason (checkRequest request) of
                         Nothing ->
                             -- check succeeded
@@ -1492,8 +1496,8 @@ expectHttpRequestHelper functionName method url checkRequest state =
                         Just reason ->
                             Err (ExpectFailed functionName reason.description reason.reason)
 
-                Nothing ->
-                    Err (NoMatchingHttpRequest functionName { method = method, url = url } (Dict.keys simulation.state.http))
+                (_ :: _ :: _) as many ->
+                    Err (MultipleMatchingHttpRequest functionName { method = method, url = url } (List.length many) (MultiDict.keys simulation.state.http))
 
 
 {-| Simulates an HTTP 200 response to a pending request with the given method and url.
@@ -1524,7 +1528,8 @@ NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you ca
 -}
 simulateHttpOk : String -> String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateHttpOk method url responseBody =
-    simulateHttpResponse method
+    simulateHttpResponseHelper "simulateHttpOk"
+        method
         url
         (Test.Http.httpResponse
             { statusCode = 200
@@ -1571,25 +1576,30 @@ NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you ca
 -}
 simulateHttpResponse : String -> String -> Http.Response String -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateHttpResponse method url response =
+    simulateHttpResponseHelper "simulateHttpResponse" method url response
+
+
+simulateHttpResponseHelper : String -> String -> String -> Http.Response String -> ProgramTest model msg effect -> ProgramTest model msg effect
+simulateHttpResponseHelper functionName method url response =
     andThen <|
         \program state ->
             case state.effectSimulation of
                 Nothing ->
-                    Err (EffectSimulationNotConfigured "simulateHttpResponse")
+                    Err (EffectSimulationNotConfigured functionName)
 
                 Just simulation ->
-                    case Dict.get ( method, url ) simulation.state.http of
-                        Nothing ->
-                            Err (NoMatchingHttpRequest "simulateHttpResponse" { method = method, url = url } (Dict.keys simulation.state.http))
+                    case MultiDict.get ( method, url ) simulation.state.http of
+                        [] ->
+                            Err (NoMatchingHttpRequest functionName { method = method, url = url } (MultiDict.keys simulation.state.http))
 
-                        Just actualRequest ->
+                        [ actualRequest ] ->
                             let
                                 resolveHttpRequest sim =
                                     let
                                         st =
                                             sim.state
                                     in
-                                    { sim | state = { st | http = Dict.remove ( method, url ) st.http } }
+                                    { sim | state = { st | http = MultiDict.remove ( method, url ) actualRequest st.http } }
                             in
                             state
                                 |> TestState.withSimulation
@@ -1597,6 +1607,9 @@ simulateHttpResponse method url response =
                                         >> EffectSimulation.queueTask (actualRequest.onRequestComplete response)
                                     )
                                 |> TestState.drain program
+
+                        (_ :: _ :: _) as many ->
+                            Err (MultipleMatchingHttpRequest functionName { method = method, url = url } (List.length many) (MultiDict.keys simulation.state.http))
 
 
 {-| Simulates the passing of time.

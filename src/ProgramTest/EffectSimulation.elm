@@ -12,6 +12,7 @@ module ProgramTest.EffectSimulation exposing
 import Dict exposing (Dict)
 import Fifo exposing (Fifo)
 import Json.Encode
+import MultiDict exposing (MultiDict)
 import PairingHeap exposing (PairingHeap)
 import SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
 
@@ -36,7 +37,7 @@ init f =
 
 
 type alias SimulationState msg =
-    { http : Dict ( String, String ) (SimulatedEffect.HttpRequest msg msg)
+    { http : MultiDict ( String, String ) (SimulatedEffect.HttpRequest msg msg)
     , futureTasks : PairingHeap Int (() -> SimulatedTask msg msg)
     , nowMs : Int
     }
@@ -44,7 +45,7 @@ type alias SimulationState msg =
 
 emptySimulationState : SimulationState msg
 emptySimulationState =
-    { http = Dict.empty
+    { http = MultiDict.empty
     , futureTasks = PairingHeap.empty
     , nowMs = 0
     }
@@ -89,7 +90,7 @@ simulateTask task simulationState =
         SimulatedEffect.HttpTask request ->
             ( { simulationState
                 | http =
-                    Dict.insert ( request.method, request.url )
+                    MultiDict.insert ( request.method, request.url )
                         request
                         simulationState.http
               }
