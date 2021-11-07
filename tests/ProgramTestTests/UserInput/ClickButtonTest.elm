@@ -22,6 +22,20 @@ all =
                     )
                     |> ProgramTest.clickButton "Click Me"
                     |> ProgramTest.expectModel (Expect.equal [ "CLICK" ])
+        , test "can click a button containing an image with alt text" <|
+            \() ->
+                TestingProgram.startView
+                    (Html.button
+                        [ onClick (Log "CLICK") ]
+                        [ Html.img
+                            [ Html.Attributes.src "googoo.png"
+                            , Html.Attributes.alt "Click Me"
+                            ]
+                            []
+                        ]
+                    )
+                    |> ProgramTest.clickButton "Click Me"
+                    |> ProgramTest.expectModel (Expect.equal [ "CLICK" ])
         , test "can click a button with an aria-label attribute" <|
             \() ->
                 TestingProgram.startView
@@ -129,6 +143,7 @@ all =
                         , ""
                         , "Expected one of the following to exist:"
                         , "- <button> (not disabled) with onClick and text \"Click Me\""
+                        , "- <button> (not disabled) with onClick containing an <img> with alt=\"Click Me\""
                         , "- <button> (not disabled) with onClick and attribute aria-label=\"Click Me\""
                         , "- an element with role=\"button\" (not disabled) and onClick and text \"Click Me\""
                         , "- an element with role=\"button\" (not disabled) and onClick and aria-label=\"Click Me\""
