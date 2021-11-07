@@ -838,6 +838,18 @@ clickButton buttonText programTest =
                     )
                     Test.Html.Event.click
               )
+            , ( "<button> (not disabled) with onClick containing an <img> with alt=" ++ String.Extra.escape buttonText
+              , simulateHelper functionDescription
+                    (findNotDisabled
+                        [ Selector.tag "button"
+                        , Selector.containing
+                            [ Selector.tag "img"
+                            , Selector.attribute (Html.Attributes.alt buttonText)
+                            ]
+                        ]
+                    )
+                    Test.Html.Event.click
+              )
             , ( "<button> (not disabled) with onClick and attribute aria-label=" ++ String.Extra.escape buttonText
               , simulateHelper functionDescription
                     (findNotDisabled

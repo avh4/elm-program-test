@@ -9,6 +9,7 @@ New features:
   - Added `expectHttpRequests` for checking whether multiple requests have been made to the same endpoint (or that zero requests have been made).
   - Added `simulateHttpResponseAdvanced` for simulating HTTP responses when multiple requests have been made to the same endpoint.
   - Added `SimulatedEffect.Time.now`
+  - `clickButton` can now click buttons containing only an image with alt text
 
 
 ## 3.5.1
