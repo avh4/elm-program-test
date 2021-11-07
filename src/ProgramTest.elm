@@ -1893,23 +1893,6 @@ simulateIncomingPort portName value =
                         List.foldl (\match -> Result.andThen (step match)) (Ok state) matches
 
 
-replaceView : (model -> Query.Single msg) -> ProgramTest model msg effect -> ProgramTest model msg effect
-replaceView newView programTest =
-    case programTest of
-        FailedToCreate failure ->
-            FailedToCreate failure
-
-        Created created ->
-            let
-                program =
-                    created.program
-            in
-            Created
-                { created
-                    | program = { program | view = newView }
-                }
-
-
 {-| Simulates a route change event (which would happen when your program is
 a `Browser.application` and the user manually changes the URL in the browser's URL bar).
 
@@ -2309,7 +2292,7 @@ failWithViewError functionDescription errorMessage =
                             |> Test.Runner.getFailureReason
                     of
                         Nothing ->
-                            -- We expect the fake query to fail -- if it doesn't for some reason, just try recursing with a different fake matchin string until it does fail
+                            -- We expect the fake query to fail -- if it doesn't for some reason, just try recursing with a different fake matching string until it does fail
                             renderHtml (unique ++ "_")
 
                         Just reason ->
