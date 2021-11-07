@@ -115,6 +115,22 @@ toString failure =
                             , String.join "\n" <|
                                 List.map (\( method, url ) -> "      - " ++ method ++ " " ++ url) pendingRequests
                             ]
+                , if expected == 1 && actual > 1 then
+                    let
+                        useInstead =
+                            if String.startsWith "simulate" functionName then
+                                "simulateHttpResponseAdvanced"
+
+                            else if String.startsWith "expect" functionName then
+                                "expectHttpRequests"
+
+                            else
+                                "ensureHttpRequests"
+                    in
+                    "\n\nNOTE: If you want to allow multiple requests to the same endpoint, use ProgramTest." ++ useInstead ++ "."
+
+                  else
+                    ""
                 ]
 
         EffectSimulationNotConfigured functionName ->

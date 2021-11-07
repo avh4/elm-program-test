@@ -207,6 +207,8 @@ all =
                             , "    The following requests were made:"
                             , "      - GET https://example.com/"
                             , "      - GET https://example.com/"
+                            , ""
+                            , "NOTE: If you want to allow multiple requests to the same endpoint, use ProgramTest." ++ expect ++ "HttpRequests."
                             ]
             , testRequests "can assert that no requests were made" <|
                 \expect assertHttpRequests ->
@@ -342,6 +344,8 @@ all =
                             , "    The following requests were made:"
                             , "      - GET https://example.com/"
                             , "      - GET https://example.com/"
+                            , ""
+                            , "NOTE: If you want to allow multiple requests to the same endpoint, use ProgramTest.simulateHttpResponseAdvanced."
                             ]
             , test "can resolve one of multiple identical requests" <|
                 \() ->
