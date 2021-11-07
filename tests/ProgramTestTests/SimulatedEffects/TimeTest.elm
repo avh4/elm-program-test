@@ -5,8 +5,10 @@ import ProgramTest exposing (ProgramTest, SimulatedEffect, SimulatedTask)
 import SimulatedEffect.Cmd
 import SimulatedEffect.Process as Process
 import SimulatedEffect.Task as Task
+import SimulatedEffect.Time as Time
 import Test exposing (..)
 import TestingProgram exposing (Msg(..))
+import Time as RealTime
 
 
 startTasks : List (SimulatedTask x a) -> TestingProgram.ProgramTest
@@ -70,4 +72,21 @@ all =
                     |> ProgramTest.update (Log "B")
                     |> ProgramTest.advanceTime 1
                     |> ProgramTest.expectModel (Expect.equal [ "A", "B", "Ok ()" ])
+        , describe "Time.now"
+            [ test "time is initially Posix 0" <|
+                \() ->
+                    startTasks [ Time.now ]
+                        |> ProgramTest.expectModel (Expect.equal [ "Ok (Posix 0)" ])
+            , test "advanceTime is reflected" <|
+                \() ->
+                    startTasks []
+                        |> ProgramTest.advanceTime 134
+                        |> ProgramTest.update (produceTasks [ Time.now ])
+                        |> ProgramTest.expectModel (Expect.equal [ "Ok (Posix 134)" ])
+            , test "it resolves to the time at the moment it resolves" <|
+                \() ->
+                    startTasks [ Process.sleep 17 |> Task.andThen (\() -> Time.now) ]
+                        |> ProgramTest.advanceTime 2000
+                        |> ProgramTest.expectModel (Expect.equal [ "Ok (Posix 17)" ])
+            ]
         ]

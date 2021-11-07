@@ -80,6 +80,9 @@ andThen f task =
         SimulatedEffect.SleepTask delay onResult ->
             SimulatedEffect.SleepTask delay (onResult >> andThen f)
 
+        SimulatedEffect.NowTask onResult ->
+            SimulatedEffect.NowTask (onResult >> andThen f)
+
 
 {-| A task that succeeds immediately when run.
 -}
@@ -210,6 +213,9 @@ mapError f task =
         SimulatedEffect.SleepTask delay onResult ->
             SimulatedEffect.SleepTask delay (onResult >> mapError f)
 
+        SimulatedEffect.NowTask onResult ->
+            SimulatedEffect.NowTask (onResult >> mapError f)
+
 
 {-| Recover from a failure in a task.
 -}
@@ -233,3 +239,6 @@ onError f task =
 
         SimulatedEffect.SleepTask delay onResult ->
             SimulatedEffect.SleepTask delay (onResult >> onError f)
+
+        SimulatedEffect.NowTask onResult ->
+            SimulatedEffect.NowTask (onResult >> onError f)
