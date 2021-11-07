@@ -16,7 +16,8 @@ type Failure
     | InvalidFlags String String
     | ProgramDoesNotSupportNavigation String
     | NoBaseUrl String String
-    | NoMatchingHttpRequest String { method : String, url : String } (List ( String, String ))
+    | NoMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
+    | MultipleMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | EffectSimulationNotConfigured String
     | CustomFailure String String
 
@@ -51,15 +52,29 @@ toString failure =
         NoBaseUrl functionName relativeUrl ->
             functionName ++ ": The ProgramTest does not have a base URL and cannot resolve the relative URL " ++ String.Extra.escape relativeUrl ++ ".  Use ProgramTest.withBaseUrl before calling ProgramTest.start to create a ProgramTest that can resolve relative URLs."
 
-        NoMatchingHttpRequest functionName request pendingRequests ->
+        NoMatchingHttpRequest expected actual functionName request pendingRequests ->
             String.concat
                 [ functionName
                 , ": "
-                , "Expected HTTP request ("
+                , "Expected "
+                , case expected of
+                    1 ->
+                        "HTTP request"
+
+                    _ ->
+                        "at least " ++ String.fromInt expected ++ " HTTP requests"
+                , " ("
                 , request.method
                 , " "
                 , request.url
-                , ") to have been made, but it was not.\n"
+                , ") to have been made and still be pending, "
+                , case actual of
+                    0 ->
+                        "but no such requests were made."
+
+                    _ ->
+                        "but only " ++ String.fromInt actual ++ " such requests were made."
+                , "\n"
                 , case pendingRequests of
                     [] ->
                         "    No requests were made."
@@ -70,6 +85,52 @@ toString failure =
                             , String.join "\n" <|
                                 List.map (\( method, url ) -> "      - " ++ method ++ " " ++ url) pendingRequests
                             ]
+                ]
+
+        MultipleMatchingHttpRequest expected actual functionName request pendingRequests ->
+            String.concat
+                [ functionName
+                , ": "
+                , "Expected "
+                , case expected of
+                    1 ->
+                        "a single HTTP request"
+
+                    _ ->
+                        String.fromInt expected ++ " HTTP requests"
+                , " ("
+                , request.method
+                , " "
+                , request.url
+                , ") to have been made, but "
+                , String.fromInt actual
+                , " such requests were made.\n"
+                , case pendingRequests of
+                    [] ->
+                        "    No requests were made."
+
+                    _ ->
+                        String.concat
+                            [ "    The following requests were made:\n"
+                            , String.join "\n" <|
+                                List.map (\( method, url ) -> "      - " ++ method ++ " " ++ url) pendingRequests
+                            ]
+                , if expected == 1 && actual > 1 then
+                    let
+                        useInstead =
+                            if String.startsWith "simulate" functionName then
+                                "simulateHttpResponseAdvanced"
+
+                            else if String.startsWith "expect" functionName then
+                                "expectHttpRequests"
+
+                            else
+                                "ensureHttpRequests"
+                    in
+                    "\n\nNOTE: If you want to allow multiple requests to the same endpoint, use ProgramTest." ++ useInstead ++ "."
+
+                  else
+                    ""
                 ]
 
         EffectSimulationNotConfigured functionName ->

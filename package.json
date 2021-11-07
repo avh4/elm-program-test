@@ -1,11 +1,11 @@
 {
   "devDependencies": {
-    "@vue/babel-preset-app": "^4.5.13",
-    "chokidar-cli": "^2.1.0",
-    "concurrently": "^6.2.0",
+    "@vue/babel-preset-app": "^4.5.15",
+    "chokidar-cli": "^3.0.0",
+    "concurrently": "^6.3.0",
     "elm-doc-preview": "^5.0.5",
-    "elm-test": "^0.19.1",
-    "elm-tooling": "^1.3.0",
+    "elm-test": "^0.19.1-revision7",
+    "elm-tooling": "^1.6.0",
     "vuepress": "^1.8.2"
   },
   "scripts": {
