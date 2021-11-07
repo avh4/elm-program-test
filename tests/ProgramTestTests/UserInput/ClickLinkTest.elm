@@ -7,6 +7,8 @@ import Html.Events
 import Json.Decode
 import ProgramTest exposing (ProgramTest)
 import Test exposing (..)
+import Test.Expect exposing (expectFailure)
+import TestingProgram exposing (Msg(..))
 
 
 type TestEffect
@@ -27,7 +29,7 @@ linkProgram =
         { init = "<INIT>"
         , update = \msg model -> model ++ ";" ++ msg
         , view =
-            \model ->
+            \_ ->
                 Html.div []
                     [ Html.a [ href "https://example.com/link" ] [ Html.text "External" ]
                     , Html.a [ href "/settings" ] [ Html.text "Relative" ]
@@ -55,7 +57,7 @@ all =
                 ProgramTest.createApplication
                     { onUrlChange = .path
                     , onUrlRequest = \_ -> Debug.todo "ClickLinkTest:onUrlRequest"
-                    , init = \() location key -> ( "<INIT:" ++ location.path ++ ">", NoOp )
+                    , init = \() location () -> ( "<INIT:" ++ location.path ++ ">", NoOp )
                     , update = testUpdate
                     , view =
                         \_ ->
@@ -73,6 +75,26 @@ all =
                     |> ProgramTest.start ()
                     |> ProgramTest.clickLink "SPA" "#search"
                     |> ProgramTest.expectModel (Expect.equal "<INIT:/>;GoToSearch")
+        , test "gives accessibility advice for links with bad onClick" <|
+            \() ->
+                TestingProgram.startView
+                    (Html.a
+                        [ href "#search"
+                        , Html.Events.onClick (Log "Click")
+                        ]
+                        [ Html.text "SPA" ]
+                    )
+                    |> ProgramTest.clickLink "SPA" "#search"
+                    |> ProgramTest.done
+                    |> expectFailure
+                        [ """clickLink "SPA": Found an `<a href="...">` tag has an onClick handler, but the handler is overriding ctrl-click and meta-click."""
+                        , ""
+                        , "A properly behaved single-page app should not override ctrl- and meta-clicks on `<a>` tags because this prevents users from opening links in new tabs/windows."
+                        , ""
+                        , "Use `onClickPreventDefaultForLinkWithHref` defined at <https://gist.github.com/avh4/712d43d649b7624fab59285a70610707> instead of `onClick` to fix this problem."
+                        , ""
+                        , "See discussion of this issue at <https://github.com/elm-lang/navigation/issues/13>."
+                        ]
         ]
 
 
