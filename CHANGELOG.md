@@ -1,4 +1,4 @@
-## main
+## 3.6.0
 
 Changes:
 
