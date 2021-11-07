@@ -15,6 +15,7 @@ import Json.Encode
 import MultiDict exposing (MultiDict)
 import PairingHeap exposing (PairingHeap)
 import SimulatedEffect exposing (SimulatedEffect, SimulatedTask)
+import Time
 
 
 type alias EffectSimulation msg effect =
@@ -104,6 +105,9 @@ simulateTask task simulationState =
               }
             , Nothing
             )
+
+        SimulatedEffect.NowTask onResult ->
+            simulateTask (onResult (Time.millisToPosix simulationState.nowMs)) simulationState
 
 
 outgoingPortValues : String -> EffectSimulation msg effect -> List Json.Encode.Value

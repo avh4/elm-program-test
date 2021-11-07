@@ -3,6 +3,7 @@ module SimulatedEffect exposing (HttpRequest, SimulatedEffect(..), SimulatedSub(
 import Http
 import Json.Decode
 import Json.Encode
+import Time
 
 
 type SimulatedEffect msg
@@ -23,6 +24,7 @@ type SimulatedTask x a
     | Fail x
     | HttpTask (HttpRequest x a)
     | SleepTask Float (() -> SimulatedTask x a)
+    | NowTask (Time.Posix -> SimulatedTask x a)
 
 
 type alias HttpRequest x a =

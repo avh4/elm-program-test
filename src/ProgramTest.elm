@@ -584,6 +584,7 @@ which parallel the modules your real program would use to create `Cmd`s and `Tas
   - [`SimulatedEffect.Ports`](SimulatedEffect-Ports) (parallels the `port` keyword)
   - [`SimulatedEffect.Task`](SimulatedEffect-Task) (parallels `Task` from `elm/core`)
   - [`SimulatedEffect.Process`](SimulatedEffect-Process) (parallels `Process` from `elm/core`)
+  - [`SimulatedEffect.Time`](SimulatedEffect-Time) (parallels `Time` from `elm/time`)
 
 -}
 type alias SimulatedEffect msg =
