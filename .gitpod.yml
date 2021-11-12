@@ -1,0 +1,11 @@
+
+tasks:
+  - init: |
+      npm install -g pnpm
+      pnpm install
+      npm run postinstall
+    command: npm test
+
+vscode:
+  extensions:
+    - elmtooling.elm-ls-vscode
