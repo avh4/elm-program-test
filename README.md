@@ -66,7 +66,7 @@ exampleProgramTest =
 
 ## Testing programs with flags and/or navigation
 
-This example tests a program that requires both [flags](https://guide.elm-lang.org/interop/javascript.html#flags) and [navigation](https://package.elm-lang.org/packages/elm/browser/latest/Browser#application).
+This example tests a program that requires both [flags](https://guide.elm-lang.org/interop/flags.html) and [navigation](https://package.elm-lang.org/packages/elm/browser/latest/Browser#application).
 There are variants of the `ProgramTest.create*` functions ([see all](ProgramTest#creating)) for each type of Elm program supported by `elm/browser`,
 and there are a handful of other options that can be used to configure the test before starting it.
 
