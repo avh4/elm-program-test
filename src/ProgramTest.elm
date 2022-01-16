@@ -771,12 +771,8 @@ expectOneOfManyViewChecks functionDescription errorMessage checks programTest =
             case items of
                 [] ->
                     failWithViewError functionDescription
-                        (String.join "\n" <|
-                            List.concat
-                                [ [ errorMessage ++ ":" ]
-                                , List.map (\check_ -> "- " ++ Tuple.first check_) checks
-                                ]
-                        )
+                        errorMessage
+                        (List.map Tuple.first checks)
                         programTest
 
                 next :: rest ->
@@ -2289,8 +2285,8 @@ fail assertionName failureMessage =
 
 {-| This is meant for internal use only and adds a rendering of the current view to an error message.
 -}
-failWithViewError : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
-failWithViewError functionDescription errorMessage =
+failWithViewError : String -> String -> List String -> ProgramTest model msg effect -> ProgramTest model msg effect
+failWithViewError functionDescription errorMessage attempts =
     -- This is a big hack to grab the rendered HTML for the error message,
     -- since Test.Html.Query doesn't expose a way to get the HTML as a string
     -- or to compose custom error messages
@@ -2302,7 +2298,7 @@ failWithViewError functionDescription errorMessage =
                     program.view state.currentModel
                         |> Html.map (\_ -> ())
             in
-            Err (ViewAssertionFailed functionDescription renderedView errorMessage)
+            Err (ViewAssertionFailed functionDescription renderedView errorMessage attempts)
 
 
 {-| `createFailed` can be used to report custom errors if you are writing your own convenience functions to _create_ program tests.

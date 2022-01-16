@@ -23,7 +23,7 @@ type Failure
     | NoMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | MultipleMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | EffectSimulationNotConfigured String
-    | ViewAssertionFailed String (Html ()) String
+    | ViewAssertionFailed String (Html ()) String (List String)
     | CustomFailure String String
 
 
@@ -141,12 +141,25 @@ toString failure =
         EffectSimulationNotConfigured functionName ->
             "TEST SETUP ERROR: In order to use " ++ functionName ++ ", you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start"
 
-        ViewAssertionFailed functionName html errorMessage ->
+        ViewAssertionFailed functionName html errorMessage attempts ->
+            let
+                errorMessageFinal =
+                    case attempts of
+                        [] ->
+                            errorMessage
+
+                        some ->
+                            String.join "\n" <|
+                                List.concat
+                                    [ [ errorMessage ++ ":" ]
+                                    , List.map (\attempt -> "- " ++ attempt) some
+                                    ]
+            in
             String.join "\n"
                 [ functionName ++ ":"
                 , renderHtml functionName "" html
                 , ""
-                , errorMessage
+                , errorMessageFinal
                 ]
 
         CustomFailure assertionName message ->
