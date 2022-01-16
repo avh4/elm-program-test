@@ -1,4 +1,4 @@
-module ProgramTest.ComplexQuery exposing (ComplexQuery, Failure(..), Priority, andThen, exactlyOneOf, find, findButNot, run, simulate)
+module ProgramTest.ComplexQuery exposing (ComplexQuery, Failure(..), Priority, andThen, exactlyOneOf, find, findButNot, map, run, simulate)
 
 import Expect exposing (Expectation)
 import Json.Encode as Json

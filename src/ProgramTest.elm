@@ -772,6 +772,22 @@ simulateComplexQuery functionName complexQuery =
                     Err (ViewAssertionFailed functionName (Html.map (\_ -> ()) (program.view state.currentModel)) queryFailure)
 
 
+assertComplexQuery : String -> (Query.Single msg -> ComplexQuery msg ()) -> ProgramTest model msg effect -> ProgramTest model msg effect
+assertComplexQuery functionName complexQuery =
+    andThen <|
+        \program state ->
+            let
+                view =
+                    Program.renderView program state.currentModel
+            in
+            case ComplexQuery.run (complexQuery view) of
+                Ok () ->
+                    Ok state
+
+                Err queryFailure ->
+                    Err (ViewAssertionFailed functionName (Html.map (\_ -> ()) (program.view state.currentModel)) queryFailure)
+
+
 {-| Simulates a custom DOM event.
 
 NOTE: If there is another, more specific function (see [“Simulating user input”](#simulating-user-input))
@@ -971,11 +987,10 @@ clickLink linkText href programTest =
             "clickLink " ++ String.Extra.escape linkText
 
         findLinkTag =
-            Query.find
-                [ Selector.tag "a"
-                , Selector.attribute (Html.Attributes.href href)
-                , Selector.containing [ Selector.text linkText ]
-                ]
+            [ Selector.tag "a"
+            , Selector.attribute (Html.Attributes.href href)
+            , Selector.containing [ Selector.text linkText ]
+            ]
 
         normalClick =
             ( "click"
@@ -1015,7 +1030,7 @@ clickLink linkText href programTest =
                     let
                         link =
                             Program.renderView program state.currentModel
-                                |> findLinkTag
+                                |> Query.find findLinkTag
                     in
                     if respondsTo normalClick link then
                         -- there is a click handler
@@ -1036,7 +1051,7 @@ clickLink linkText href programTest =
 
                         else
                             -- everything looks good, so simulate that event and ignore the `href`
-                            simulateHelper functionDescription findLinkTag normalClick program state
+                            simulateHelper functionDescription (Query.find findLinkTag) normalClick program state
 
                     else
                         -- the link doesn't have a click handler
@@ -1055,11 +1070,10 @@ clickLink linkText href programTest =
                     True
     in
     programTest
-        |> andThen
-            (expectViewHelper functionDescription
-                (findLinkTag
-                    >> Query.has []
-                )
+        |> assertComplexQuery functionDescription
+            (\source ->
+                ComplexQuery.find findLinkTag source
+                    |> ComplexQuery.map (\_ -> ())
             )
         |> tryClicking { otherwise = \_ -> TestState.simulateLoadUrlHelper functionDescription href >> Err }
 
