@@ -145,12 +145,15 @@ step state complexQuery =
         Find selectors source next ->
             case Test.Runner.getFailureReason (Query.has [ Selector.all selectors ] source) of
                 Just _ ->
-                    ( state
-                    , firstErrorOf source
-                        [ Query.has selectors
-                        , Query.has [ Selector.all selectors ]
-                        ]
-                        |> Result.mapError QueryFailed
+                    let
+                        error =
+                            firstErrorOf source
+                                [ Query.has selectors
+                                , Query.has [ Selector.all selectors ]
+                                ]
+                    in
+                    ( { state | priority = state.priority + countSuccesses error }
+                    , Err (QueryFailed error)
                     )
 
                 Nothing ->
@@ -210,14 +213,17 @@ step state complexQuery =
                             case Test.Runner.getFailureReason isBad of
                                 Nothing ->
                                     -- the element matches the bad selectors; produce a Query using the onError selectors that will fail that will show a reasonable failure message
-                                    ( { state | priority = state.priority + extraPriority }
-                                    , firstErrorOf source
-                                        [ Query.has good
-                                        , Query.has [ Selector.all good ]
-                                        , Query.has onError
-                                        , Query.has [ Selector.all onError ]
-                                        ]
-                                        |> Result.mapError QueryFailed
+                                    let
+                                        error =
+                                            firstErrorOf source
+                                                [ Query.has good
+                                                , Query.has [ Selector.all good ]
+                                                , Query.has onError
+                                                , Query.has [ Selector.all onError ]
+                                                ]
+                                    in
+                                    ( { state | priority = state.priority + extraPriority + countSuccesses error }
+                                    , Err (QueryFailed error)
                                     )
 
                                 Just _ ->
@@ -230,12 +236,15 @@ step state complexQuery =
             case Test.Runner.getFailureReason isGood of
                 Just _ ->
                     -- Couldn't find it, so report the best error message we can
-                    ( state
-                    , firstErrorOf source
-                        [ Query.has good
-                        , Query.has [ Selector.all good ]
-                        ]
-                        |> Result.mapError QueryFailed
+                    let
+                        error =
+                            firstErrorOf source
+                                [ Query.has good
+                                , Query.has [ Selector.all good ]
+                                ]
+                    in
+                    ( { state | priority = state.priority + countSuccesses error }
+                    , Err (QueryFailed error)
                     )
 
                 Nothing ->
@@ -267,16 +276,36 @@ step state complexQuery =
                             ( state, Ok (next msg) )
 
 
-firstErrorOf : Query.Single msg -> List (Query.Single msg -> Expectation) -> Result TestHtmlHacks.FailureReason never
+firstErrorOf : Query.Single msg -> List (Query.Single msg -> Expectation) -> TestHtmlHacks.FailureReason
 firstErrorOf source choices =
     case choices of
         [] ->
-            Err (TestHtmlHacks.parseFailureReason "PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: firstErrorOf: asked to report an error but none of the choices failed")
+            TestHtmlHacks.parseFailureReason "PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: firstErrorOf: asked to report an error but none of the choices failed"
 
         next :: rest ->
             case Test.Runner.getFailureReason (next source) of
                 Just reason ->
-                    Err (TestHtmlHacks.parseFailureReason reason.description)
+                    TestHtmlHacks.parseFailureReason reason.description
 
                 Nothing ->
                     firstErrorOf source rest
+
+
+countSuccesses : TestHtmlHacks.FailureReason -> Int
+countSuccesses failureReason =
+    case failureReason of
+        TestHtmlHacks.Simple string ->
+            0
+
+        TestHtmlHacks.SelectorsFailed results ->
+            List.length (List.filter isOk results)
+
+
+isOk : Result x a -> Bool
+isOk result =
+    case result of
+        Ok _ ->
+            True
+
+        Err _ ->
+            False

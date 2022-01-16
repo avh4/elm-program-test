@@ -148,7 +148,7 @@ toString failure =
                 [ functionName ++ ":"
                 , renderHtml functionName "" html
                 , ""
-                , renderQueryFailure 0 reason
+                , renderQueryFailure 0 True reason
                 ]
 
         CustomFailure assertionName message ->
@@ -170,27 +170,43 @@ renderHtml functionName unique html =
             reason.description
 
 
-renderQueryFailure : Int -> ComplexQuery.Failure -> String
-renderQueryFailure indent failure =
+renderQueryFailure : Int -> Bool -> ComplexQuery.Failure -> String
+renderQueryFailure indent color failure =
     case failure of
         QueryFailed failureReason ->
-            renderTestHtmlFailureReason indent failureReason
+            renderTestHtmlFailureReason indent (colorsFor color) failureReason
 
         ComplexQuery.SimulateFailed string ->
-            String.repeat indent " " ++ string
+            let
+                colors =
+                    colorsFor color
+            in
+            String.repeat indent " " ++ colors.bold string
 
         NoMatches description options ->
+            let
+                sortedByPriority =
+                    options
+                        |> List.sortBy (\( _, prio, _ ) -> -prio)
+
+                maxPriority =
+                    List.head sortedByPriority
+                        |> Maybe.map (\( _, prio, _ ) -> prio)
+                        |> Maybe.withDefault 0
+            in
             String.join "\n" <|
                 List.concat
                     [ [ description ++ ":" ]
-                    , List.map (\( desc, prio, reason ) -> "- " ++ {- String.fromInt prio ++ " " ++ -} desc ++ "\n" ++ renderQueryFailure (indent + 4) reason) options
+                    , sortedByPriority
+                        |> List.filter (\( _, prio, _ ) -> prio > maxPriority - 2)
+                        |> List.map (\( desc, prio, reason ) -> "- " ++ desc ++ "\n" ++ renderQueryFailure (indent + 4) (color && prio >= maxPriority - 1) reason)
                     ]
 
         TooManyMatches description matches ->
             String.join "\n" <|
                 List.concat
                     [ [ description ++ ", but there were multiple successful matches:" ]
-                    , List.map (\desc -> "- " ++ {- String.fromInt prio ++ " " ++ -} desc) matches
+                    , List.map (\desc -> "- " ++ desc) matches
                     , [ ""
                       , "If that's what you intended, use `ProgramTest.within` to focus in on a portion of"
                       , "the view that contains only one of the matches."
@@ -198,25 +214,34 @@ renderQueryFailure indent failure =
                     ]
 
 
-renderTestHtmlFailureReason : Int -> TestHtmlHacks.FailureReason -> String
-renderTestHtmlFailureReason indent failureReason =
+renderTestHtmlFailureReason : Int -> Colors -> TestHtmlHacks.FailureReason -> String
+renderTestHtmlFailureReason indent colors failureReason =
     case failureReason of
         TestHtmlHacks.Simple string ->
             String.repeat indent " " ++ string
 
         TestHtmlHacks.SelectorsFailed results ->
-            List.map ((++) (String.repeat indent " ") << renderSelectorResult) (upToFirstErr results)
+            List.map ((++) (String.repeat indent " ") << renderSelectorResult colors) (upToFirstErr results)
                 |> String.join "\n"
 
 
-renderSelectorResult : Result String String -> String
-renderSelectorResult result =
+renderSelectorResult : Colors -> Result String String -> String
+renderSelectorResult colors result =
     case result of
         Ok selector ->
-            "✓ " ++ selector
+            String.concat
+                [ colors.green "✓"
+                , " "
+                , colors.bold selector
+                ]
 
         Err selector ->
-            "✗ " ++ selector
+            colors.red <|
+                String.concat
+                    [ "✗"
+                    , " "
+                    , selector
+                    ]
 
 
 upToFirstErr : List (Result x a) -> List (Result x a)
@@ -235,3 +260,32 @@ upToFirstErr results =
     in
     step [] results
         |> List.reverse
+
+
+type alias Colors =
+    { bold : String -> String
+    , red : String -> String
+    , green : String -> String
+    }
+
+
+colorsFor : Bool -> Colors
+colorsFor show =
+    if show then
+        showColors
+
+    else
+        noColors
+
+
+showColors : Colors
+showColors =
+    { bold = \s -> String.concat [ "\u{001B}[1m", s, "\u{001B}[22m" ]
+    , red = \s -> String.concat [ "\u{001B}[31m", s, "\u{001B}[39m" ]
+    , green = \s -> String.concat [ "\u{001B}[32m", s, "\u{001B}[39m" ]
+    }
+
+
+noColors : Colors
+noColors =
+    { bold = identity, red = identity, green = identity }
