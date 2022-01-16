@@ -1,5 +1,6 @@
-module ProgramTest.Program exposing (Program)
+module ProgramTest.Program exposing (Program, renderView)
 
+import Html exposing (Html)
 import Test.Html.Query as Query
 import Url exposing (Url)
 
@@ -13,7 +14,15 @@ Note that we also parameterize `effect` and `sub` separately because
 -}
 type alias Program model msg effect sub =
     { update : msg -> model -> ( model, effect )
-    , view : model -> Query.Single msg
+    , view : model -> Html msg
     , onRouteChange : Url -> Maybe msg
     , subscriptions : Maybe (model -> sub)
+    , withinFocus : Query.Single msg -> Query.Single msg
     }
+
+
+renderView : Program model msg effect sub -> model -> Query.Single msg
+renderView program model =
+    program.view model
+        |> Query.fromHtml
+        |> program.withinFocus

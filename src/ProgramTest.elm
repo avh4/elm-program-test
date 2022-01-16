@@ -208,7 +208,7 @@ import List.Extra
 import MultiDict
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
 import ProgramTest.Failure as Failure exposing (Failure(..))
-import ProgramTest.Program exposing (Program)
+import ProgramTest.Program as Program exposing (Program)
 import SimulatedEffect exposing (SimulatedEffect, SimulatedSub, SimulatedTask)
 import String.Extra
 import Test.Html.Event
@@ -310,9 +310,10 @@ createHelper program options =
     let
         program_ =
             { update = program.update
-            , view = program.view >> Query.fromHtml
+            , view = program.view
             , onRouteChange = program.onRouteChange
             , subscriptions = options.subscriptions
+            , withinFocus = identity
             }
 
         ( newModel, newEffect ) =
@@ -640,7 +641,7 @@ simulateHelper :
 simulateHelper functionDescription findTarget event program state =
     let
         targetQuery =
-            program.view state.currentModel
+            Program.renderView program state.currentModel
                 |> findTarget
     in
     -- First check the target so we can give a better error message if it doesn't exist
@@ -1081,7 +1082,7 @@ clickLink linkText href programTest =
                 \program state ->
                     let
                         link =
-                            program.view state.currentModel
+                            Program.renderView program state.currentModel
                                 |> findLinkTag
                     in
                     if respondsTo normalClick link then
@@ -1382,7 +1383,7 @@ within findTarget onScopedTest =
                     { state = Ok state
                     , program =
                         { program
-                            | view = program.view >> findTarget
+                            | withinFocus = program.withinFocus >> findTarget
                         }
                     }
                     |> onScopedTest
@@ -2013,8 +2014,7 @@ expectViewHelper :
     -> Result Failure (TestState model msg effect)
 expectViewHelper functionName assertion program state =
     case
-        state.currentModel
-            |> program.view
+        Program.renderView program state.currentModel
             |> assertion
             |> Test.Runner.getFailureReason
     of
@@ -2299,8 +2299,7 @@ failWithViewError functionDescription errorMessage =
             let
                 renderHtml unique =
                     case
-                        state.currentModel
-                            |> program.view
+                        Program.renderView program state.currentModel
                             |> Query.has [ Selector.text ("HTML expected by the call to: " ++ functionDescription ++ unique) ]
                             |> Test.Runner.getFailureReason
                     of
