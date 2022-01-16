@@ -1231,21 +1231,17 @@ selectOption fieldId label optionValue optionText =
                 , String.Extra.escape optionText
                 ]
     in
-    andThen <|
-        \program state ->
-            state
-                |> expectViewHelper functionDescription
-                    (Query.find
-                        [ Selector.tag "label"
-                        , Selector.attribute (Html.Attributes.for fieldId)
-                        , Selector.text label
-                        ]
-                        >> Query.has []
-                    )
-                    program
-                |> Result.andThen
-                    (expectViewHelper functionDescription
-                        (Query.find
+    simulateComplexQuery functionDescription <|
+        \source ->
+            ComplexQuery.find
+                [ Selector.tag "label"
+                , Selector.attribute (Html.Attributes.for fieldId)
+                , Selector.text label
+                ]
+                source
+                |> ComplexQuery.andThen
+                    (\_ ->
+                        ComplexQuery.find
                             [ Selector.tag "select"
                             , Selector.id fieldId
                             , Selector.containing
@@ -1254,17 +1250,18 @@ selectOption fieldId label optionValue optionText =
                                 , Selector.text optionText
                                 ]
                             ]
-                            >> Query.has []
-                        )
-                        program
+                            source
                     )
-                |> Result.andThen
-                    (simulateHelper functionDescription
-                        (Query.find
+                |> ComplexQuery.andThen
+                    (\_ ->
+                        ComplexQuery.find
                             [ Selector.tag "select"
                             , Selector.id fieldId
                             ]
-                        )
+                            source
+                    )
+                |> ComplexQuery.andThen
+                    (ComplexQuery.simulate
                         ( "change"
                         , Json.Encode.object
                             [ ( "target"
@@ -1274,7 +1271,6 @@ selectOption fieldId label optionValue optionText =
                               )
                             ]
                         )
-                        program
                     )
 
 
