@@ -127,7 +127,7 @@ all =
                     |> ProgramTest.clickButton "Click Me"
                     |> ProgramTest.done
                     |> expectFailure
-                        [ "clickButton \"Click Me\": "
+                        [ "clickButton \"Click Me\":"
                         , "▼ Query.fromHtml"
                         , ""
                         , "    <body>"

@@ -143,7 +143,7 @@ toString failure =
 
         ViewAssertionFailed functionName html errorMessage ->
             String.join "\n"
-                [ functionName ++ ": "
+                [ functionName ++ ":"
                 , renderHtml functionName "" html
                 , ""
                 , errorMessage

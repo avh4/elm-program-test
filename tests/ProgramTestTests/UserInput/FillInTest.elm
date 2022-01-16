@@ -93,7 +93,7 @@ all =
                     |> ProgramTest.fillIn "field-id" "Field 1" "value99"
                     |> ProgramTest.done
                     |> expectFailure
-                        [ """fillIn "Field 1": """
+                        [ """fillIn "Field 1":"""
                         , "▼ Query.fromHtml"
                         , ""
                         , "    <body>"
