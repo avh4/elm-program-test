@@ -2297,28 +2297,12 @@ failWithViewError functionDescription errorMessage =
     andThen <|
         \program state ->
             let
-                renderHtml unique =
-                    case
-                        Program.renderView program state.currentModel
-                            |> Query.has [ Selector.text ("HTML expected by the call to: " ++ functionDescription ++ unique) ]
-                            |> Test.Runner.getFailureReason
-                    of
-                        Nothing ->
-                            -- We expect the fake query to fail -- if it doesn't for some reason, just try recursing with a different fake matching string until it does fail
-                            renderHtml (unique ++ "_")
-
-                        Just reason ->
-                            reason.description
-
-                finalMessage =
-                    String.join "\n"
-                        [ ""
-                        , renderHtml ""
-                        , ""
-                        , errorMessage
-                        ]
+                renderedView : Html ()
+                renderedView =
+                    program.view state.currentModel
+                        |> Html.map (\_ -> ())
             in
-            Err (CustomFailure functionDescription finalMessage)
+            Err (ViewAssertionFailed functionDescription renderedView errorMessage)
 
 
 {-| `createFailed` can be used to report custom errors if you are writing your own convenience functions to _create_ program tests.

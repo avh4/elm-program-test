@@ -1,6 +1,10 @@
 module ProgramTest.Failure exposing (Failure(..), toString)
 
+import Html exposing (Html)
 import String.Extra
+import Test.Html.Query as Query
+import Test.Html.Selector as Selector
+import Test.Runner
 import Test.Runner.Failure
 import Url exposing (Url)
 
@@ -19,6 +23,7 @@ type Failure
     | NoMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | MultipleMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | EffectSimulationNotConfigured String
+    | ViewAssertionFailed String (Html ()) String
     | CustomFailure String String
 
 
@@ -136,5 +141,28 @@ toString failure =
         EffectSimulationNotConfigured functionName ->
             "TEST SETUP ERROR: In order to use " ++ functionName ++ ", you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start"
 
+        ViewAssertionFailed functionName html errorMessage ->
+            String.join "\n"
+                [ functionName ++ ": "
+                , renderHtml functionName "" html
+                , ""
+                , errorMessage
+                ]
+
         CustomFailure assertionName message ->
             assertionName ++ ": " ++ message
+
+
+renderHtml : String -> String -> Html any -> String
+renderHtml functionName unique html =
+    case
+        Query.fromHtml html
+            |> Query.has [ Selector.text ("HTML expected by the call to: " ++ functionName ++ unique) ]
+            |> Test.Runner.getFailureReason
+    of
+        Nothing ->
+            -- We expect the fake query to fail -- if it doesn't for some reason, just try recursing with a different fake matching string until it does fail
+            renderHtml functionName (unique ++ "_") html
+
+        Just reason ->
+            reason.description
