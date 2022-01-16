@@ -22,6 +22,47 @@ all =
                     )
                     |> ProgramTest.clickButton "Click Me"
                     |> ProgramTest.expectModel (Expect.equal [ "CLICK" ])
+        , test "failure message when button doesn't have onClick" <|
+            \() ->
+                TestingProgram.startView
+                    (Html.button []
+                        [ Html.text "Click Me" ]
+                    )
+                    |> ProgramTest.clickButton "Click Me"
+                    |> ProgramTest.done
+                    |> expectFailure
+                        [ "clickButton \"Click Me\":"
+                        , "▼ Query.fromHtml"
+                        , ""
+                        , "    <body>"
+                        , "        <button>"
+                        , "            Click Me"
+                        , "        </button>"
+                        , "    </body>"
+                        , ""
+                        , ""
+                        , "▼ Query.has [ text \"HTML expected by the call to: clickButton \"Click Me\"\" ]"
+                        , ""
+                        , "✗ has text \"HTML expected by the call to: clickButton \"Click Me\"\""
+                        , ""
+                        , "Expected one of the following to exist:"
+                        , "- <button> (not disabled) with onClick and text \"Click Me\""
+                        , "    Event.expectEvent: I found a node, but it does not listen for \"click\" events like I expected it would."
+                        , "- <button> (not disabled) with onClick containing an <img> with alt=\"Click Me\""
+                        , "    ✓ has tag \"button\""
+                        , "    ✗ has containing [ tag \"img\", attribute \"alt\" \"Click Me\" ]"
+                        , "- <button> (not disabled) with onClick and attribute aria-label=\"Click Me\""
+                        , "    ✓ has tag \"button\""
+                        , "    ✗ has attribute \"aria-label\" \"Click Me\""
+                        , "- an element with role=\"button\" (not disabled) and onClick and text \"Click Me\""
+                        , "    ✗ has attribute \"role\" \"button\""
+                        , "- an element with role=\"button\" (not disabled) and onClick and aria-label=\"Click Me\""
+                        , "    ✗ has attribute \"role\" \"button\""
+                        , "- a <form> with onSubmit containing a <button> (not disabled, not type=button) with text \"Click Me\""
+                        , "    ✗ has tag \"form\""
+                        , "- a <form> with onSubmit containing an <input type=submit value=\"Click Me\"> (not disabled)"
+                        , "    ✗ has tag \"form\""
+                        ]
         , test "can click a button containing an image with alt text" <|
             \() ->
                 TestingProgram.startView
@@ -143,12 +184,23 @@ all =
                         , ""
                         , "Expected one of the following to exist:"
                         , "- <button> (not disabled) with onClick and text \"Click Me\""
+                        , "    ✓ has tag \"button\""
+                        , "    ✓ has containing [ text \"Click Me\" ]"
+                        , "    ✗ has attribute \"disabled\" False"
                         , "- <button> (not disabled) with onClick containing an <img> with alt=\"Click Me\""
+                        , "    ✓ has tag \"button\""
+                        , "    ✗ has containing [ tag \"img\", attribute \"alt\" \"Click Me\" ]"
                         , "- <button> (not disabled) with onClick and attribute aria-label=\"Click Me\""
+                        , "    ✓ has tag \"button\""
+                        , "    ✗ has attribute \"aria-label\" \"Click Me\""
                         , "- an element with role=\"button\" (not disabled) and onClick and text \"Click Me\""
+                        , "    ✗ has attribute \"role\" \"button\""
                         , "- an element with role=\"button\" (not disabled) and onClick and aria-label=\"Click Me\""
+                        , "    ✗ has attribute \"role\" \"button\""
                         , "- a <form> with onSubmit containing a <button> (not disabled, not type=button) with text \"Click Me\""
+                        , "    ✗ has tag \"form\""
                         , "- a <form> with onSubmit containing an <input type=submit value=\"Click Me\"> (not disabled)"
+                        , "    ✗ has tag \"form\""
                         ]
         , test "fails when clicking a disabled button in a form" <|
             \() ->

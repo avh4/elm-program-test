@@ -1,6 +1,7 @@
 module ProgramTest.Failure exposing (Failure(..), toString)
 
 import Html exposing (Html)
+import ProgramTest.TestHtmlHacks as TestHtmlHacks
 import String.Extra
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
@@ -23,7 +24,7 @@ type Failure
     | NoMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | MultipleMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | EffectSimulationNotConfigured String
-    | ViewAssertionFailed String (Html ()) String (List String)
+    | ViewAssertionFailed String (Html ()) String (List ( String, TestHtmlHacks.FailureReason ))
     | CustomFailure String String
 
 
@@ -152,7 +153,7 @@ toString failure =
                             String.join "\n" <|
                                 List.concat
                                     [ [ errorMessage ++ ":" ]
-                                    , List.map (\attempt -> "- " ++ attempt) some
+                                    , List.map (\( desc, reason ) -> "- " ++ desc ++ "\n" ++ renderIndentedTestHtmlFailure 4 reason) some
                                     ]
             in
             String.join "\n"
@@ -179,3 +180,42 @@ renderHtml functionName unique html =
 
         Just reason ->
             reason.description
+
+
+renderIndentedTestHtmlFailure : Int -> TestHtmlHacks.FailureReason -> String
+renderIndentedTestHtmlFailure indent failureReason =
+    case failureReason of
+        TestHtmlHacks.Simple string ->
+            String.repeat indent " " ++ string
+
+        TestHtmlHacks.SelectorsFailed results ->
+            List.map ((++) (String.repeat indent " ") << renderSelectorResult) (upToFirstErr results)
+                |> String.join "\n"
+
+
+renderSelectorResult : Result String String -> String
+renderSelectorResult result =
+    case result of
+        Ok selector ->
+            "✓ " ++ selector
+
+        Err selector ->
+            "✗ " ++ selector
+
+
+upToFirstErr : List (Result x a) -> List (Result x a)
+upToFirstErr results =
+    let
+        step acc results_ =
+            case results_ of
+                [] ->
+                    acc
+
+                (Err x) :: _ ->
+                    Err x :: acc
+
+                (Ok a) :: rest ->
+                    step (Ok a :: acc) rest
+    in
+    step [] results
+        |> List.reverse

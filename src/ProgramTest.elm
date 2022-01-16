@@ -209,6 +209,7 @@ import MultiDict
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
 import ProgramTest.Failure as Failure exposing (Failure(..))
 import ProgramTest.Program as Program exposing (Program)
+import ProgramTest.TestHtmlHacks as TestHtmlHacks
 import SimulatedEffect exposing (SimulatedEffect, SimulatedSub, SimulatedTask)
 import String.Extra
 import Test.Html.Event
@@ -639,32 +640,48 @@ simulateHelper :
     -> TestState model msg effect
     -> Result Failure (TestState model msg effect)
 simulateHelper functionDescription findTarget event program state =
+    simulateHelper_ functionDescription (findTarget >> Ok) event program state
+
+
+simulateHelper_ :
+    String
+    -> (Query.Single msg -> Result String (Query.Single msg))
+    -> ( String, Json.Encode.Value )
+    -> Program model msg effect sub
+    -> TestState model msg effect
+    -> Result Failure (TestState model msg effect)
+simulateHelper_ functionDescription findTarget event program state =
     let
         targetQuery =
             Program.renderView program state.currentModel
                 |> findTarget
     in
     -- First check the target so we can give a better error message if it doesn't exist
-    case
-        targetQuery
-            |> Query.has []
-            |> Test.Runner.getFailureReason
-    of
-        Just reason ->
-            Err (SimulateFailedToFindTarget functionDescription reason.description)
+    case targetQuery of
+        Err reason ->
+            Err (SimulateFailedToFindTarget functionDescription reason)
 
-        Nothing ->
-            -- Try to simulate the event, now that we know the target exists
+        Ok targetQuery_ ->
             case
-                targetQuery
-                    |> Test.Html.Event.simulate event
-                    |> Test.Html.Event.toResult
+                targetQuery_
+                    |> Query.has []
+                    |> Test.Runner.getFailureReason
             of
-                Err message ->
-                    Err (SimulateFailed functionDescription message)
+                Just reason ->
+                    Err (SimulateFailedToFindTarget functionDescription reason.description)
 
-                Ok msg ->
-                    TestState.update msg program state
+                Nothing ->
+                    -- Try to simulate the event, now that we know the target exists
+                    case
+                        targetQuery_
+                            |> Test.Html.Event.simulate event
+                            |> Test.Html.Event.toResult
+                    of
+                        Err message ->
+                            Err (SimulateFailed functionDescription message)
+
+                        Ok msg ->
+                            TestState.update msg program state
 
 
 {-| **PRIVATE** helper for simulating events on input elements with associated labels.
@@ -762,33 +779,64 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
 expectOneOfManyViewChecks :
     String
     -> String
-    -> List ( String, Program model msg effect (SimulatedSub msg) -> TestState model msg effect -> Result Failure (TestState model msg effect) )
+    ->
+        List
+            ( String
+            , Program model msg effect (SimulatedSub msg) -> TestState model msg effect -> Result Failure (TestState model msg effect)
+            )
     -> ProgramTest model msg effect
     -> ProgramTest model msg effect
 expectOneOfManyViewChecks functionDescription errorMessage checks programTest =
     let
-        oneOf items =
+        oneOf : List ( String, ProgramTest model msg effect -> ProgramTest model msg effect ) -> List ( String, TestHtmlHacks.FailureReason ) -> ProgramTest model msg effect
+        oneOf items errors =
             case items of
                 [] ->
                     failWithViewError functionDescription
                         errorMessage
-                        (List.map Tuple.first checks)
+                        (List.reverse errors)
                         programTest
 
-                next :: rest ->
+                ( description, check_ ) :: rest ->
                     let
                         newProgramTest =
-                            next programTest
+                            check_ programTest
                     in
                     case Test.Runner.getFailureReason (done newProgramTest) of
                         Nothing ->
                             -- the check passed
                             newProgramTest
 
-                        Just _ ->
-                            oneOf rest
+                        Just failureReason ->
+                            oneOf rest (( description, TestHtmlHacks.parseFailureReason failureReason.description ) :: errors)
     in
-    oneOf (List.map (Tuple.second >> andThen) checks)
+    oneOf (List.map (Tuple.mapSecond andThen) checks) []
+
+
+expectOneViewCheck :
+    String
+    -> String
+    ->
+        ( String
+        , Program model msg effect (SimulatedSub msg) -> TestState model msg effect -> Result Failure (TestState model msg effect)
+        )
+    -> ProgramTest model msg effect
+    -> ProgramTest model msg effect
+expectOneViewCheck functionDescription errorMessage ( description, check_ ) programTest =
+    let
+        newProgramTest =
+            andThen check_ programTest
+    in
+    case Test.Runner.getFailureReason (done newProgramTest) of
+        Nothing ->
+            -- the check passed
+            newProgramTest
+
+        Just failureReason ->
+            failWithViewError functionDescription
+                errorMessage
+                [ ( description, TestHtmlHacks.parseFailureReason failureReason.description ) ]
+                programTest
 
 
 {-| Simulates a custom DOM event.
@@ -827,7 +875,7 @@ clickButton buttonText programTest =
         checks : List ( String, Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect) )
         checks =
             [ ( "<button> (not disabled) with onClick and text " ++ String.Extra.escape buttonText
-              , simulateHelper functionDescription
+              , simulateHelper_ functionDescription
                     (findNotDisabled
                         [ Selector.tag "button"
                         , Selector.containing [ Selector.text buttonText ]
@@ -836,7 +884,7 @@ clickButton buttonText programTest =
                     Test.Html.Event.click
               )
             , ( "<button> (not disabled) with onClick containing an <img> with alt=" ++ String.Extra.escape buttonText
-              , simulateHelper functionDescription
+              , simulateHelper_ functionDescription
                     (findNotDisabled
                         [ Selector.tag "button"
                         , Selector.containing
@@ -848,7 +896,7 @@ clickButton buttonText programTest =
                     Test.Html.Event.click
               )
             , ( "<button> (not disabled) with onClick and attribute aria-label=" ++ String.Extra.escape buttonText
-              , simulateHelper functionDescription
+              , simulateHelper_ functionDescription
                     (findNotDisabled
                         [ Selector.tag "button"
                         , Selector.attribute (Html.Attributes.attribute "aria-label" buttonText)
@@ -857,7 +905,7 @@ clickButton buttonText programTest =
                     Test.Html.Event.click
               )
             , ( "an element with role=\"button\" (not disabled) and onClick and text " ++ String.Extra.escape buttonText
-              , simulateHelper functionDescription
+              , simulateHelper_ functionDescription
                     (findNotDisabled
                         [ Selector.attribute (Html.Attributes.attribute "role" "button")
                         , Selector.containing [ Selector.text buttonText ]
@@ -866,7 +914,7 @@ clickButton buttonText programTest =
                     Test.Html.Event.click
               )
             , ( "an element with role=\"button\" (not disabled) and onClick and aria-label=" ++ String.Extra.escape buttonText
-              , simulateHelper functionDescription
+              , simulateHelper_ functionDescription
                     (findNotDisabled
                         [ Selector.attribute (Html.Attributes.attribute "role" "button")
                         , Selector.attribute (Html.Attributes.attribute "aria-label" buttonText)
@@ -875,7 +923,7 @@ clickButton buttonText programTest =
                     Test.Html.Event.click
               )
             , ( "a <form> with onSubmit containing a <button> (not disabled, not type=button) with text " ++ String.Extra.escape buttonText
-              , simulateHelper functionDescription
+              , simulateHelper_ functionDescription
                     (findButNot
                         { good =
                             [ Selector.tag "form"
@@ -914,7 +962,7 @@ clickButton buttonText programTest =
                     Test.Html.Event.submit
               )
             , ( "a <form> with onSubmit containing an <input type=submit value=" ++ String.Extra.escape buttonText ++ "> (not disabled)"
-              , simulateHelper functionDescription
+              , simulateHelper_ functionDescription
                     (findButNot
                         { good =
                             [ Selector.tag "form"
@@ -956,7 +1004,7 @@ clickButton buttonText programTest =
         programTest
 
 
-findNotDisabled : List Selector -> Query.Single msg -> Query.Single msg
+findNotDisabled : List Selector -> Query.Single msg -> Result String (Query.Single msg)
 findNotDisabled selectors source =
     -- This is tricky because Test.Html doesn't provide a way to search for an attribute being *not* present.
     -- So we have to check if "disabled=True" *is* present, and manually force a failure if it is.
@@ -964,7 +1012,7 @@ findNotDisabled selectors source =
     findButNot
         { good = selectors
         , bads = [ Selector.disabled True :: selectors ]
-        , onError = Selector.disabled False :: selectors
+        , onError = selectors ++ [ Selector.disabled False ]
         }
         source
 
@@ -976,36 +1024,66 @@ findNotDisabled selectors source =
   - `onError`: the selector to use to produce an error message if any of the checks fail
 
 -}
-findButNot : { good : List Selector, bads : List (List Selector), onError : List Selector } -> Query.Single msg -> Query.Single msg
+findButNot : { good : List Selector, bads : List (List Selector), onError : List Selector } -> Query.Single msg -> Result String (Query.Single msg)
 findButNot { good, bads, onError } source =
     -- This is tricky because Test.Html doesn't provide a way to search for an attribute being *not* present.
     -- So we have to check if a selector we don't want *is* present, and manually force a failure if it is.
     let
-        checkBads : List (List Selector) -> Query.Single msg -> Query.Single msg
+        checkBads : List (List Selector) -> Query.Single msg -> Result String (Query.Single msg)
         checkBads bads_ found =
             case bads_ of
                 [] ->
-                    found
+                    Ok found
 
                 next :: rest ->
                     let
                         isBad =
-                            Query.find next source
-                                |> Query.has []
+                            Query.has [ Selector.all next ] source
                     in
                     case Test.Runner.getFailureReason isBad of
                         Nothing ->
                             -- the element matches the bad selectors; produce a Query using the onError selectors that will fail that will show a reasonable failure message
-                            Query.find
-                                onError
-                                source
+                            firstErrorOf source
+                                [ Query.has good
+                                , Query.has [ Selector.all good ]
+                                , Query.has onError
+                                , Query.has [ Selector.all onError ]
+                                ]
 
                         Just _ ->
-                            -- the element we found is good; continue on to the next check
+                            -- the element we found is not bad; continue on to the next check
                             checkBads rest found
     in
-    Query.find good source
-        |> checkBads bads
+    let
+        isGood =
+            Query.has [ Selector.all good ] source
+    in
+    case Test.Runner.getFailureReason isGood of
+        Just _ ->
+            -- Couldn't find it, so report the best error message we can
+            firstErrorOf source
+                [ Query.has good
+                , Query.has [ Selector.all good ]
+                ]
+
+        Nothing ->
+            Query.find good source
+                |> checkBads bads
+
+
+firstErrorOf : Query.Single msg -> List (Query.Single msg -> Expectation) -> Result String never
+firstErrorOf source choices =
+    case choices of
+        [] ->
+            Err "PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: firstErrorOf: asked to report an error but none of the choices failed"
+
+        next :: rest ->
+            case Test.Runner.getFailureReason (next source) of
+                Just reason ->
+                    Err reason.description
+
+                Nothing ->
+                    firstErrorOf source rest
 
 
 {-| Simulates clicking a `<a href="...">` link.
@@ -2285,7 +2363,7 @@ fail assertionName failureMessage =
 
 {-| This is meant for internal use only and adds a rendering of the current view to an error message.
 -}
-failWithViewError : String -> String -> List String -> ProgramTest model msg effect -> ProgramTest model msg effect
+failWithViewError : String -> String -> List ( String, TestHtmlHacks.FailureReason ) -> ProgramTest model msg effect -> ProgramTest model msg effect
 failWithViewError functionDescription errorMessage attempts =
     -- This is a big hack to grab the rendered HTML for the error message,
     -- since Test.Html.Query doesn't expose a way to get the HTML as a string
