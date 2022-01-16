@@ -1,4 +1,4 @@
-module ProgramTest.TestHtmlHacks exposing (FailureReason(..), parseFailureReason)
+module ProgramTest.TestHtmlHacks exposing (FailureReason(..), parseFailureReason, parseSimulateFailure)
 
 
 type FailureReason
@@ -14,12 +14,7 @@ parseFailureReason string =
     in
     case List.filterMap parseSelectorResult lines of
         [] ->
-            case List.filterMap parseSimpleMessage lines of
-                [ single ] ->
-                    Simple single
-
-                _ ->
-                    Simple ("PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: Got a failure message from Test.Html.Query that we couldn't parse: " ++ string)
+            Simple ("PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: Got a failure message from Test.Html.Query that we couldn't parse: " ++ string)
 
         some ->
             SelectorsFailed some
@@ -38,10 +33,8 @@ parseSelectorResult string =
             Nothing
 
 
-parseSimpleMessage : String -> Maybe String
-parseSimpleMessage string =
-    if String.startsWith "Event.expectEvent" string then
-        Just string
-
-    else
-        Nothing
+parseSimulateFailure : String -> String
+parseSimulateFailure string =
+    String.lines string
+        |> List.head
+        |> Maybe.withDefault string

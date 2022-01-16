@@ -224,4 +224,48 @@ all =
                     |> ProgramTest.clickButton "Click Me"
                     |> ProgramTest.done
                     |> expectAnyFailure
+        , test "failure message with multiple matches" <|
+            \() ->
+                TestingProgram.startView
+                    (Html.div []
+                        [ Html.button
+                            [ onClick (Log "CLICK") ]
+                            [ Html.text "Click Me"
+                            ]
+                        , Html.button
+                            [ onClick (Log "CLICK2")
+                            , attribute "role" "button"
+                            , attribute "aria-label" "Click Me"
+                            ]
+                            []
+                        ]
+                    )
+                    |> ProgramTest.clickButton "Click Me"
+                    |> ProgramTest.done
+                    |> expectFailure
+                        [ "clickButton \"Click Me\":"
+                        , "▼ Query.fromHtml"
+                        , ""
+                        , "    <body>"
+                        , "        <div>"
+                        , "            <button>"
+                        , "                Click Me"
+                        , "            </button>"
+                        , "            <button aria-label=\"Click Me\" role=\"button\">"
+                        , "            </button>"
+                        , "        </div>"
+                        , "    </body>"
+                        , ""
+                        , ""
+                        , "▼ Query.has [ text \"HTML expected by the call to: clickButton \"Click Me\"\" ]"
+                        , ""
+                        , "✗ has text \"HTML expected by the call to: clickButton \"Click Me\"\""
+                        , ""
+                        , "Expected one of the following to exist, but there were multiple successful matches:"
+                        , "- <button> (not disabled) with onClick and text \"Click Me\""
+                        , "- <button> (not disabled) with onClick and attribute aria-label=\"Click Me\""
+                        , ""
+                        , "If that's what you intended, use `ProgramTest.within` to focus in on a portion of"
+                        , "the view that contains only one of the matches."
+                        ]
         ]

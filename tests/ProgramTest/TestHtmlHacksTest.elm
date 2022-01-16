@@ -8,11 +8,6 @@ import Test exposing (..)
 all : Test
 all =
     describe "ProgramTest.TestHtmlHacks" <|
-        let
-            parse lines =
-                TestHtmlHacks.parseFailureReason
-                    (String.join "\n" lines)
-        in
         [ describe "parseFailureReason"
             [ test "parses a selector error" <|
                 \() ->
@@ -24,11 +19,11 @@ all =
                                 , Err "has containing [ tag \"input\", attribute \"type\" \"submit\", attribute \"value\" \"Click Me\" ]"
                                 ]
                             )
-            , test "parses a simulate event error" <|
+            ]
+        , describe "parseSimulateFailure"
+            [ test "parses" <|
                 \() ->
-                    TestHtmlHacks.parseFailureReason
-                        "clickButton \"Click Me\":\nEvent.expectEvent: I found a node, but it does not listen for \"click\" events like I expected it would.\n\n<button>\n    Click Me\n</button>"
-                        |> Expect.equal
-                            (Simple "Event.expectEvent: I found a node, but it does not listen for \"click\" events like I expected it would.")
+                    TestHtmlHacks.parseSimulateFailure "Event.expectEvent: I found a node, but it does not listen for \"click\" events like I expected it would.\n\n<button>\n    Click Me\n</button>"
+                        |> Expect.equal "Event.expectEvent: I found a node, but it does not listen for \"click\" events like I expected it would."
             ]
         ]

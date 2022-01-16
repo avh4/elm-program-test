@@ -107,14 +107,12 @@ all =
                         , ""
                         , "Expected one of the following to exist and have an \"oninput\" handler:"
                         , """- <label for="field-id"> with text "Field 1" and an <input id="field-id">"""
-
-                        -- TODO: improve the error message that is produced here
-                        , """    ✗ Query.find always expects to find 1 element, but it found 0 instead."""
+                        , """    ✗ has tag "label\""""
                         , """- <input aria-label="Field 1" id="field-id">"""
-                        , """    ✗ Query.find always expects to find 1 element, but it found 0 instead."""
+                        , """    ✗ has tag "input\""""
                         , """- <label for="field-id"> with text "Field 1" and a <textarea id="field-id">"""
-                        , """    ✗ Query.find always expects to find 1 element, but it found 0 instead."""
+                        , """    ✗ has tag "label\""""
                         , """- <textarea aria-label="Field 1" id="field-id">"""
-                        , """    ✗ Query.find always expects to find 1 element, but it found 0 instead."""
+                        , """    ✗ has tag "textarea\""""
                         ]
         ]

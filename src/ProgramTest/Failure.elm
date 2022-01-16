@@ -1,6 +1,7 @@
 module ProgramTest.Failure exposing (Failure(..), toString)
 
 import Html exposing (Html)
+import ProgramTest.ComplexQuery as ComplexQuery exposing (Failure(..))
 import ProgramTest.TestHtmlHacks as TestHtmlHacks
 import String.Extra
 import Test.Html.Query as Query
@@ -24,7 +25,7 @@ type Failure
     | NoMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | MultipleMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | EffectSimulationNotConfigured String
-    | ViewAssertionFailed String (Html ()) String (List ( String, TestHtmlHacks.FailureReason ))
+    | ViewAssertionFailed String (Html ()) ComplexQuery.Failure
     | CustomFailure String String
 
 
@@ -142,25 +143,12 @@ toString failure =
         EffectSimulationNotConfigured functionName ->
             "TEST SETUP ERROR: In order to use " ++ functionName ++ ", you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start"
 
-        ViewAssertionFailed functionName html errorMessage attempts ->
-            let
-                errorMessageFinal =
-                    case attempts of
-                        [] ->
-                            errorMessage
-
-                        some ->
-                            String.join "\n" <|
-                                List.concat
-                                    [ [ errorMessage ++ ":" ]
-                                    , List.map (\( desc, reason ) -> "- " ++ desc ++ "\n" ++ renderIndentedTestHtmlFailure 4 reason) some
-                                    ]
-            in
+        ViewAssertionFailed functionName html reason ->
             String.join "\n"
                 [ functionName ++ ":"
                 , renderHtml functionName "" html
                 , ""
-                , errorMessageFinal
+                , renderQueryFailure 0 reason
                 ]
 
         CustomFailure assertionName message ->
@@ -182,8 +170,36 @@ renderHtml functionName unique html =
             reason.description
 
 
-renderIndentedTestHtmlFailure : Int -> TestHtmlHacks.FailureReason -> String
-renderIndentedTestHtmlFailure indent failureReason =
+renderQueryFailure : Int -> ComplexQuery.Failure -> String
+renderQueryFailure indent failure =
+    case failure of
+        QueryFailed failureReason ->
+            renderTestHtmlFailureReason indent failureReason
+
+        ComplexQuery.SimulateFailed string ->
+            String.repeat indent " " ++ string
+
+        NoMatches description options ->
+            String.join "\n" <|
+                List.concat
+                    [ [ description ++ ":" ]
+                    , List.map (\( desc, prio, reason ) -> "- " ++ {- String.fromInt prio ++ " " ++ -} desc ++ "\n" ++ renderQueryFailure (indent + 4) reason) options
+                    ]
+
+        TooManyMatches description matches ->
+            String.join "\n" <|
+                List.concat
+                    [ [ description ++ ", but there were multiple successful matches:" ]
+                    , List.map (\desc -> "- " ++ {- String.fromInt prio ++ " " ++ -} desc) matches
+                    , [ ""
+                      , "If that's what you intended, use `ProgramTest.within` to focus in on a portion of"
+                      , "the view that contains only one of the matches."
+                      ]
+                    ]
+
+
+renderTestHtmlFailureReason : Int -> TestHtmlHacks.FailureReason -> String
+renderTestHtmlFailureReason indent failureReason =
     case failureReason of
         TestHtmlHacks.Simple string ->
             String.repeat indent " " ++ string
