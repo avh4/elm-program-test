@@ -1148,10 +1148,9 @@ see [`simulateDomEvent`](#simulateDomEvent).
 -}
 fillInTextarea : String -> ProgramTest model msg effect -> ProgramTest model msg effect
 fillInTextarea newContent =
-    andThen
-        (simulateHelper "fillInTextarea"
-            (Query.find [ Selector.tag "textarea" ])
-            (Test.Html.Event.input newContent)
+    simulateComplexQuery "fillInTextarea" <|
+        (ComplexQuery.find [ Selector.tag "textarea" ]
+            >> ComplexQuery.andThen (ComplexQuery.simulate (Test.Html.Event.input newContent))
         )
 
 
