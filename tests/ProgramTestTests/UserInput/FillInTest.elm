@@ -93,7 +93,7 @@ all =
                     |> ProgramTest.fillIn "field-id" "Field 1" "value99"
                     |> ProgramTest.done
                     |> expectFailure
-                        [ """fillIn "Field 1": """
+                        [ """fillIn "Field 1":"""
                         , "▼ Query.fromHtml"
                         , ""
                         , "    <body>"
@@ -107,8 +107,12 @@ all =
                         , ""
                         , "Expected one of the following to exist and have an \"oninput\" handler:"
                         , """- <label for="field-id"> with text "Field 1" and an <input id="field-id">"""
+                        , """    \u{001B}[31m✗ has tag "label"\u{001B}[39m"""
                         , """- <input aria-label="Field 1" id="field-id">"""
+                        , """    \u{001B}[31m✗ has tag "input"\u{001B}[39m"""
                         , """- <label for="field-id"> with text "Field 1" and a <textarea id="field-id">"""
+                        , """    \u{001B}[31m✗ has tag "label"\u{001B}[39m"""
                         , """- <textarea aria-label="Field 1" id="field-id">"""
+                        , """    \u{001B}[31m✗ has tag "textarea"\u{001B}[39m"""
                         ]
         ]

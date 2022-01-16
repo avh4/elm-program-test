@@ -1,3 +1,14 @@
+## main
+
+New features:
+
+  - Functions to simulate DOM events now report more detailed and more relevant information in the case of failure.
+
+Bug fixes:
+
+  - Functions to simulate DOM events now correctly fail in all cases when there are multiple possible matches.
+
+
 ## 3.6.0
 
 Changes:
