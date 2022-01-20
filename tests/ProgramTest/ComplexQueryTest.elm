@@ -91,8 +91,7 @@ all =
                         |> ComplexQuery.run
                         |> Expect.equal
                             (Err
-                                (CheckSucceeded
-                                    "text exists"
+                                (CheckSucceeded "text exists"
                                     (FindSucceeded [ "has text \"Outer text\"" ]
                                         (None ())
                                     )

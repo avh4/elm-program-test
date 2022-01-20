@@ -25,6 +25,11 @@ expectFailure expectedFailureMessage actualResult =
 
         Just actualInfo ->
             actualInfo.description
+                |> String.replace "\u{001B}[1m" ""
+                |> String.replace "\u{001B}[22m" ""
+                |> String.replace "\u{001B}[31m" ""
+                |> String.replace "\u{001B}[32m" ""
+                |> String.replace "\u{001B}[39m" ""
                 |> Expect.equal (String.join "\n" expectedFailureMessage)
 
 

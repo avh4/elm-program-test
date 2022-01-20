@@ -163,10 +163,17 @@ renderQueryFailureWithContext renderInner indent color failure =
         None inner ->
             renderInner indent color inner
 
+        Description description baseFailure ->
+            String.join "\n" <|
+                List.filter ((/=) "")
+                    [ indentS ++ renderDescriptionResult (colorsFor color) description ++ ":"
+                    , renderQueryFailureWithContext renderInner (indent + 2) color baseFailure
+                    ]
+
         CheckSucceeded description checkContext baseFailure ->
             String.join "\n" <|
                 List.filter ((/=) "")
-                    [ indentS ++ (colorsFor color).green "✓" ++ " " ++ description ++ ":"
+                    [ indentS ++ renderDescriptionResult (colorsFor color) (Ok description) ++ ":"
                     , renderQueryFailureWithContext_ (\_ _ () -> "") (indent + 2) color checkContext
                     , renderQueryFailureWithContext renderInner indent color baseFailure
                     ]
@@ -199,7 +206,7 @@ renderQueryFailure indent color failure =
                 colors =
                     colorsFor color
             in
-            indentS ++ colors.bold string
+            indentS ++ renderSelectorResult colors (Err string)
 
         NoMatches description options ->
             let
@@ -224,7 +231,7 @@ renderQueryFailure indent color failure =
             String.join "\n" <|
                 List.concat
                     [ [ indentS ++ description ++ ", but there were multiple successful matches:" ]
-                    , List.map (\desc -> indentS ++ "- " ++ desc) matches
+                    , List.map (\( desc, todo ) -> indentS ++ "- " ++ desc) matches
                     , [ ""
                       , "If that's what you intended, use `ProgramTest.within` to focus in on a portion of"
                       , "the view that contains only one of the matches."
@@ -273,6 +280,24 @@ renderSelectorResult colors result =
                     , " "
                     , selector
                     ]
+
+
+renderDescriptionResult : Colors -> Result String String -> String
+renderDescriptionResult colors result =
+    case result of
+        Ok selector ->
+            String.concat
+                [ colors.green "✓"
+                , " "
+                , selector
+                ]
+
+        Err selector ->
+            String.concat
+                [ colors.red "✗"
+                , " "
+                , selector
+                ]
 
 
 upToFirstErr : List (Result x a) -> List (Result x a)

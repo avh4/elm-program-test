@@ -1241,23 +1241,19 @@ selectOption fieldId label optionValue optionText =
                     , Selector.text label
                     ]
                 )
-            >> ComplexQuery.check
-                "select with option exists"
-                (ComplexQuery.find
-                    [ Selector.tag "select"
-                    , Selector.id fieldId
-                    , Selector.containing
-                        [ Selector.tag "option"
-                        , Selector.attribute (Html.Attributes.value optionValue)
-                        , Selector.text optionText
-                        ]
-                    ]
-                )
             >> ComplexQuery.andThen
                 (ComplexQuery.find
                     [ Selector.tag "select"
                     , Selector.id fieldId
                     ]
+                    >> ComplexQuery.check
+                        "option exists"
+                        (ComplexQuery.find
+                            [ Selector.tag "option"
+                            , Selector.attribute (Html.Attributes.value optionValue)
+                            , Selector.text optionText
+                            ]
+                        )
                 )
             >> ComplexQuery.andThen
                 (ComplexQuery.simulate

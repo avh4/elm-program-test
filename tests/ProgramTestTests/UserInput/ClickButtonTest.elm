@@ -44,7 +44,9 @@ all =
                         , ""
                         , "Expected one of the following to exist:"
                         , "- <button> (not disabled) with onClick and text \"Click Me\""
-                        , "    \u{001B}[1mEvent.expectEvent: I found a node, but it does not listen for \"click\" events like I expected it would.\u{001B}[22m"
+                        , "    ✓ has tag \"button\""
+                        , "    ✓ has containing [ text \"Click Me\" ]"
+                        , "      ✗ Event.expectEvent: I found a node, but it does not listen for \"click\" events like I expected it would."
                         ]
         , test "can click a button containing an image with alt text" <|
             \() ->
@@ -164,9 +166,9 @@ all =
                         , ""
                         , "Expected one of the following to exist:"
                         , "- <button> (not disabled) with onClick and text \"Click Me\""
-                        , "    \u{001B}[32m✓\u{001B}[39m \u{001B}[1mhas tag \"button\"\u{001B}[22m"
-                        , "    \u{001B}[32m✓\u{001B}[39m \u{001B}[1mhas containing [ text \"Click Me\" ]\u{001B}[22m"
-                        , "    \u{001B}[31m✗ has attribute \"disabled\" False\u{001B}[39m"
+                        , "    ✓ has tag \"button\""
+                        , "    ✓ has containing [ text \"Click Me\" ]"
+                        , "    ✗ has attribute \"disabled\" False"
                         ]
         , test "fails when clicking a disabled button in a form" <|
             \() ->

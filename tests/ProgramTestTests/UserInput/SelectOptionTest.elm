@@ -6,7 +6,7 @@ import Html.Attributes exposing (for, id, value)
 import Html.Events exposing (on)
 import ProgramTest exposing (ProgramTest)
 import Test exposing (..)
-import Test.Runner
+import Test.Expect exposing (expectFailure)
 
 
 start : ProgramTest String String ()
@@ -55,12 +55,56 @@ all =
                 start
                     |> ProgramTest.selectOption "name-select" "Choose a name" "george-value" "George"
                     |> ProgramTest.done
-                    |> Test.Runner.getFailureReason
-                    |> Maybe.map .description
-                    |> Maybe.withDefault "<Expected selectOption to fail, but it succeeded>"
-                    |> Expect.all
-                        [ expectContains "selectOption"
-                        , expectContains "it does not listen for \"change\" events like I expected it would."
+                    |> expectFailure
+                        [ """▼ Query.fromHtml"""
+                        , """"""
+                        , """    <div>"""
+                        , """        <label htmlFor="pet-select">"""
+                        , """            Choose a pet"""
+                        , """        </label>"""
+                        , """        <select id="pet-select">"""
+                        , """            <option value="dog-value">"""
+                        , """                Dog"""
+                        , """            </option>"""
+                        , """            <option value="cat-value">"""
+                        , """                Cat"""
+                        , """            </option>"""
+                        , """            <option value="hamster-value">"""
+                        , """                Hamster"""
+                        , """            </option>"""
+                        , """            <option>"""
+                        , """                Tegu"""
+                        , """            </option>"""
+                        , """        </select>"""
+                        , """        <label htmlFor="name-select">"""
+                        , """            Choose a name"""
+                        , """        </label>"""
+                        , """        <select id="name-select">"""
+                        , """            <option value="hamster-value">"""
+                        , """                Hamster"""
+                        , """            </option>"""
+                        , """            <option value="george-value">"""
+                        , """                George"""
+                        , """            </option>"""
+                        , """        </select>"""
+                        , """    </div>"""
+                        , """"""
+                        , """"""
+                        , """▼ ProgramTest.selectOption "name-select" "Choose a name" "george-value" "George\""""
+                        , """"""
+                        , """✓ label exists:"""
+                        , """  ✓ has tag "label\""""
+                        , """  ✓ has attribute "htmlFor" "name-select\""""
+                        , """  ✓ has text "Choose a name\""""
+                        , """✓ has tag "select\""""
+                        , """✓ has attribute "id" "name-select\""""
+                        , """  ✓ option exists:"""
+                        , """    ✓ has tag "option\""""
+                        , """    ✓ has attribute "value" "george-value\""""
+                        , """    ✓ has text "George\""""
+                        , """  ✓ has tag "select\""""
+                        , """  ✓ has attribute "id" "name-select\""""
+                        , """    ✗ Event.expectEvent: I found a node, but it does not listen for "change" events like I expected it would."""
                         ]
         ]
 

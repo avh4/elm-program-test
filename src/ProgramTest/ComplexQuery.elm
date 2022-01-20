@@ -72,7 +72,7 @@ simulate event target =
 -}
 check : String -> (a -> ComplexQuery msg ignored) -> ComplexQuery msg a -> ComplexQuery msg a
 check description checkQuery mainQuery =
-    Check description (mainQuery |> andThen checkQuery |> map (\_ -> ())) mainQuery
+    mainQuery |> andThen (\a -> Check description (checkQuery a |> map (\_ -> ())) mainQuery)
 
 
 andThen : (a -> ComplexQuery msg b) -> ComplexQuery msg a -> ComplexQuery msg b
@@ -103,7 +103,6 @@ type alias Priority =
 
 type alias State =
     { priority : Priority
-    , errorContext : FailureContext ()
     }
 
 
@@ -111,12 +110,13 @@ type Failure
     = QueryFailed TestHtmlHacks.FailureReason
     | SimulateFailed String
     | NoMatches String (List ( String, Priority, FailureContext Failure ))
-    | TooManyMatches String (List String)
+    | TooManyMatches String (List ( String, FailureContext () ))
 
 
 type FailureContext a
     = FindSucceeded (List String) (FailureContext a)
     | CheckSucceeded String (FailureContext ()) (FailureContext a)
+    | Description (Result String String) (FailureContext a)
     | None a
 
 
@@ -128,6 +128,9 @@ mapFailureContext f failureContext =
 
         CheckSucceeded description checkContext next ->
             CheckSucceeded description checkContext (mapFailureContext f next)
+
+        Description description next ->
+            Description description (mapFailureContext f next)
 
         None a ->
             None (f a)
@@ -142,40 +145,54 @@ extractFromContext failureContext =
         CheckSucceeded _ _ next ->
             extractFromContext next
 
+        Description _ next ->
+            extractFromContext next
+
         None a ->
             a
+
+
+destructureContext : FailureContext a -> ( FailureContext (), a )
+destructureContext failureContext =
+    case failureContext of
+        FindSucceeded selectors baseFailure ->
+            destructureContext baseFailure
+                |> Tuple.mapFirst (FindSucceeded selectors)
+
+        CheckSucceeded description checkContext baseFailure ->
+            destructureContext baseFailure
+                |> Tuple.mapFirst (CheckSucceeded description checkContext)
+
+        Description string baseFailure ->
+            destructureContext baseFailure
+                |> Tuple.mapFirst (Description string)
+
+        None a ->
+            ( None (), a )
 
 
 run : ComplexQuery msg a -> Result (FailureContext Failure) a
 run complexQuery =
     let
-        ( finalState, result ) =
+        ( _, result ) =
             step
                 { priority = 0
-                , errorContext = None ()
                 }
                 complexQuery
     in
-    Result.mapError (applyContext finalState.errorContext) result
+    case destructureContext result of
+        ( _, Ok a ) ->
+            Ok a
+
+        ( context, Err error ) ->
+            Err (mapFailureContext (\_ -> error) context)
 
 
-applyContext : FailureContext () -> a -> FailureContext a
-applyContext errorContext err =
-    mapFailureContext (\() -> err) errorContext
-
-
-addContext : (FailureContext () -> FailureContext ()) -> ( State, Result Failure a ) -> ( State, Result Failure a )
-addContext newContext ( state, result ) =
-    ( { state | errorContext = newContext state.errorContext }
-    , result
-    )
-
-
-step : State -> ComplexQuery msg a -> ( State, Result Failure a )
+step : State -> ComplexQuery msg a -> ( State, FailureContext (Result Failure a) )
 step state complexQuery =
     case complexQuery of
         Done a ->
-            ( state, Ok a )
+            ( state, None (Ok a) )
 
         Find selectors source next ->
             case Test.Runner.getFailureReason (Query.has [ Selector.all selectors ] source) of
@@ -190,7 +207,7 @@ step state complexQuery =
                     ( { state
                         | priority = state.priority + countSuccesses error
                       }
-                    , Err (QueryFailed error)
+                    , None (Err (QueryFailed error))
                     )
 
                 Nothing ->
@@ -199,7 +216,7 @@ step state complexQuery =
                             | priority = state.priority + List.length selectors
                         }
                         (next (Query.find selectors source))
-                        |> addContext (FindSucceeded (TestHtmlHacks.getPassingSelectors selectors source))
+                        |> Tuple.mapSecond (FindSucceeded (TestHtmlHacks.getPassingSelectors selectors source))
 
         ExactlyOneOf description options ->
             let
@@ -210,15 +227,15 @@ step state complexQuery =
                     List.filterMap checkSuccess results
 
                 checkSuccess ( desc, ( newState, result ) ) =
-                    case result of
+                    case extractFromContext result of
                         Ok a ->
-                            Just ( desc, ( newState, Ok a ) )
+                            Just ( desc, ( newState, result ) )
 
                         Err _ ->
                             Nothing
 
                 collectError ( desc, ( newState, result ) ) =
-                    case result of
+                    case extractFromContext result of
                         Ok _ ->
                             Nothing
 
@@ -226,7 +243,7 @@ step state complexQuery =
                             Just
                                 ( desc
                                 , newState.priority
-                                , applyContext newState.errorContext x
+                                , mapFailureContext (\_ -> x) result
                                 )
             in
             case successes of
@@ -234,22 +251,24 @@ step state complexQuery =
                     one
 
                 [] ->
-                    ( state, Err (NoMatches description (List.filterMap collectError results)) )
+                    ( state, None (Err (NoMatches description (List.filterMap collectError results))) )
 
                 many ->
-                    ( state, Err (TooManyMatches description (List.map Tuple.first many)) )
+                    ( state, None (Err (TooManyMatches description (List.map (Tuple.mapSecond (Tuple.second >> mapFailureContext (\_ -> ()))) many))) )
 
         FindButNot { good, bads, onError } source next ->
             -- This is tricky because Test.Html doesn't provide a way to search for an attribute being *not* present.
             -- So we have to check if a selector we don't want *is* present, and manually force a failure if it is.
             let
-                checkBads : Priority -> List (List Selector) -> Query.Single msg -> ( State, Result Failure a )
+                checkBads : Priority -> List (List Selector) -> Query.Single msg -> ( State, FailureContext (Result Failure a) )
                 checkBads extraPriority bads_ found =
                     case bads_ of
                         [] ->
                             step
                                 { state | priority = state.priority + extraPriority + 1 }
                                 (next found)
+                                -- TODO: add the not bads to the context (or alternatively, add the "onErrors", but convert them all to successes)
+                                |> Tuple.mapSecond (FindSucceeded (TestHtmlHacks.getPassingSelectors good source))
 
                         nextBad :: rest ->
                             let
@@ -269,7 +288,7 @@ step state complexQuery =
                                                 ]
                                     in
                                     ( { state | priority = state.priority + extraPriority + countSuccesses error }
-                                    , Err (QueryFailed error)
+                                    , None (Err (QueryFailed error))
                                     )
 
                                 Just _ ->
@@ -290,7 +309,7 @@ step state complexQuery =
                                 ]
                     in
                     ( { state | priority = state.priority + countSuccesses error }
-                    , Err (QueryFailed error)
+                    , None (Err (QueryFailed error))
                     )
 
                 Nothing ->
@@ -306,7 +325,7 @@ step state complexQuery =
             of
                 Just reason ->
                     --( state, Err (QueryFailed (TestHtmlHacks.parseFailureReason reason.description)) )
-                    ( state, Err (QueryFailed (TestHtmlHacks.parseFailureReason "XXX: Does this code ever run????")) )
+                    ( state, None (Err (QueryFailed (TestHtmlHacks.parseFailureReason "XXX: Does this code ever run????"))) )
 
                 Nothing ->
                     -- Try to simulate the event, now that we know the target exists
@@ -316,24 +335,31 @@ step state complexQuery =
                             |> Test.Html.Event.toResult
                     of
                         Err message ->
-                            ( state, Err (SimulateFailed (TestHtmlHacks.parseSimulateFailure message)) )
+                            ( state, None (Err (SimulateFailed (TestHtmlHacks.parseSimulateFailure message))) )
 
                         Ok msg ->
                             step state (next msg)
 
         Check description checkQuery next ->
-            case step_ state checkQuery of
-                ( checkedState, Err failure ) ->
-                    ( checkedState, Err failure )
+            let
+                ( checkedState, checkResult ) =
+                    step_ state checkQuery
+            in
+            case destructureContext checkResult of
+                ( checkContext, Err failure ) ->
+                    ( checkedState
+                    , mapFailureContext (\() -> Err failure) checkContext
+                    )
+                        |> Tuple.mapSecond (Description (Err description))
 
-                ( checkedState, Ok () ) ->
+                ( checkContext, Ok () ) ->
                     step { state | priority = checkedState.priority } next
-                        |> addContext (CheckSucceeded description checkedState.errorContext)
+                        |> Tuple.mapSecond (CheckSucceeded description checkContext)
 
 
 {-| This is needed because Elm does not allow a function to call itself with a different concrete type, and we need to do so above in the `Check` branch.
 -}
-step_ : State -> ComplexQuery msg a -> ( State, Result Failure a )
+step_ : State -> ComplexQuery msg a -> ( State, FailureContext (Result Failure a) )
 step_ =
     step
 
