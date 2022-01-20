@@ -1230,44 +1230,43 @@ selectOption fieldId label optionValue optionText =
                 ]
     in
     simulateComplexQuery functionDescription <|
-        \source ->
-            ComplexQuery.succeed source
-                |> ComplexQuery.check
-                    (ComplexQuery.find
-                        [ Selector.tag "label"
-                        , Selector.attribute (Html.Attributes.for fieldId)
-                        , Selector.text label
+        ComplexQuery.succeed
+            >> ComplexQuery.check
+                (ComplexQuery.find
+                    [ Selector.tag "label"
+                    , Selector.attribute (Html.Attributes.for fieldId)
+                    , Selector.text label
+                    ]
+                )
+            >> ComplexQuery.check
+                (ComplexQuery.find
+                    [ Selector.tag "select"
+                    , Selector.id fieldId
+                    , Selector.containing
+                        [ Selector.tag "option"
+                        , Selector.attribute (Html.Attributes.value optionValue)
+                        , Selector.text optionText
+                        ]
+                    ]
+                )
+            >> ComplexQuery.andThen
+                (ComplexQuery.find
+                    [ Selector.tag "select"
+                    , Selector.id fieldId
+                    ]
+                )
+            >> ComplexQuery.andThen
+                (ComplexQuery.simulate
+                    ( "change"
+                    , Json.Encode.object
+                        [ ( "target"
+                          , Json.Encode.object
+                                [ ( "value", Json.Encode.string optionValue )
+                                ]
+                          )
                         ]
                     )
-                |> ComplexQuery.check
-                    (ComplexQuery.find
-                        [ Selector.tag "select"
-                        , Selector.id fieldId
-                        , Selector.containing
-                            [ Selector.tag "option"
-                            , Selector.attribute (Html.Attributes.value optionValue)
-                            , Selector.text optionText
-                            ]
-                        ]
-                    )
-                |> ComplexQuery.andThen
-                    (ComplexQuery.find
-                        [ Selector.tag "select"
-                        , Selector.id fieldId
-                        ]
-                    )
-                |> ComplexQuery.andThen
-                    (ComplexQuery.simulate
-                        ( "change"
-                        , Json.Encode.object
-                            [ ( "target"
-                              , Json.Encode.object
-                                    [ ( "value", Json.Encode.string optionValue )
-                                    ]
-                              )
-                            ]
-                        )
-                    )
+                )
 
 
 {-| Focus on a part of the view for a particular operation.
