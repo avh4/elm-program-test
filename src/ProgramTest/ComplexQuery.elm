@@ -9,38 +9,28 @@ import Test.Html.Selector as Selector exposing (Selector)
 import Test.Runner
 
 
-type ComplexQueryF msg a
-    = Find (List Selector) (Query.Single msg) (Query.Single msg -> a)
+type ComplexQuery msg a
+    = Done a
+    | Find (List Selector) (Query.Single msg) (Query.Single msg -> ComplexQuery msg a)
     | FindButNot
         { good : List Selector
         , bads : List (List Selector)
         , onError : List Selector
         }
         (Query.Single msg)
-        (Query.Single msg -> a)
-    | Simulate ( String, Json.Value ) (Query.Single msg) (msg -> a)
+        (Query.Single msg -> ComplexQuery msg a)
+    | Simulate ( String, Json.Value ) (Query.Single msg) (msg -> ComplexQuery msg a)
     | ExactlyOneOf String (List ( String, ComplexQuery msg a ))
 
 
-mapF : (a -> b) -> ComplexQueryF msg a -> ComplexQueryF msg b
-mapF f complexQuery =
-    case complexQuery of
-        FindButNot config source next ->
-            FindButNot config source (next >> f)
-
-        Find selectors source next ->
-            Find selectors source (next >> f)
-
-        Simulate event target next ->
-            Simulate event target (next >> f)
-
-        ExactlyOneOf desc options ->
-            ExactlyOneOf desc (List.map (Tuple.mapSecond (map f)) options)
+map : (a -> b) -> ComplexQuery msg a -> ComplexQuery msg b
+map f complexQuery =
+    andThen (f >> Done) complexQuery
 
 
 find : List Selector -> Query.Single msg -> ComplexQuery msg (Query.Single msg)
 find selectors source =
-    Continue (Find selectors source Done)
+    Find selectors source Done
 
 
 {-|
@@ -58,17 +48,17 @@ findButNot :
     -> Query.Single msg
     -> ComplexQuery msg (Query.Single msg)
 findButNot config source =
-    Continue (FindButNot config source Done)
+    FindButNot config source Done
 
 
 exactlyOneOf : String -> List ( String, ComplexQuery msg a ) -> ComplexQuery msg a
 exactlyOneOf description options =
-    Continue (ExactlyOneOf description (List.map (Tuple.mapSecond (map Done)) options))
+    ExactlyOneOf description options
 
 
 simulate : ( String, Json.Value ) -> Query.Single msg -> ComplexQuery msg msg
 simulate event target =
-    Continue (Simulate event target Done)
+    Simulate event target Done
 
 
 andThen : (a -> ComplexQuery msg b) -> ComplexQuery msg a -> ComplexQuery msg b
@@ -77,8 +67,17 @@ andThen f queryChain =
         Done a ->
             f a
 
-        Continue start ->
-            Continue (mapF (andThen f) start)
+        FindButNot config source next ->
+            FindButNot config source (next >> andThen f)
+
+        Find selectors source next ->
+            Find selectors source (next >> andThen f)
+
+        Simulate event target next ->
+            Simulate event target (next >> andThen f)
+
+        ExactlyOneOf desc options ->
+            ExactlyOneOf desc (List.map (Tuple.mapSecond (andThen f)) options)
 
 
 type alias Priority =
@@ -97,26 +96,11 @@ type Failure
     | TooManyMatches String (List String)
 
 
-type ComplexQuery msg a
-    = Done a
-    | Continue (ComplexQueryF msg (ComplexQuery msg a))
-
-
-map : (a -> b) -> ComplexQuery msg a -> ComplexQuery msg b
-map f complexQuery =
-    case complexQuery of
-        Done a ->
-            Done (f a)
-
-        Continue next ->
-            Continue (mapF (map f) next)
-
-
 run : ComplexQuery msg a -> Result Failure a
 run complexQuery =
     let
         ( _, result ) =
-            stepChain
+            step
                 { priority = 0
                 }
                 complexQuery
@@ -124,24 +108,12 @@ run complexQuery =
     result
 
 
-stepChain : State -> ComplexQuery msg a -> ( State, Result Failure a )
-stepChain state query =
-    case query of
+step : State -> ComplexQuery msg a -> ( State, Result Failure a )
+step state complexQuery =
+    case complexQuery of
         Done a ->
             ( state, Ok a )
 
-        Continue next ->
-            case step state next of
-                ( newState, Err x ) ->
-                    ( newState, Err x )
-
-                ( newState, Ok nextChain ) ->
-                    stepChain newState nextChain
-
-
-step : State -> ComplexQueryF msg a -> ( State, Result Failure a )
-step state complexQuery =
-    case complexQuery of
         Find selectors source next ->
             case Test.Runner.getFailureReason (Query.has [ Selector.all selectors ] source) of
                 Just _ ->
@@ -157,14 +129,14 @@ step state complexQuery =
                     )
 
                 Nothing ->
-                    ( { state | priority = state.priority + List.length selectors }
-                    , Ok (next (Query.find selectors source))
-                    )
+                    step
+                        { state | priority = state.priority + List.length selectors }
+                        (next (Query.find selectors source))
 
         ExactlyOneOf description options ->
             let
                 results =
-                    List.map (Tuple.mapSecond (stepChain state)) options
+                    List.map (Tuple.mapSecond (step state)) options
 
                 successes =
                     List.filterMap checkSuccess results
@@ -203,7 +175,9 @@ step state complexQuery =
                 checkBads extraPriority bads_ found =
                     case bads_ of
                         [] ->
-                            ( { state | priority = state.priority + extraPriority + 1 }, Ok (next found) )
+                            step
+                                { state | priority = state.priority + extraPriority + 1 }
+                                (next found)
 
                         nextBad :: rest ->
                             let
@@ -273,7 +247,7 @@ step state complexQuery =
                             ( state, Err (SimulateFailed (TestHtmlHacks.parseSimulateFailure message)) )
 
                         Ok msg ->
-                            ( state, Ok (next msg) )
+                            step state (next msg)
 
 
 firstErrorOf : Query.Single msg -> List (Query.Single msg -> Expectation) -> TestHtmlHacks.FailureReason
