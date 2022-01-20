@@ -5,8 +5,6 @@ import ProgramTest.ComplexQuery as ComplexQuery exposing (Failure(..))
 import ProgramTest.TestHtmlHacks as TestHtmlHacks
 import String.Extra
 import Test.Html.Query as Query
-import Test.Html.Selector as Selector
-import Test.Runner
 import Test.Runner.Failure
 import Url exposing (Url)
 
@@ -145,29 +143,14 @@ toString failure =
 
         ViewAssertionFailed functionName html reason ->
             String.join "\n"
-                [ functionName ++ ":"
-                , renderHtml functionName "" html
+                [ TestHtmlHacks.renderHtml (Query.fromHtml html)
+                , "▼ " ++ functionName
                 , ""
                 , renderQueryFailure 0 True reason
                 ]
 
         CustomFailure assertionName message ->
             assertionName ++ ": " ++ message
-
-
-renderHtml : String -> String -> Html any -> String
-renderHtml functionName unique html =
-    case
-        Query.fromHtml html
-            |> Query.has [ Selector.text ("HTML expected by the call to: " ++ functionName ++ unique) ]
-            |> Test.Runner.getFailureReason
-    of
-        Nothing ->
-            -- We expect the fake query to fail -- if it doesn't for some reason, just try recursing with a different fake matching string until it does fail
-            renderHtml functionName (unique ++ "_") html
-
-        Just reason ->
-            reason.description
 
 
 renderQueryFailure : Int -> Bool -> ComplexQuery.Failure -> String

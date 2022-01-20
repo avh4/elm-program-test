@@ -1,3 +1,10 @@
+## develop
+
+New features:
+
+  - Functions to simulate DOM events display errors more nicely (without extra junk like "`✗ has text "HTML expected by the call to: ..."`").
+
+
 ## 3.6.1
 
 New features:

@@ -31,8 +31,7 @@ all =
                     |> ProgramTest.clickButton "Click Me"
                     |> ProgramTest.done
                     |> expectFailure
-                        [ "clickButton \"Click Me\":"
-                        , "▼ Query.fromHtml"
+                        [ "▼ Query.fromHtml"
                         , ""
                         , "    <body>"
                         , "        <button>"
@@ -41,9 +40,7 @@ all =
                         , "    </body>"
                         , ""
                         , ""
-                        , "▼ Query.has [ text \"HTML expected by the call to: clickButton \"Click Me\"\" ]"
-                        , ""
-                        , "✗ has text \"HTML expected by the call to: clickButton \"Click Me\"\""
+                        , "▼ ProgramTest.clickButton \"Click Me\""
                         , ""
                         , "Expected one of the following to exist:"
                         , "- <button> (not disabled) with onClick and text \"Click Me\""
@@ -154,8 +151,7 @@ all =
                     |> ProgramTest.clickButton "Click Me"
                     |> ProgramTest.done
                     |> expectFailure
-                        [ "clickButton \"Click Me\":"
-                        , "▼ Query.fromHtml"
+                        [ "▼ Query.fromHtml"
                         , ""
                         , "    <body>"
                         , "        <button disabled=true>"
@@ -164,9 +160,7 @@ all =
                         , "    </body>"
                         , ""
                         , ""
-                        , "▼ Query.has [ text \"HTML expected by the call to: clickButton \"Click Me\"\" ]"
-                        , ""
-                        , "✗ has text \"HTML expected by the call to: clickButton \"Click Me\"\""
+                        , "▼ ProgramTest.clickButton \"Click Me\""
                         , ""
                         , "Expected one of the following to exist:"
                         , "- <button> (not disabled) with onClick and text \"Click Me\""
@@ -215,8 +209,7 @@ all =
                     |> ProgramTest.clickButton "Click Me"
                     |> ProgramTest.done
                     |> expectFailure
-                        [ "clickButton \"Click Me\":"
-                        , "▼ Query.fromHtml"
+                        [ "▼ Query.fromHtml"
                         , ""
                         , "    <body>"
                         , "        <div>"
@@ -229,9 +222,7 @@ all =
                         , "    </body>"
                         , ""
                         , ""
-                        , "▼ Query.has [ text \"HTML expected by the call to: clickButton \"Click Me\"\" ]"
-                        , ""
-                        , "✗ has text \"HTML expected by the call to: clickButton \"Click Me\"\""
+                        , "▼ ProgramTest.clickButton \"Click Me\""
                         , ""
                         , "Expected one of the following to exist, but there were multiple successful matches:"
                         , "- <button> (not disabled) with onClick and text \"Click Me\""

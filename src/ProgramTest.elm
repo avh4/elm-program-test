@@ -765,7 +765,7 @@ simulateComplexQuery functionName complexQuery =
                     TestState.update msg program state
 
                 Err queryFailure ->
-                    Err (ViewAssertionFailed functionName (Html.map (\_ -> ()) (program.view state.currentModel)) queryFailure)
+                    Err (ViewAssertionFailed ("ProgramTest." ++ functionName) (Html.map (\_ -> ()) (program.view state.currentModel)) queryFailure)
 
 
 assertComplexQuery : String -> (Query.Single msg -> ComplexQuery msg ignored) -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -781,7 +781,7 @@ assertComplexQuery functionName complexQuery =
                     Ok state
 
                 Err queryFailure ->
-                    Err (ViewAssertionFailed functionName (Html.map (\_ -> ()) (program.view state.currentModel)) queryFailure)
+                    Err (ViewAssertionFailed ("ProgramTest." ++ functionName) (Html.map (\_ -> ()) (program.view state.currentModel)) queryFailure)
 
 
 {-| Simulates a custom DOM event.
