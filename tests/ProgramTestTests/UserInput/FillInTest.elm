@@ -87,6 +87,40 @@ all =
                     ]
                     |> ProgramTest.fillIn "field-id" "Field 1" "value99"
                     |> ProgramTest.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
+        , test "error message for when an input is in a label" <|
+            \() ->
+                start
+                    [ Html.label []
+                        [ Html.text "Field 1"
+                        , Html.b [] []
+                        ]
+                    ]
+                    |> ProgramTest.fillIn "" "Field 1" "value99"
+                    |> ProgramTest.done
+                    |> expectFailure
+                        [ "▼ Query.fromHtml"
+                        , ""
+                        , "    <body>"
+                        , "        <label>"
+                        , "            Field 1"
+                        , "            <b>"
+                        , "            </b>"
+                        , "        </label>"
+                        , "    </body>"
+                        , ""
+                        , ""
+                        , """▼ ProgramTest.fillIn "Field 1\""""
+                        , ""
+                        , "Expected one of the following to exist and have an \"oninput\" handler:"
+                        , """- a <label> with text "Field 1" containing an <input>"""
+                        , """    \u{001B}[32m✓\u{001B}[39m \u{001B}[1mhas tag "label"\u{001B}[22m"""
+                        , """    \u{001B}[32m✓\u{001B}[39m \u{001B}[1mhas containing [ text "Field 1" ]\u{001B}[22m"""
+                        , """      \u{001B}[31m✗ has tag "input"\u{001B}[39m"""
+                        , """- a <label> with text "Field 1" containing a <textarea>"""
+                        , """    \u{001B}[32m✓\u{001B}[39m \u{001B}[1mhas tag "label"\u{001B}[22m"""
+                        , """    \u{001B}[32m✓\u{001B}[39m \u{001B}[1mhas containing [ text "Field 1" ]\u{001B}[22m"""
+                        , """      \u{001B}[31m✗ has tag "textarea"\u{001B}[39m"""
+                        ]
         , test "shows a useful error when the input doesn't exist" <|
             \() ->
                 start [ Html.text "no input" ]

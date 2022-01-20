@@ -15,9 +15,13 @@ all =
     describe "ProgramTest.ComplexQuery" <|
         let
             html =
-                Html.div []
-                    [ Html.form [ HtmlA.id "formA" ]
-                        []
+                Html.node "body"
+                    []
+                    [ Html.div []
+                        [ Html.form [ HtmlA.id "formA" ]
+                            [ Html.button [] []
+                            ]
+                        ]
                     ]
                     |> Query.fromHtml
         in
@@ -37,6 +41,34 @@ all =
                                         [ Ok "has tag \"form\""
                                         , Err "has attribute \"id\" \"formX\""
                                         ]
+                                    )
+                                )
+                            )
+            ]
+        , describe "errors for composed queries"
+            [ test "a find followed by a failing find includes the successful selectors of the first find" <|
+                \() ->
+                    ComplexQuery.find
+                        [ Selector.tag "form"
+                        ]
+                        html
+                        |> ComplexQuery.andThen
+                            (ComplexQuery.find
+                                [ Selector.tag "button"
+                                , Selector.id "buttonX"
+                                ]
+                            )
+                        |> ComplexQuery.run
+                        |> Expect.equal
+                            (Err
+                                (FindSucceeded
+                                    [ "has tag \"form\"" ]
+                                    (QueryFailed
+                                        (SelectorsFailed
+                                            [ Ok "has tag \"button\""
+                                            , Err "has attribute \"id\" \"buttonX\""
+                                            ]
+                                        )
                                     )
                                 )
                             )

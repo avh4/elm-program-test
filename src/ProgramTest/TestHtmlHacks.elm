@@ -1,7 +1,7 @@
-module ProgramTest.TestHtmlHacks exposing (FailureReason(..), parseFailureReason, parseSimulateFailure, renderHtml)
+module ProgramTest.TestHtmlHacks exposing (FailureReason(..), getPassingSelectors, parseFailureReason, parseSimulateFailure, renderHtml)
 
 import Test.Html.Query as Query
-import Test.Html.Selector as Selector
+import Test.Html.Selector as Selector exposing (Selector)
 import Test.Runner
 
 
@@ -10,31 +10,54 @@ pleaseReport description =
 
 
 renderHtml : Query.Single any -> String
-renderHtml =
-    renderHtml_ "ProgramTest.TestHtmlHacks is trying to force a failure to collect the error message %%"
+renderHtml single =
+    case forceFailureReport [] single of
+        ( "▼ Query.fromHtml", UnparsedSection a ) :: _ ->
+            "▼ Query.fromHtml\n\n" ++ a
+
+        ( first, _ ) :: _ ->
+            pleaseReport ("unexpected failure report" ++ first)
+
+        [] ->
+            pleaseReport "renderHtml: empty failure report"
 
 
-renderHtml_ : String -> Query.Single any -> String
-renderHtml_ unique single =
+getPassingSelectors : List Selector -> Query.Single msg -> List String
+getPassingSelectors selectors single =
+    case List.reverse (forceFailureReport selectors single) of
+        ( _, FailureSection (SelectorsFailed results) ) :: _ ->
+            case List.reverse results of
+                (Ok _) :: _ ->
+                    [ pleaseReport "getPassingSelectors: forced selector didn't fail" ]
+
+                _ ->
+                    List.filterMap Result.toMaybe results
+
+        ( _, FailureSection _ ) :: _ ->
+            [ pleaseReport "getPassingSelectors: failure section didn't have selectors" ]
+
+        _ ->
+            [ pleaseReport "getPassingSelectors: no failure section" ]
+
+
+forceFailureReport : List Selector -> Query.Single any -> List ( String, Section )
+forceFailureReport selectors =
+    forceFailureReport_ selectors "ProgramTest.TestHtmlHacks is trying to force a failure to collect the error message %%"
+
+
+forceFailureReport_ : List Selector -> String -> Query.Single any -> List ( String, Section )
+forceFailureReport_ selectors unique single =
     case
         single
-            |> Query.has [ Selector.text unique ]
+            |> Query.has (selectors ++ [ Selector.text unique ])
             |> Test.Runner.getFailureReason
     of
         Nothing ->
             -- We expect the fake query to fail -- if it doesn't for some reason, just try recursing with a different fake matching string until it does fail
-            renderHtml_ (unique ++ "_") single
+            forceFailureReport_ selectors (unique ++ "_") single
 
         Just reason ->
-            case parseFailureReport reason.description of
-                ( "▼ Query.fromHtml", UnparsedSection a ) :: _ ->
-                    "▼ Query.fromHtml\n\n" ++ a
-
-                ( first, _ ) :: _ ->
-                    pleaseReport ("unexpected failure report" ++ first)
-
-                [] ->
-                    pleaseReport "renderHtml: empty failure report"
+            parseFailureReport reason.description
 
 
 parseFailureReport : String -> List ( String, Section )
@@ -88,8 +111,12 @@ type Section
 
 parseSection : List String -> Section
 parseSection lines =
-    -- TODO
-    UnparsedSection (String.join "\n" lines)
+    case List.filterMap parseSelectorResult lines of
+        [] ->
+            UnparsedSection (String.join "\n" lines)
+
+        some ->
+            FailureSection (SelectorsFailed some)
 
 
 type FailureReason

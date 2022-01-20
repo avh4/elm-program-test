@@ -103,26 +103,31 @@ type alias Priority =
 
 type alias State =
     { priority : Priority
+    , errorContext : Failure -> Failure
     }
 
 
 type Failure
-    = QueryFailed TestHtmlHacks.FailureReason
+    = -- base failures
+      QueryFailed TestHtmlHacks.FailureReason
     | SimulateFailed String
     | NoMatches String (List ( String, Priority, Failure ))
     | TooManyMatches String (List String)
+      -- Extra information about the context of a failure
+    | FindSucceeded (List String) Failure
 
 
 run : ComplexQuery msg a -> Result Failure a
 run complexQuery =
     let
-        ( _, result ) =
+        ( finalState, result ) =
             step
                 { priority = 0
+                , errorContext = identity
                 }
                 complexQuery
     in
-    result
+    Result.mapError finalState.errorContext result
 
 
 step : State -> ComplexQuery msg a -> ( State, Result Failure a )
@@ -141,13 +146,21 @@ step state complexQuery =
                                 , Query.has [ Selector.all selectors ]
                                 ]
                     in
-                    ( { state | priority = state.priority + countSuccesses error }
+                    ( { state
+                        | priority = state.priority + countSuccesses error
+                      }
                     , Err (QueryFailed error)
                     )
 
                 Nothing ->
                     step
-                        { state | priority = state.priority + List.length selectors }
+                        { state
+                            | priority = state.priority + List.length selectors
+                            , errorContext =
+                                state.errorContext
+                                    << FindSucceeded
+                                        (TestHtmlHacks.getPassingSelectors selectors source)
+                        }
                         (next (Query.find selectors source))
 
         ExactlyOneOf description options ->
@@ -172,7 +185,7 @@ step state complexQuery =
                             Nothing
 
                         Err x ->
-                            Just ( desc, newState.priority, x )
+                            Just ( desc, newState.priority, newState.errorContext x )
             in
             case successes of
                 [ ( _, one ) ] ->

@@ -155,6 +155,10 @@ toString failure =
 
 renderQueryFailure : Int -> Bool -> ComplexQuery.Failure -> String
 renderQueryFailure indent color failure =
+    let
+        indentS =
+            String.repeat indent " "
+    in
     case failure of
         QueryFailed failureReason ->
             renderTestHtmlFailureReason indent (colorsFor color) failureReason
@@ -164,7 +168,7 @@ renderQueryFailure indent color failure =
                 colors =
                     colorsFor color
             in
-            String.repeat indent " " ++ colors.bold string
+            indentS ++ colors.bold string
 
         NoMatches description options ->
             let
@@ -179,33 +183,52 @@ renderQueryFailure indent color failure =
             in
             String.join "\n" <|
                 List.concat
-                    [ [ description ++ ":" ]
+                    [ [ indentS ++ description ++ ":" ]
                     , sortedByPriority
                         |> List.filter (\( _, prio, _ ) -> prio > maxPriority - 2)
-                        |> List.map (\( desc, prio, reason ) -> "- " ++ desc ++ "\n" ++ renderQueryFailure (indent + 4) (color && prio >= maxPriority - 1) reason)
+                        |> List.map (\( desc, prio, reason ) -> indentS ++ "- " ++ desc ++ "\n" ++ renderQueryFailure (indent + 4) (color && prio >= maxPriority - 1) reason)
                     ]
 
         TooManyMatches description matches ->
             String.join "\n" <|
                 List.concat
-                    [ [ description ++ ", but there were multiple successful matches:" ]
-                    , List.map (\desc -> "- " ++ desc) matches
+                    [ [ indentS ++ description ++ ", but there were multiple successful matches:" ]
+                    , List.map (\desc -> indentS ++ "- " ++ desc) matches
                     , [ ""
                       , "If that's what you intended, use `ProgramTest.within` to focus in on a portion of"
                       , "the view that contains only one of the matches."
                       ]
                     ]
 
+        FindSucceeded successfulChecks baseFailure ->
+            String.join "\n"
+                [ renderSelectorResults indent (colorsFor color) (List.map Ok successfulChecks)
+                , renderQueryFailure (indent + 2) color baseFailure
+                ]
+
 
 renderTestHtmlFailureReason : Int -> Colors -> TestHtmlHacks.FailureReason -> String
 renderTestHtmlFailureReason indent colors failureReason =
+    let
+        indentS =
+            String.repeat indent " "
+    in
     case failureReason of
         TestHtmlHacks.Simple string ->
-            String.repeat indent " " ++ string
+            indentS ++ string
 
         TestHtmlHacks.SelectorsFailed results ->
-            List.map ((++) (String.repeat indent " ") << renderSelectorResult colors) (upToFirstErr results)
-                |> String.join "\n"
+            renderSelectorResults indent colors results
+
+
+renderSelectorResults : Int -> Colors -> List (Result String String) -> String
+renderSelectorResults indent colors results =
+    let
+        indentS =
+            String.repeat indent " "
+    in
+    List.map ((++) indentS << renderSelectorResult colors) (upToFirstErr results)
+        |> String.join "\n"
 
 
 renderSelectorResult : Colors -> Result String String -> String
