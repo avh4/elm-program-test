@@ -57,9 +57,10 @@ findButNot config source =
     FindButNot config source Done
 
 
-exactlyOneOf : String -> List ( String, ComplexQuery msg a ) -> ComplexQuery msg a
-exactlyOneOf description options =
-    ExactlyOneOf description options
+exactlyOneOf : String -> List ( String, a -> ComplexQuery msg b ) -> a -> ComplexQuery msg b
+exactlyOneOf description options a =
+    ExactlyOneOf description
+        (List.map (Tuple.mapSecond (\f -> f a)) options)
 
 
 simulate : ( String, Json.Value ) -> Query.Single msg -> ComplexQuery msg msg
