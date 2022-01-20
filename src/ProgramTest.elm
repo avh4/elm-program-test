@@ -700,49 +700,48 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
         checks_ article inputTag source =
             if fieldId == "" then
                 [ ( "a <label> with text " ++ String.Extra.escape label ++ " containing " ++ article ++ " <" ++ inputTag ++ ">"
-                  , ComplexQuery.find
-                        [ Selector.tag "label"
-                        , Selector.containing [ Selector.text label ]
-                        ]
-                        source
+                  , source
+                        |> ComplexQuery.find
+                            [ Selector.tag "label"
+                            , Selector.containing [ Selector.text label ]
+                            ]
                         |> ComplexQuery.andThen
                             (ComplexQuery.find [ Selector.tag inputTag ])
                         |> ComplexQuery.andThen (ComplexQuery.simulate event)
                   )
                 , ( "<" ++ inputTag ++ " aria-label=" ++ String.Extra.escape label ++ ">"
-                  , ComplexQuery.find
-                        [ Selector.tag inputTag
-                        , Selector.attribute (attribute "aria-label" label)
-                        ]
-                        source
+                  , source
+                        |> ComplexQuery.find
+                            [ Selector.tag inputTag
+                            , Selector.attribute (attribute "aria-label" label)
+                            ]
                         |> ComplexQuery.andThen (ComplexQuery.simulate event)
                   )
                 ]
 
             else
                 [ ( "<label for=" ++ String.Extra.escape fieldId ++ "> with text " ++ String.Extra.escape label ++ " and " ++ article ++ " <" ++ inputTag ++ " id=" ++ String.Extra.escape fieldId ++ ">"
-                  , ComplexQuery.find associatedLabel source
+                  , ComplexQuery.succeed source
+                        |> ComplexQuery.check (ComplexQuery.find associatedLabel)
                         |> ComplexQuery.andThen
-                            (\_ ->
-                                ComplexQuery.find
-                                    (List.concat
-                                        [ [ Selector.tag inputTag
-                                          , Selector.id fieldId
-                                          ]
-                                        , additionalInputSelectors
-                                        ]
-                                    )
-                                    source
+                            (ComplexQuery.find
+                                (List.concat
+                                    [ [ Selector.tag inputTag
+                                      , Selector.id fieldId
+                                      ]
+                                    , additionalInputSelectors
+                                    ]
+                                )
                             )
                         |> ComplexQuery.andThen (ComplexQuery.simulate event)
                   )
                 , ( "<" ++ inputTag ++ " aria-label=" ++ String.Extra.escape label ++ " id=" ++ String.Extra.escape fieldId ++ ">"
-                  , ComplexQuery.find
-                        [ Selector.tag inputTag
-                        , Selector.id fieldId
-                        , Selector.attribute (attribute "aria-label" label)
-                        ]
-                        source
+                  , source
+                        |> ComplexQuery.find
+                            [ Selector.tag inputTag
+                            , Selector.id fieldId
+                            , Selector.attribute (attribute "aria-label" label)
+                            ]
                         |> ComplexQuery.andThen (ComplexQuery.simulate event)
                   )
                 ]
@@ -1246,32 +1245,30 @@ selectOption fieldId label optionValue optionText =
     in
     simulateComplexQuery functionDescription <|
         \source ->
-            ComplexQuery.find
-                [ Selector.tag "label"
-                , Selector.attribute (Html.Attributes.for fieldId)
-                , Selector.text label
-                ]
-                source
-                |> ComplexQuery.andThen
-                    (\_ ->
-                        ComplexQuery.find
-                            [ Selector.tag "select"
-                            , Selector.id fieldId
-                            , Selector.containing
-                                [ Selector.tag "option"
-                                , Selector.attribute (Html.Attributes.value optionValue)
-                                , Selector.text optionText
-                                ]
+            ComplexQuery.succeed source
+                |> ComplexQuery.check
+                    (ComplexQuery.find
+                        [ Selector.tag "label"
+                        , Selector.attribute (Html.Attributes.for fieldId)
+                        , Selector.text label
+                        ]
+                    )
+                |> ComplexQuery.check
+                    (ComplexQuery.find
+                        [ Selector.tag "select"
+                        , Selector.id fieldId
+                        , Selector.containing
+                            [ Selector.tag "option"
+                            , Selector.attribute (Html.Attributes.value optionValue)
+                            , Selector.text optionText
                             ]
-                            source
+                        ]
                     )
                 |> ComplexQuery.andThen
-                    (\_ ->
-                        ComplexQuery.find
-                            [ Selector.tag "select"
-                            , Selector.id fieldId
-                            ]
-                            source
+                    (ComplexQuery.find
+                        [ Selector.tag "select"
+                        , Selector.id fieldId
+                        ]
                     )
                 |> ComplexQuery.andThen
                     (ComplexQuery.simulate

@@ -1,4 +1,4 @@
-module ProgramTest.ComplexQuery exposing (ComplexQuery, Failure(..), Priority, andThen, exactlyOneOf, find, findButNot, map, run, simulate)
+module ProgramTest.ComplexQuery exposing (ComplexQuery, Failure(..), Priority, andThen, check, exactlyOneOf, find, findButNot, map, run, simulate, succeed)
 
 import Expect exposing (Expectation)
 import Json.Encode as Json
@@ -20,7 +20,13 @@ type ComplexQuery msg a
         (Query.Single msg)
         (Query.Single msg -> ComplexQuery msg a)
     | Simulate ( String, Json.Value ) (Query.Single msg) (msg -> ComplexQuery msg a)
+    | Check (ComplexQuery msg ()) (ComplexQuery msg a)
     | ExactlyOneOf String (List ( String, ComplexQuery msg a ))
+
+
+succeed : a -> ComplexQuery msg a
+succeed =
+    Done
 
 
 map : (a -> b) -> ComplexQuery msg a -> ComplexQuery msg b
@@ -61,6 +67,13 @@ simulate event target =
     Simulate event target Done
 
 
+{-| Ensure that the given query succeeds, but then ignore its result.
+-}
+check : (a -> ComplexQuery msg ignored) -> ComplexQuery msg a -> ComplexQuery msg a
+check checkQuery mainQuery =
+    Check (mainQuery |> andThen checkQuery |> map (\_ -> ())) mainQuery
+
+
 andThen : (a -> ComplexQuery msg b) -> ComplexQuery msg a -> ComplexQuery msg b
 andThen f queryChain =
     case queryChain of
@@ -75,6 +88,9 @@ andThen f queryChain =
 
         Simulate event target next ->
             Simulate event target (next >> andThen f)
+
+        Check checkQuery next ->
+            Check checkQuery (next |> andThen f)
 
         ExactlyOneOf desc options ->
             ExactlyOneOf desc (List.map (Tuple.mapSecond (andThen f)) options)
@@ -248,6 +264,21 @@ step state complexQuery =
 
                         Ok msg ->
                             step state (next msg)
+
+        Check checkQuery next ->
+            case step_ state checkQuery of
+                ( checkedState, Err failure ) ->
+                    ( checkedState, Err failure )
+
+                ( checkedState, Ok () ) ->
+                    step checkedState next
+
+
+{-| This is needed because Elm does not allow a function to call itself with a different concrete type, and we need to do so above in the `Check` branch.
+-}
+step_ : State -> ComplexQuery msg a -> ( State, Result Failure a )
+step_ =
+    step
 
 
 firstErrorOf : Query.Single msg -> List (Query.Single msg -> Expectation) -> TestHtmlHacks.FailureReason
