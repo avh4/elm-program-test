@@ -3,7 +3,7 @@ module ProgramTest.ComplexQueryTest exposing (all)
 import Expect
 import Html
 import Html.Attributes as HtmlA
-import ProgramTest.ComplexQuery as ComplexQuery exposing (Failure(..))
+import ProgramTest.ComplexQuery as ComplexQuery exposing (Failure(..), FailureContext(..))
 import ProgramTest.TestHtmlHacks exposing (FailureReason(..))
 import Test exposing (..)
 import Test.Html.Query as Query
@@ -22,6 +22,7 @@ all =
                             [ Html.button [] []
                             ]
                         ]
+                    , Html.text "Outer text"
                     ]
                     |> Query.fromHtml
         in
@@ -36,11 +37,13 @@ all =
                         |> ComplexQuery.run
                         |> Expect.equal
                             (Err
-                                (QueryFailed
-                                    (SelectorsFailed
-                                        [ Ok "has tag \"form\""
-                                        , Err "has attribute \"id\" \"formX\""
-                                        ]
+                                (None
+                                    (QueryFailed
+                                        (SelectorsFailed
+                                            [ Ok "has tag \"form\""
+                                            , Err "has attribute \"id\" \"formX\""
+                                            ]
+                                        )
                                     )
                                 )
                             )
@@ -63,11 +66,42 @@ all =
                             (Err
                                 (FindSucceeded
                                     [ "has tag \"form\"" ]
-                                    (QueryFailed
-                                        (SelectorsFailed
-                                            [ Ok "has tag \"button\""
-                                            , Err "has attribute \"id\" \"buttonX\""
-                                            ]
+                                    (None
+                                        (QueryFailed
+                                            (SelectorsFailed
+                                                [ Ok "has tag \"button\""
+                                                , Err "has attribute \"id\" \"buttonX\""
+                                                ]
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+            , test "failing after a check should include the check success" <|
+                \() ->
+                    ComplexQuery.succeed html
+                        |> ComplexQuery.check
+                            "text exists"
+                            (ComplexQuery.find [ Selector.text "Outer text" ])
+                        |> ComplexQuery.andThen
+                            (ComplexQuery.find
+                                [ Selector.tag "nope"
+                                ]
+                            )
+                        |> ComplexQuery.run
+                        |> Expect.equal
+                            (Err
+                                (CheckSucceeded
+                                    "text exists"
+                                    (FindSucceeded [ "has text \"Outer text\"" ]
+                                        (None ())
+                                    )
+                                    (None
+                                        (QueryFailed
+                                            (SelectorsFailed
+                                                [ Err "has tag \"nope\""
+                                                ]
+                                            )
                                         )
                                     )
                                 )

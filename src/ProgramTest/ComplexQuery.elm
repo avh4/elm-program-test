@@ -1,4 +1,4 @@
-module ProgramTest.ComplexQuery exposing (ComplexQuery, Failure(..), Priority, andThen, check, exactlyOneOf, find, findButNot, map, run, simulate, succeed)
+module ProgramTest.ComplexQuery exposing (ComplexQuery, Failure(..), FailureContext(..), Priority, andThen, check, exactlyOneOf, extractFromContext, find, findButNot, map, run, simulate, succeed)
 
 import Expect exposing (Expectation)
 import Json.Encode as Json
@@ -20,7 +20,7 @@ type ComplexQuery msg a
         (Query.Single msg)
         (Query.Single msg -> ComplexQuery msg a)
     | Simulate ( String, Json.Value ) (Query.Single msg) (msg -> ComplexQuery msg a)
-    | Check (ComplexQuery msg ()) (ComplexQuery msg a)
+    | Check String (ComplexQuery msg ()) (ComplexQuery msg a)
     | ExactlyOneOf String (List ( String, ComplexQuery msg a ))
 
 
@@ -70,9 +70,9 @@ simulate event target =
 
 {-| Ensure that the given query succeeds, but then ignore its result.
 -}
-check : (a -> ComplexQuery msg ignored) -> ComplexQuery msg a -> ComplexQuery msg a
-check checkQuery mainQuery =
-    Check (mainQuery |> andThen checkQuery |> map (\_ -> ())) mainQuery
+check : String -> (a -> ComplexQuery msg ignored) -> ComplexQuery msg a -> ComplexQuery msg a
+check description checkQuery mainQuery =
+    Check description (mainQuery |> andThen checkQuery |> map (\_ -> ())) mainQuery
 
 
 andThen : (a -> ComplexQuery msg b) -> ComplexQuery msg a -> ComplexQuery msg b
@@ -90,8 +90,8 @@ andThen f queryChain =
         Simulate event target next ->
             Simulate event target (next >> andThen f)
 
-        Check checkQuery next ->
-            Check checkQuery (next |> andThen f)
+        Check description checkQuery next ->
+            Check description checkQuery (next |> andThen f)
 
         ExactlyOneOf desc options ->
             ExactlyOneOf desc (List.map (Tuple.mapSecond (andThen f)) options)
@@ -103,31 +103,72 @@ type alias Priority =
 
 type alias State =
     { priority : Priority
-    , errorContext : Failure -> Failure
+    , errorContext : FailureContext ()
     }
 
 
 type Failure
-    = -- base failures
-      QueryFailed TestHtmlHacks.FailureReason
+    = QueryFailed TestHtmlHacks.FailureReason
     | SimulateFailed String
-    | NoMatches String (List ( String, Priority, Failure ))
+    | NoMatches String (List ( String, Priority, FailureContext Failure ))
     | TooManyMatches String (List String)
-      -- Extra information about the context of a failure
-    | FindSucceeded (List String) Failure
 
 
-run : ComplexQuery msg a -> Result Failure a
+type FailureContext a
+    = FindSucceeded (List String) (FailureContext a)
+    | CheckSucceeded String (FailureContext ()) (FailureContext a)
+    | None a
+
+
+mapFailureContext : (a -> b) -> FailureContext a -> FailureContext b
+mapFailureContext f failureContext =
+    case failureContext of
+        FindSucceeded selectors next ->
+            FindSucceeded selectors (mapFailureContext f next)
+
+        CheckSucceeded description checkContext next ->
+            CheckSucceeded description checkContext (mapFailureContext f next)
+
+        None a ->
+            None (f a)
+
+
+extractFromContext : FailureContext a -> a
+extractFromContext failureContext =
+    case failureContext of
+        FindSucceeded _ next ->
+            extractFromContext next
+
+        CheckSucceeded _ _ next ->
+            extractFromContext next
+
+        None a ->
+            a
+
+
+run : ComplexQuery msg a -> Result (FailureContext Failure) a
 run complexQuery =
     let
         ( finalState, result ) =
             step
                 { priority = 0
-                , errorContext = identity
+                , errorContext = None ()
                 }
                 complexQuery
     in
-    Result.mapError finalState.errorContext result
+    Result.mapError (applyContext finalState.errorContext) result
+
+
+applyContext : FailureContext () -> a -> FailureContext a
+applyContext errorContext err =
+    mapFailureContext (\() -> err) errorContext
+
+
+addContext : (FailureContext () -> FailureContext ()) -> ( State, Result Failure a ) -> ( State, Result Failure a )
+addContext newContext ( state, result ) =
+    ( { state | errorContext = newContext state.errorContext }
+    , result
+    )
 
 
 step : State -> ComplexQuery msg a -> ( State, Result Failure a )
@@ -156,12 +197,9 @@ step state complexQuery =
                     step
                         { state
                             | priority = state.priority + List.length selectors
-                            , errorContext =
-                                state.errorContext
-                                    << FindSucceeded
-                                        (TestHtmlHacks.getPassingSelectors selectors source)
                         }
                         (next (Query.find selectors source))
+                        |> addContext (FindSucceeded (TestHtmlHacks.getPassingSelectors selectors source))
 
         ExactlyOneOf description options ->
             let
@@ -185,7 +223,11 @@ step state complexQuery =
                             Nothing
 
                         Err x ->
-                            Just ( desc, newState.priority, newState.errorContext x )
+                            Just
+                                ( desc
+                                , newState.priority
+                                , applyContext newState.errorContext x
+                                )
             in
             case successes of
                 [ ( _, one ) ] ->
@@ -279,13 +321,14 @@ step state complexQuery =
                         Ok msg ->
                             step state (next msg)
 
-        Check checkQuery next ->
+        Check description checkQuery next ->
             case step_ state checkQuery of
                 ( checkedState, Err failure ) ->
                     ( checkedState, Err failure )
 
                 ( checkedState, Ok () ) ->
-                    step checkedState next
+                    step { state | priority = checkedState.priority } next
+                        |> addContext (CheckSucceeded description checkedState.errorContext)
 
 
 {-| This is needed because Elm does not allow a function to call itself with a different concrete type, and we need to do so above in the `Check` branch.

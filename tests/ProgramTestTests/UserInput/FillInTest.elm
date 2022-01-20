@@ -87,6 +87,43 @@ all =
                     ]
                     |> ProgramTest.fillIn "field-id" "Field 1" "value99"
                     |> ProgramTest.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
+        , test "error message with labelled input" <|
+            \() ->
+                start
+                    [ Html.label
+                        [ for "field-1"
+                        ]
+                        [ Html.text "Field 1"
+                        ]
+                    ]
+                    |> ProgramTest.fillIn "field-1" "Field 1" "value99"
+                    |> ProgramTest.done
+                    |> expectFailure
+                        [ "▼ Query.fromHtml"
+                        , ""
+                        , "    <body>"
+                        , "        <label htmlFor=\"field-1\">"
+                        , "            Field 1"
+                        , "        </label>"
+                        , "    </body>"
+                        , ""
+                        , ""
+                        , """▼ ProgramTest.fillIn "Field 1\""""
+                        , ""
+                        , "Expected one of the following to exist and have an \"oninput\" handler:"
+                        , """- <label for="field-1"> with text "Field 1" and an <input id="field-1">"""
+                        , """    \u{001B}[32m✓\u{001B}[39m label exists:"""
+                        , """      \u{001B}[32m✓\u{001B}[39m \u{001B}[1mhas tag "label"\u{001B}[22m"""
+                        , """      \u{001B}[32m✓\u{001B}[39m \u{001B}[1mhas attribute "htmlFor" "field-1"\u{001B}[22m"""
+                        , """      \u{001B}[32m✓\u{001B}[39m \u{001B}[1mhas text "Field 1"\u{001B}[22m"""
+                        , """    \u{001B}[31m✗ has tag "input"\u{001B}[39m"""
+                        , """- <label for="field-1"> with text "Field 1" and a <textarea id="field-1">"""
+                        , """    \u{001B}[32m✓\u{001B}[39m label exists:"""
+                        , """      \u{001B}[32m✓\u{001B}[39m \u{001B}[1mhas tag "label"\u{001B}[22m"""
+                        , """      \u{001B}[32m✓\u{001B}[39m \u{001B}[1mhas attribute "htmlFor" "field-1"\u{001B}[22m"""
+                        , """      \u{001B}[32m✓\u{001B}[39m \u{001B}[1mhas text "Field 1"\u{001B}[22m"""
+                        , """    \u{001B}[31m✗ has tag "textarea"\u{001B}[39m"""
+                        ]
         , test "error message for when an input is in a label" <|
             \() ->
                 start

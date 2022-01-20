@@ -720,7 +720,9 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
             else
                 [ ( "<label for=" ++ String.Extra.escape fieldId ++ "> with text " ++ String.Extra.escape label ++ " and " ++ article ++ " <" ++ inputTag ++ " id=" ++ String.Extra.escape fieldId ++ ">"
                   , ComplexQuery.succeed
-                        >> ComplexQuery.check (ComplexQuery.find associatedLabel)
+                        >> ComplexQuery.check
+                            "label exists"
+                            (ComplexQuery.find associatedLabel)
                         >> ComplexQuery.andThen
                             (ComplexQuery.find
                                 (List.concat
@@ -1232,6 +1234,7 @@ selectOption fieldId label optionValue optionText =
     simulateComplexQuery functionDescription <|
         ComplexQuery.succeed
             >> ComplexQuery.check
+                "label exists"
                 (ComplexQuery.find
                     [ Selector.tag "label"
                     , Selector.attribute (Html.Attributes.for fieldId)
@@ -1239,6 +1242,7 @@ selectOption fieldId label optionValue optionText =
                     ]
                 )
             >> ComplexQuery.check
+                "select with option exists"
                 (ComplexQuery.find
                     [ Selector.tag "select"
                     , Selector.id fieldId

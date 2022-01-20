@@ -1,7 +1,7 @@
 module ProgramTest.Failure exposing (Failure(..), toString)
 
 import Html exposing (Html)
-import ProgramTest.ComplexQuery as ComplexQuery exposing (Failure(..))
+import ProgramTest.ComplexQuery as ComplexQuery exposing (Failure(..), FailureContext(..))
 import ProgramTest.TestHtmlHacks as TestHtmlHacks
 import String.Extra
 import Test.Html.Query as Query
@@ -23,7 +23,7 @@ type Failure
     | NoMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | MultipleMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | EffectSimulationNotConfigured String
-    | ViewAssertionFailed String (Html ()) ComplexQuery.Failure
+    | ViewAssertionFailed String (Html ()) (ComplexQuery.FailureContext ComplexQuery.Failure)
     | CustomFailure String String
 
 
@@ -146,11 +146,42 @@ toString failure =
                 [ TestHtmlHacks.renderHtml (Query.fromHtml html)
                 , "▼ " ++ functionName
                 , ""
-                , renderQueryFailure 0 True reason
+                , renderQueryFailureWithContext renderQueryFailure 0 True reason
                 ]
 
         CustomFailure assertionName message ->
             assertionName ++ ": " ++ message
+
+
+renderQueryFailureWithContext : (Int -> Bool -> a -> String) -> Int -> Bool -> ComplexQuery.FailureContext a -> String
+renderQueryFailureWithContext renderInner indent color failure =
+    let
+        indentS =
+            String.repeat indent " "
+    in
+    case failure of
+        None inner ->
+            renderInner indent color inner
+
+        CheckSucceeded description checkContext baseFailure ->
+            String.join "\n" <|
+                List.filter ((/=) "")
+                    [ indentS ++ (colorsFor color).green "✓" ++ " " ++ description ++ ":"
+                    , renderQueryFailureWithContext_ (\_ _ () -> "") (indent + 2) color checkContext
+                    , renderQueryFailureWithContext renderInner indent color baseFailure
+                    ]
+
+        FindSucceeded successfulChecks baseFailure ->
+            String.join "\n" <|
+                List.filter ((/=) "")
+                    [ renderSelectorResults indent (colorsFor color) (List.map Ok successfulChecks)
+                    , renderQueryFailureWithContext renderInner (indent + 2) color baseFailure
+                    ]
+
+
+renderQueryFailureWithContext_ : (Int -> Bool -> a -> String) -> Int -> Bool -> ComplexQuery.FailureContext a -> String
+renderQueryFailureWithContext_ =
+    renderQueryFailureWithContext
 
 
 renderQueryFailure : Int -> Bool -> ComplexQuery.Failure -> String
@@ -186,7 +217,7 @@ renderQueryFailure indent color failure =
                     [ [ indentS ++ description ++ ":" ]
                     , sortedByPriority
                         |> List.filter (\( _, prio, _ ) -> prio > maxPriority - 2)
-                        |> List.map (\( desc, prio, reason ) -> indentS ++ "- " ++ desc ++ "\n" ++ renderQueryFailure (indent + 4) (color && prio >= maxPriority - 1) reason)
+                        |> List.map (\( desc, prio, reason ) -> indentS ++ "- " ++ desc ++ "\n" ++ renderQueryFailureWithContext renderQueryFailure (indent + 4) (color && prio >= maxPriority - 1) reason)
                     ]
 
         TooManyMatches description matches ->
@@ -199,12 +230,6 @@ renderQueryFailure indent color failure =
                       , "the view that contains only one of the matches."
                       ]
                     ]
-
-        FindSucceeded successfulChecks baseFailure ->
-            String.join "\n"
-                [ renderSelectorResults indent (colorsFor color) (List.map Ok successfulChecks)
-                , renderQueryFailure (indent + 2) color baseFailure
-                ]
 
 
 renderTestHtmlFailureReason : Int -> Colors -> TestHtmlHacks.FailureReason -> String
