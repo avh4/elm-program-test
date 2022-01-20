@@ -11,8 +11,9 @@ import Test.Runner
 
 type ComplexQuery msg a
     = Done a
-    | Find (List Selector) (Query.Single msg) (Query.Single msg -> ComplexQuery msg a)
+    | Find (Maybe String) (List Selector) (Query.Single msg) (Query.Single msg -> ComplexQuery msg a)
     | FindButNot
+        (Maybe String)
         { good : List Selector
         , bads : List (List Selector)
         , onError : List Selector
@@ -34,9 +35,9 @@ map f complexQuery =
     andThen (f >> Done) complexQuery
 
 
-find : List Selector -> Query.Single msg -> ComplexQuery msg (Query.Single msg)
-find selectors source =
-    Find selectors source Done
+find : Maybe String -> List Selector -> Query.Single msg -> ComplexQuery msg (Query.Single msg)
+find description selectors source =
+    Find description selectors source Done
 
 
 {-|
@@ -47,14 +48,16 @@ find selectors source =
 
 -}
 findButNot :
-    { good : List Selector
-    , bads : List (List Selector)
-    , onError : List Selector
-    }
+    Maybe String
+    ->
+        { good : List Selector
+        , bads : List (List Selector)
+        , onError : List Selector
+        }
     -> Query.Single msg
     -> ComplexQuery msg (Query.Single msg)
-findButNot config source =
-    FindButNot config source Done
+findButNot description config source =
+    FindButNot description config source Done
 
 
 exactlyOneOf : String -> List ( String, a -> ComplexQuery msg b ) -> a -> ComplexQuery msg b
@@ -81,11 +84,11 @@ andThen f queryChain =
         Done a ->
             f a
 
-        FindButNot config source next ->
-            FindButNot config source (next >> andThen f)
+        FindButNot description config source next ->
+            FindButNot description config source (next >> andThen f)
 
-        Find selectors source next ->
-            Find selectors source (next >> andThen f)
+        Find description selectors source next ->
+            Find description selectors source (next >> andThen f)
 
         Simulate event target next ->
             Simulate event target (next >> andThen f)
@@ -114,7 +117,7 @@ type Failure
 
 
 type FailureContext a
-    = FindSucceeded (List String) (FailureContext a)
+    = FindSucceeded (Maybe String) (List String) (FailureContext a)
     | CheckSucceeded String (FailureContext ()) (FailureContext a)
     | Description (Result String String) (FailureContext a)
     | None a
@@ -123,8 +126,8 @@ type FailureContext a
 mapFailureContext : (a -> b) -> FailureContext a -> FailureContext b
 mapFailureContext f failureContext =
     case failureContext of
-        FindSucceeded selectors next ->
-            FindSucceeded selectors (mapFailureContext f next)
+        FindSucceeded description selectors next ->
+            FindSucceeded description selectors (mapFailureContext f next)
 
         CheckSucceeded description checkContext next ->
             CheckSucceeded description checkContext (mapFailureContext f next)
@@ -139,7 +142,7 @@ mapFailureContext f failureContext =
 extractFromContext : FailureContext a -> a
 extractFromContext failureContext =
     case failureContext of
-        FindSucceeded _ next ->
+        FindSucceeded _ _ next ->
             extractFromContext next
 
         CheckSucceeded _ _ next ->
@@ -155,9 +158,9 @@ extractFromContext failureContext =
 destructureContext : FailureContext a -> ( FailureContext (), a )
 destructureContext failureContext =
     case failureContext of
-        FindSucceeded selectors baseFailure ->
+        FindSucceeded description selectors baseFailure ->
             destructureContext baseFailure
-                |> Tuple.mapFirst (FindSucceeded selectors)
+                |> Tuple.mapFirst (FindSucceeded description selectors)
 
         CheckSucceeded description checkContext baseFailure ->
             destructureContext baseFailure
@@ -194,7 +197,7 @@ step state complexQuery =
         Done a ->
             ( state, None (Ok a) )
 
-        Find selectors source next ->
+        Find description selectors source next ->
             case Test.Runner.getFailureReason (Query.has [ Selector.all selectors ] source) of
                 Just _ ->
                     let
@@ -203,12 +206,21 @@ step state complexQuery =
                                 [ Query.has selectors
                                 , Query.has [ Selector.all selectors ]
                                 ]
+
+                        addDescription =
+                            case description of
+                                Nothing ->
+                                    identity
+
+                                Just desc ->
+                                    Description (Err desc)
                     in
                     ( { state
                         | priority = state.priority + countSuccesses error
                       }
                     , None (Err (QueryFailed error))
                     )
+                        |> Tuple.mapSecond addDescription
 
                 Nothing ->
                     step
@@ -216,7 +228,7 @@ step state complexQuery =
                             | priority = state.priority + List.length selectors
                         }
                         (next (Query.find selectors source))
-                        |> Tuple.mapSecond (FindSucceeded (TestHtmlHacks.getPassingSelectors selectors source))
+                        |> Tuple.mapSecond (FindSucceeded description (TestHtmlHacks.getPassingSelectors selectors source))
 
         ExactlyOneOf description options ->
             let
@@ -256,10 +268,18 @@ step state complexQuery =
                 many ->
                     ( state, None (Err (TooManyMatches description (List.map (Tuple.mapSecond (Tuple.second >> mapFailureContext (\_ -> ()))) many))) )
 
-        FindButNot { good, bads, onError } source next ->
+        FindButNot description { good, bads, onError } source next ->
             -- This is tricky because Test.Html doesn't provide a way to search for an attribute being *not* present.
             -- So we have to check if a selector we don't want *is* present, and manually force a failure if it is.
             let
+                addDescription =
+                    case description of
+                        Nothing ->
+                            identity
+
+                        Just desc ->
+                            Description (Err desc)
+
                 checkBads : Priority -> List (List Selector) -> Query.Single msg -> ( State, FailureContext (Result Failure a) )
                 checkBads extraPriority bads_ found =
                     case bads_ of
@@ -268,7 +288,7 @@ step state complexQuery =
                                 { state | priority = state.priority + extraPriority + 1 }
                                 (next found)
                                 -- TODO: add the not bads to the context (or alternatively, add the "onErrors", but convert them all to successes)
-                                |> Tuple.mapSecond (FindSucceeded (TestHtmlHacks.getPassingSelectors good source))
+                                |> Tuple.mapSecond (FindSucceeded description (TestHtmlHacks.getPassingSelectors good source))
 
                         nextBad :: rest ->
                             let
@@ -290,6 +310,7 @@ step state complexQuery =
                                     ( { state | priority = state.priority + extraPriority + countSuccesses error }
                                     , None (Err (QueryFailed error))
                                     )
+                                        |> Tuple.mapSecond addDescription
 
                                 Just _ ->
                                     -- the element we found is not bad; continue on to the next check
@@ -336,6 +357,7 @@ step state complexQuery =
                     of
                         Err message ->
                             ( state, None (Err (SimulateFailed (TestHtmlHacks.parseSimulateFailure message))) )
+                                |> Tuple.mapSecond (Description (Err ("simulate " ++ Tuple.first event)))
 
                         Ok msg ->
                             step state (next msg)

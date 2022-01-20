@@ -44,8 +44,10 @@ all =
                         , ""
                         , "Expected one of the following to exist:"
                         , "- <button> (not disabled) with onClick and text \"Click Me\""
-                        , "    ✓ has tag \"button\""
-                        , "    ✓ has containing [ text \"Click Me\" ]"
+                        , "    ✓ find button:"
+                        , "      ✓ has tag \"button\""
+                        , "      ✓ has containing [ text \"Click Me\" ]"
+                        , "    ✗ simulate click:"
                         , "      ✗ Event.expectEvent: I found a node, but it does not listen for \"click\" events like I expected it would."
                         ]
         , test "can click a button containing an image with alt text" <|
@@ -166,9 +168,10 @@ all =
                         , ""
                         , "Expected one of the following to exist:"
                         , "- <button> (not disabled) with onClick and text \"Click Me\""
-                        , "    ✓ has tag \"button\""
-                        , "    ✓ has containing [ text \"Click Me\" ]"
-                        , "    ✗ has attribute \"disabled\" False"
+                        , "    ✗ find button:"
+                        , "      ✓ has tag \"button\""
+                        , "      ✓ has containing [ text \"Click Me\" ]"
+                        , "      ✗ has attribute \"disabled\" False"
                         ]
         , test "fails when clicking a disabled button in a form" <|
             \() ->

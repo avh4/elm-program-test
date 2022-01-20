@@ -178,11 +178,19 @@ renderQueryFailureWithContext renderInner indent color failure =
                     , renderQueryFailureWithContext renderInner indent color baseFailure
                     ]
 
-        FindSucceeded successfulChecks baseFailure ->
+        FindSucceeded (Just description) successfulChecks baseFailure ->
+            String.join "\n" <|
+                List.filter ((/=) "")
+                    [ indentS ++ renderDescriptionResult (colorsFor color) (Ok description) ++ ":"
+                    , renderSelectorResults (indent + 2) (colorsFor color) (List.map Ok successfulChecks)
+                    , renderQueryFailureWithContext renderInner indent color baseFailure
+                    ]
+
+        FindSucceeded Nothing successfulChecks baseFailure ->
             String.join "\n" <|
                 List.filter ((/=) "")
                     [ renderSelectorResults indent (colorsFor color) (List.map Ok successfulChecks)
-                    , renderQueryFailureWithContext renderInner (indent + 2) color baseFailure
+                    , renderQueryFailureWithContext renderInner indent color baseFailure
                     ]
 
 

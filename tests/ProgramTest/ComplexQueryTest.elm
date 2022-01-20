@@ -29,7 +29,7 @@ all =
         [ describe "find"
             [ test "when failing, returns the list of successful selectors" <|
                 \() ->
-                    ComplexQuery.find
+                    ComplexQuery.find Nothing
                         [ Selector.tag "form"
                         , Selector.id "formX"
                         ]
@@ -48,15 +48,40 @@ all =
                                 )
                             )
             ]
+        , describe "findButNot"
+            [ test "error report when bad check succeeds" <|
+                \() ->
+                    ComplexQuery.findButNot (Just "expected bad")
+                        { good = [ Selector.tag "form" ]
+                        , bads = [ [ Selector.id "formA" ] ]
+                        , onError = [ Selector.tag "form", Selector.id "form<notA>" ]
+                        }
+                        html
+                        |> ComplexQuery.run
+                        |> Expect.equal
+                            (Err
+                                (Description (Err "expected bad")
+                                    (None
+                                        (QueryFailed
+                                            (SelectorsFailed
+                                                [ Ok "has tag \"form\""
+                                                , Err "has attribute \"id\" \"form<notA>\""
+                                                ]
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+            ]
         , describe "errors for composed queries"
             [ test "a find followed by a failing find includes the successful selectors of the first find" <|
                 \() ->
-                    ComplexQuery.find
+                    ComplexQuery.find Nothing
                         [ Selector.tag "form"
                         ]
                         html
                         |> ComplexQuery.andThen
-                            (ComplexQuery.find
+                            (ComplexQuery.find (Just "expected to fail")
                                 [ Selector.tag "button"
                                 , Selector.id "buttonX"
                                 ]
@@ -65,13 +90,16 @@ all =
                         |> Expect.equal
                             (Err
                                 (FindSucceeded
+                                    Nothing
                                     [ "has tag \"form\"" ]
-                                    (None
-                                        (QueryFailed
-                                            (SelectorsFailed
-                                                [ Ok "has tag \"button\""
-                                                , Err "has attribute \"id\" \"buttonX\""
-                                                ]
+                                    (Description (Err "expected to fail")
+                                        (None
+                                            (QueryFailed
+                                                (SelectorsFailed
+                                                    [ Ok "has tag \"button\""
+                                                    , Err "has attribute \"id\" \"buttonX\""
+                                                    ]
+                                                )
                                             )
                                         )
                                     )
@@ -82,9 +110,9 @@ all =
                     ComplexQuery.succeed html
                         |> ComplexQuery.check
                             "text exists"
-                            (ComplexQuery.find [ Selector.text "Outer text" ])
+                            (ComplexQuery.find Nothing [ Selector.text "Outer text" ])
                         |> ComplexQuery.andThen
-                            (ComplexQuery.find
+                            (ComplexQuery.find (Just "expected to fail")
                                 [ Selector.tag "nope"
                                 ]
                             )
@@ -92,14 +120,17 @@ all =
                         |> Expect.equal
                             (Err
                                 (CheckSucceeded "text exists"
-                                    (FindSucceeded [ "has text \"Outer text\"" ]
+                                    (FindSucceeded Nothing
+                                        [ "has text \"Outer text\"" ]
                                         (None ())
                                     )
-                                    (None
-                                        (QueryFailed
-                                            (SelectorsFailed
-                                                [ Err "has tag \"nope\""
-                                                ]
+                                    (Description (Err "expected to fail")
+                                        (None
+                                            (QueryFailed
+                                                (SelectorsFailed
+                                                    [ Err "has tag \"nope\""
+                                                    ]
+                                                )
                                             )
                                         )
                                     )
