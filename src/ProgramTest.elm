@@ -771,7 +771,7 @@ simulateComplexQuery functionName complexQuery =
                     Err (ViewAssertionFailed functionName (Html.map (\_ -> ()) (program.view state.currentModel)) queryFailure)
 
 
-assertComplexQuery : String -> (Query.Single msg -> ComplexQuery msg ()) -> ProgramTest model msg effect -> ProgramTest model msg effect
+assertComplexQuery : String -> (Query.Single msg -> ComplexQuery msg ignored) -> ProgramTest model msg effect -> ProgramTest model msg effect
 assertComplexQuery functionName complexQuery =
     andThen <|
         \program state ->
@@ -780,7 +780,7 @@ assertComplexQuery functionName complexQuery =
                     Program.renderView program state.currentModel
             in
             case ComplexQuery.run (complexQuery view) of
-                Ok () ->
+                Ok _ ->
                     Ok state
 
                 Err queryFailure ->
@@ -1070,10 +1070,7 @@ clickLink linkText href programTest =
     in
     programTest
         |> assertComplexQuery functionDescription
-            (\source ->
-                ComplexQuery.find findLinkTag source
-                    |> ComplexQuery.map (\_ -> ())
-            )
+            (ComplexQuery.find findLinkTag)
         |> tryClicking { otherwise = \_ -> TestState.simulateLoadUrlHelper functionDescription href >> Err }
 
 
