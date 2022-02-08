@@ -5,7 +5,7 @@ New features:
   - Functions to simulate DOM events display errors more nicely:
     - Extra junk like "`✗ has text "HTML expected by the call to: ..."`" has been removed
     - All passing steps of a query up to the failure will be displayed
-
+  - Failure messages simplify the HTML to show only what's relevant to the failure
 
 ## 3.6.1
 

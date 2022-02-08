@@ -23,7 +23,7 @@ type Failure
     | NoMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | MultipleMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | EffectSimulationNotConfigured String
-    | ViewAssertionFailed String (Html ()) (ComplexQuery.FailureContext ComplexQuery.Failure)
+    | ViewAssertionFailed String (Html ()) ComplexQuery.Highlight (ComplexQuery.FailureContext ComplexQuery.Failure)
     | CustomFailure String String
 
 
@@ -141,9 +141,19 @@ toString failure =
         EffectSimulationNotConfigured functionName ->
             "TEST SETUP ERROR: In order to use " ++ functionName ++ ", you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start"
 
-        ViewAssertionFailed functionName html reason ->
+        ViewAssertionFailed functionName html highlight reason ->
+            let
+                highlighter =
+                    case highlight of
+                        [] ->
+                            \_ _ _ -> True
+
+                        interestingTags ->
+                            \tag attrs children ->
+                                List.member tag interestingTags
+            in
             String.join "\n"
-                [ TestHtmlHacks.renderHtml (Query.fromHtml html)
+                [ TestHtmlHacks.renderHtml showColors.dim highlighter (Query.fromHtml html)
                 , ""
                 , "▼ " ++ functionName
                 , ""
@@ -331,6 +341,7 @@ type alias Colors =
     { bold : String -> String
     , red : String -> String
     , green : String -> String
+    , dim : String -> String
     }
 
 
@@ -345,12 +356,17 @@ colorsFor show =
 
 showColors : Colors
 showColors =
-    { bold = \s -> String.concat [ "\u{001B}[1m", s, "\u{001B}[22m" ]
-    , red = \s -> String.concat [ "\u{001B}[31m", s, "\u{001B}[39m" ]
-    , green = \s -> String.concat [ "\u{001B}[32m", s, "\u{001B}[39m" ]
+    { bold = \s -> String.concat [ "\u{001B}[1m", s, "\u{001B}[0m" ]
+    , red = \s -> String.concat [ "\u{001B}[31m", s, "\u{001B}[0m" ]
+    , green = \s -> String.concat [ "\u{001B}[32m", s, "\u{001B}[0m" ]
+    , dim = \s -> String.concat [ "\u{001B}[2m", s, "\u{001B}[0m" ]
     }
 
 
 noColors : Colors
 noColors =
-    { bold = identity, red = identity, green = identity }
+    { bold = identity
+    , red = identity
+    , green = identity
+    , dim = identity
+    }

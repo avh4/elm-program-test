@@ -1,6 +1,7 @@
 module ProgramTest.TestHtmlHacks exposing (FailureReason(..), getPassingSelectors, parseFailureReason, parseSimulateFailure, renderHtml)
 
 import Html.Parser
+import ProgramTest.HtmlHighlighter as HtmlHighlighter
 import ProgramTest.HtmlParserHacks as HtmlParserHacks
 import ProgramTest.HtmlRenderer as HtmlRenderer
 import Test.Html.Query as Query
@@ -12,14 +13,30 @@ pleaseReport description =
     "PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: " ++ description
 
 
-renderHtml : Query.Single any -> String
-renderHtml single =
+renderHtml : (String -> String) -> (String -> List Html.Parser.Attribute -> List Html.Parser.Node -> Bool) -> Query.Single any -> String
+renderHtml colorHidden highlightPredicate single =
     case forceFailureReport [] single of
         ( "▼ Query.fromHtml", UnparsedSection a ) :: _ ->
             "▼ Query.fromHtml\n\n" ++ a
 
         ( "▼ Query.fromHtml", HtmlSection nodes ) :: _ ->
-            "▼ Query.fromHtml\n\n" ++ HtmlRenderer.render 4 nodes
+            let
+                tryHighlight =
+                    List.map
+                        (HtmlHighlighter.highlight highlightPredicate)
+                        nodes
+
+                finalHighlighted =
+                    if List.any HtmlHighlighter.isNonHiddenElement tryHighlight then
+                        tryHighlight
+
+                    else
+                        List.map
+                            (HtmlHighlighter.highlight (\_ _ _ -> True))
+                            nodes
+            in
+            "▼ Query.fromHtml\n\n"
+                ++ HtmlRenderer.render colorHidden 4 finalHighlighted
 
         ( first, _ ) :: _ ->
             pleaseReport ("unexpected failure report" ++ first)

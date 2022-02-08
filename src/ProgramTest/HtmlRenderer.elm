@@ -1,10 +1,10 @@
 module ProgramTest.HtmlRenderer exposing (render)
 
-import Html.Parser exposing (Node(..))
+import ProgramTest.HtmlHighlighter as HtmlHighlighter exposing (Node(..))
 
 
-render : Int -> List Html.Parser.Node -> String
-render indent nodes =
+render : (String -> String) -> Int -> List HtmlHighlighter.Node -> String
+render colorHidden indent nodes =
     case nodes of
         [] ->
             ""
@@ -12,13 +12,23 @@ render indent nodes =
         (Text text) :: rest ->
             case String.trim (String.replace "\n" " " text) of
                 "" ->
-                    render indent rest
+                    render colorHidden indent rest
 
                 trimmed ->
-                    String.repeat indent " " ++ trimmed ++ "\n" ++ render indent rest
+                    String.repeat indent " " ++ trimmed ++ "\n" ++ render colorHidden indent rest
 
         (Comment text) :: rest ->
-            String.repeat indent " " ++ "<!--" ++ text ++ "-->\n" ++ render indent rest
+            String.repeat indent " " ++ "<!--" ++ text ++ "-->\n" ++ render colorHidden indent rest
+
+        (Element tag attrs []) :: rest ->
+            String.repeat indent " "
+                ++ "<"
+                ++ tag
+                ++ renderAttrs attrs
+                ++ "></"
+                ++ tag
+                ++ ">\n"
+                ++ render colorHidden indent rest
 
         (Element tag attrs children) :: rest ->
             String.repeat indent " "
@@ -26,15 +36,18 @@ render indent nodes =
                 ++ tag
                 ++ renderAttrs attrs
                 ++ ">\n"
-                ++ render (indent + 4) children
+                ++ render colorHidden (indent + 4) children
                 ++ String.repeat indent " "
                 ++ "</"
                 ++ tag
                 ++ ">\n"
-                ++ render indent rest
+                ++ render colorHidden indent rest
+
+        (Hidden short) :: rest ->
+            String.repeat indent " " ++ colorHidden short ++ "\n" ++ render colorHidden indent rest
 
 
-renderAttrs : List Html.Parser.Attribute -> String
+renderAttrs : List HtmlHighlighter.Attribute -> String
 renderAttrs attrs =
     case attrs of
         [] ->

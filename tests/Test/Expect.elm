@@ -1,4 +1,4 @@
-module Test.Expect exposing (expectAnyFailure, expectFailure, expectFailureContaining, expectSuccess)
+module Test.Expect exposing (expectAnyFailure, expectFailure, expectFailureContaining, expectFailureModifiedBy, expectSuccess)
 
 {-| Functions for asserting things about expectations.
 -}
@@ -19,17 +19,26 @@ expectSuccess actualResult =
 
 expectFailure : List String -> Expectation -> Expectation
 expectFailure expectedFailureMessage actualResult =
+    expectFailureModifiedBy identity expectedFailureMessage actualResult
+
+
+expectFailureModifiedBy : (String -> String) -> List String -> Expectation -> Expectation
+expectFailureModifiedBy modify expectedFailureMessage actualResult =
     case Test.Runner.getFailureReason actualResult of
         Nothing ->
             Expect.fail "Expected a failure, but got a pass"
 
         Just actualInfo ->
             actualInfo.description
+                |> String.replace "\u{001B}[0m" ""
                 |> String.replace "\u{001B}[1m" ""
+                |> String.replace "\u{001B}[2m" ""
                 |> String.replace "\u{001B}[22m" ""
                 |> String.replace "\u{001B}[31m" ""
                 |> String.replace "\u{001B}[32m" ""
+                |> String.replace "\u{001B}[37m" ""
                 |> String.replace "\u{001B}[39m" ""
+                |> modify
                 |> Expect.equal (String.join "\n" expectedFailureMessage)
 
 

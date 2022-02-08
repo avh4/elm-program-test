@@ -701,15 +701,17 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
             if fieldId == "" then
                 [ ( "a <label> with text " ++ String.Extra.escape label ++ " containing " ++ article ++ " <" ++ inputTag ++ ">"
                   , ComplexQuery.find (Just "find label")
+                        [ "label" ]
                         [ Selector.tag "label"
                         , Selector.containing [ Selector.text label ]
                         ]
                         >> ComplexQuery.andThen
-                            (ComplexQuery.find Nothing [ Selector.tag inputTag ])
+                            (ComplexQuery.find Nothing [ inputTag ] [ Selector.tag inputTag ])
                         >> ComplexQuery.andThen (ComplexQuery.simulate event)
                   )
                 , ( "<" ++ inputTag ++ " aria-label=" ++ String.Extra.escape label ++ ">"
                   , ComplexQuery.find Nothing
+                        [ inputTag ]
                         [ Selector.tag inputTag
                         , Selector.attribute (attribute "aria-label" label)
                         ]
@@ -722,9 +724,10 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
                   , ComplexQuery.succeed
                         >> ComplexQuery.check
                             "check label exists"
-                            (ComplexQuery.find Nothing associatedLabel)
+                            (ComplexQuery.find Nothing [ "label" ] associatedLabel)
                         >> ComplexQuery.andThen
                             (ComplexQuery.find (Just ("find " ++ inputTag))
+                                [ inputTag ]
                                 (List.concat
                                     [ [ Selector.tag inputTag
                                       , Selector.id fieldId
@@ -737,6 +740,7 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
                   )
                 , ( "<" ++ inputTag ++ " aria-label=" ++ String.Extra.escape label ++ " id=" ++ String.Extra.escape fieldId ++ ">"
                   , ComplexQuery.find Nothing
+                        [ inputTag ]
                         [ Selector.tag inputTag
                         , Selector.id fieldId
                         , Selector.attribute (attribute "aria-label" label)
@@ -766,8 +770,8 @@ simulateComplexQuery functionName complexQuery =
                 Ok msg ->
                     TestState.update msg program state
 
-                Err queryFailure ->
-                    Err (ViewAssertionFailed ("ProgramTest." ++ functionName) (Html.map (\_ -> ()) (program.view state.currentModel)) queryFailure)
+                Err ( highlight, queryFailure ) ->
+                    Err (ViewAssertionFailed ("ProgramTest." ++ functionName) (Html.map (\_ -> ()) (program.view state.currentModel)) highlight queryFailure)
 
 
 assertComplexQuery : String -> (Query.Single msg -> ComplexQuery msg ignored) -> ProgramTest model msg effect -> ProgramTest model msg effect
@@ -782,8 +786,8 @@ assertComplexQuery functionName complexQuery =
                 Ok _ ->
                     Ok state
 
-                Err queryFailure ->
-                    Err (ViewAssertionFailed ("ProgramTest." ++ functionName) (Html.map (\_ -> ()) (program.view state.currentModel)) queryFailure)
+                Err ( highlight, queryFailure ) ->
+                    Err (ViewAssertionFailed ("ProgramTest." ++ functionName) (Html.map (\_ -> ()) (program.view state.currentModel)) highlight queryFailure)
 
 
 {-| Simulates a custom DOM event.
@@ -823,6 +827,7 @@ clickButton buttonText =
         checks =
             [ ( "<button> (not disabled) with onClick and text " ++ String.Extra.escape buttonText
               , findNotDisabled (Just "find button")
+                    [ "button" ]
                     Nothing
                     [ Selector.tag "button"
                     , Selector.containing [ Selector.text buttonText ]
@@ -831,6 +836,7 @@ clickButton buttonText =
               )
             , ( "<button> (not disabled) with onClick containing an <img> with alt=" ++ String.Extra.escape buttonText
               , findNotDisabled (Just "find button")
+                    [ "button" ]
                     Nothing
                     [ Selector.tag "button"
                     , Selector.containing
@@ -842,6 +848,7 @@ clickButton buttonText =
               )
             , ( "<button> (not disabled) with onClick and attribute aria-label=" ++ String.Extra.escape buttonText
               , findNotDisabled (Just "find button")
+                    [ "button" ]
                     Nothing
                     [ Selector.tag "button"
                     , Selector.attribute (Html.Attributes.attribute "aria-label" buttonText)
@@ -850,6 +857,7 @@ clickButton buttonText =
               )
             , ( "an element with role=\"button\" (not disabled) and onClick and text " ++ String.Extra.escape buttonText
               , findNotDisabled (Just "find button")
+                    [ "button" ]
                     (Just [ Selector.tag "button" ])
                     [ Selector.attribute (Html.Attributes.attribute "role" "button")
                     , Selector.containing [ Selector.text buttonText ]
@@ -858,6 +866,7 @@ clickButton buttonText =
               )
             , ( "an element with role=\"button\" (not disabled) and onClick and aria-label=" ++ String.Extra.escape buttonText
               , findNotDisabled (Just "find button")
+                    [ "button" ]
                     (Just [ Selector.tag "button" ])
                     [ Selector.attribute (Html.Attributes.attribute "role" "button")
                     , Selector.attribute (Html.Attributes.attribute "aria-label" buttonText)
@@ -866,6 +875,7 @@ clickButton buttonText =
               )
             , ( "a <form> with onSubmit containing a <button> (not disabled, not type=button) with text " ++ String.Extra.escape buttonText
               , ComplexQuery.findButNot (Just "find form")
+                    [ "form" ]
                     { good =
                         [ Selector.tag "form"
                         , Selector.containing
@@ -903,6 +913,7 @@ clickButton buttonText =
               )
             , ( "a <form> with onSubmit containing an <input type=submit value=" ++ String.Extra.escape buttonText ++ "> (not disabled)"
               , ComplexQuery.findButNot (Just "find form")
+                    [ "form" ]
                     { good =
                         [ Selector.tag "form"
                         , Selector.containing
@@ -939,12 +950,13 @@ clickButton buttonText =
         (ComplexQuery.exactlyOneOf "Expected one of the following to exist" checks)
 
 
-findNotDisabled : Maybe String -> Maybe (List Selector) -> List Selector -> Query.Single msg -> ComplexQuery msg (Query.Single msg)
-findNotDisabled description additionalBad selectors =
+findNotDisabled : Maybe String -> ComplexQuery.Highlight -> Maybe (List Selector) -> List Selector -> Query.Single msg -> ComplexQuery msg (Query.Single msg)
+findNotDisabled description highlight additionalBad selectors =
     -- This is tricky because Test.Html doesn't provide a way to search for an attribute being *not* present.
     -- So we have to check if "disabled=True" *is* present, and manually force a failure if it is.
     -- (We can't just search for "disabled=False" because we need to allow elements that don't specify "disabled" at all.)
     ComplexQuery.findButNot description
+        highlight
         { good = selectors
         , bads =
             List.filterMap identity
@@ -1066,7 +1078,7 @@ clickLink linkText href programTest =
     in
     programTest
         |> assertComplexQuery functionDescription
-            (ComplexQuery.find Nothing findLinkTag)
+            (ComplexQuery.find Nothing [ "a" ] findLinkTag)
         |> tryClicking { otherwise = \_ -> TestState.simulateLoadUrlHelper functionDescription href >> Err }
 
 
@@ -1141,7 +1153,7 @@ see [`simulateDomEvent`](#simulateDomEvent).
 fillInTextarea : String -> ProgramTest model msg effect -> ProgramTest model msg effect
 fillInTextarea newContent =
     simulateComplexQuery "fillInTextarea" <|
-        (ComplexQuery.find Nothing [ Selector.tag "textarea" ]
+        (ComplexQuery.find Nothing [ "textarea" ] [ Selector.tag "textarea" ]
             >> ComplexQuery.andThen (ComplexQuery.simulate (Test.Html.Event.input newContent))
         )
 
@@ -1241,6 +1253,7 @@ selectOption fieldId label optionValue optionText =
             >> ComplexQuery.check
                 "check label exists"
                 (ComplexQuery.find Nothing
+                    [ "label" ]
                     [ Selector.tag "label"
                     , Selector.attribute (Html.Attributes.for fieldId)
                     , Selector.text label
@@ -1248,12 +1261,14 @@ selectOption fieldId label optionValue optionText =
                 )
             >> ComplexQuery.andThen
                 (ComplexQuery.find (Just "find select")
+                    [ "select" ]
                     [ Selector.tag "select"
                     , Selector.id fieldId
                     ]
                     >> ComplexQuery.check
                         "check option exists"
                         (ComplexQuery.find Nothing
+                            [ "option" ]
                             [ Selector.tag "option"
                             , Selector.attribute (Html.Attributes.value optionValue)
                             , Selector.text optionText
