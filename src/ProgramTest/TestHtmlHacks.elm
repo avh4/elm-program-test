@@ -1,6 +1,7 @@
 module ProgramTest.TestHtmlHacks exposing (FailureReason(..), getPassingSelectors, parseFailureReason, parseSimulateFailure, renderHtml)
 
 import Html.Parser
+import ProgramTest.HtmlParserHacks as HtmlParserHacks
 import ProgramTest.HtmlRenderer as HtmlRenderer
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector exposing (Selector)
@@ -119,7 +120,7 @@ parseSection : List String -> Section
 parseSection lines =
     case List.filterMap parseSelectorResult lines of
         [] ->
-            case Html.Parser.run (String.join "\n" lines) of
+            case HtmlParserHacks.parse (String.join "\n" lines) of
                 Ok node ->
                     HtmlSection node
 
