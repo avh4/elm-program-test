@@ -1,5 +1,7 @@
 module ProgramTest.TestHtmlHacks exposing (FailureReason(..), getPassingSelectors, parseFailureReason, parseSimulateFailure, renderHtml)
 
+import Html.Parser
+import ProgramTest.HtmlRenderer as HtmlRenderer
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector exposing (Selector)
 import Test.Runner
@@ -14,6 +16,9 @@ renderHtml single =
     case forceFailureReport [] single of
         ( "▼ Query.fromHtml", UnparsedSection a ) :: _ ->
             "▼ Query.fromHtml\n\n" ++ a
+
+        ( "▼ Query.fromHtml", HtmlSection nodes ) :: _ ->
+            "▼ Query.fromHtml\n\n" ++ HtmlRenderer.render 4 nodes
 
         ( first, _ ) :: _ ->
             pleaseReport ("unexpected failure report" ++ first)
@@ -106,6 +111,7 @@ parseNamedSection lines =
 
 type Section
     = UnparsedSection String
+    | HtmlSection (List Html.Parser.Node)
     | FailureSection FailureReason
 
 
@@ -113,7 +119,12 @@ parseSection : List String -> Section
 parseSection lines =
     case List.filterMap parseSelectorResult lines of
         [] ->
-            UnparsedSection (String.join "\n" lines)
+            case Html.Parser.run (String.join "\n" lines) of
+                Ok node ->
+                    HtmlSection node
+
+                Err err ->
+                    UnparsedSection (String.join "\n" lines)
 
         some ->
             FailureSection (SelectorsFailed some)

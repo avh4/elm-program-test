@@ -102,7 +102,7 @@ all =
                         [ "▼ Query.fromHtml"
                         , ""
                         , "    <body>"
-                        , "        <label htmlFor=\"field-1\">"
+                        , "        <label for=\"field-1\">"
                         , "            Field 1"
                         , "        </label>"
                         , "    </body>"

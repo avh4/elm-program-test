@@ -144,6 +144,7 @@ toString failure =
         ViewAssertionFailed functionName html reason ->
             String.join "\n"
                 [ TestHtmlHacks.renderHtml (Query.fromHtml html)
+                , ""
                 , "▼ " ++ functionName
                 , ""
                 , renderQueryFailureWithContext renderQueryFailure 0 True reason
