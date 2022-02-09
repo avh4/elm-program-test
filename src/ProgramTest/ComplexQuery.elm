@@ -119,7 +119,7 @@ type Failure
 
 
 type FailureContext a
-    = FindSucceeded (Maybe String) (List String) (FailureContext a)
+    = FindSucceeded (Maybe String) (() -> List String) (FailureContext a)
     | CheckSucceeded String (FailureContext ()) (FailureContext a)
     | Description (Result String String) (FailureContext a)
     | None a
@@ -234,7 +234,7 @@ step state complexQuery =
                             | priority = state.priority + List.length selectors
                         }
                         (next (Query.find selectors source))
-                        |> Tuple.mapSecond (Tuple.mapBoth ((++) highlight) (FindSucceeded description (TestHtmlHacks.getPassingSelectors selectors source)))
+                        |> Tuple.mapSecond (Tuple.mapBoth ((++) highlight) (FindSucceeded description (\() -> TestHtmlHacks.getPassingSelectors selectors source)))
 
         ExactlyOneOf description options ->
             let
@@ -310,7 +310,7 @@ step state complexQuery =
                                 { state | priority = state.priority + extraPriority + 1 }
                                 (next found)
                                 -- TODO: add the not bads to the context (or alternatively, add the "onErrors", but convert them all to successes)
-                                |> Tuple.mapSecond (Tuple.mapBoth ((++) highlight) (FindSucceeded description (TestHtmlHacks.getPassingSelectors good source)))
+                                |> Tuple.mapSecond (Tuple.mapBoth ((++) highlight) (FindSucceeded description (\() -> TestHtmlHacks.getPassingSelectors good source)))
 
                         nextBad :: rest ->
                             let

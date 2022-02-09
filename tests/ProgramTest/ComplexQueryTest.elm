@@ -3,7 +3,7 @@ module ProgramTest.ComplexQueryTest exposing (all)
 import Expect
 import Html
 import Html.Attributes as HtmlA
-import ProgramTest.ComplexQuery as ComplexQuery exposing (Failure(..), FailureContext(..))
+import ProgramTest.ComplexQuery as ComplexQuery exposing (Failure(..))
 import ProgramTest.TestHtmlHacks exposing (FailureReason(..))
 import Test exposing (..)
 import Test.Html.Query as Query
@@ -25,6 +25,10 @@ all =
                     , Html.text "Outer text"
                     ]
                     |> Query.fromHtml
+
+            run =
+                ComplexQuery.run
+                    >> Result.mapError (Tuple.mapSecond forceFailureContext)
         in
         [ describe "find"
             [ test "when failing, returns the list of successful selectors" <|
@@ -35,7 +39,7 @@ all =
                         , Selector.id "formX"
                         ]
                         html
-                        |> ComplexQuery.run
+                        |> run
                         |> Expect.equal
                             (Err
                                 ( [ "form" ]
@@ -60,7 +64,7 @@ all =
                         , onError = [ Selector.tag "form", Selector.id "form<notA>" ]
                         }
                         html
-                        |> ComplexQuery.run
+                        |> run
                         |> Expect.equal
                             (Err
                                 ( [ "form" ]
@@ -92,7 +96,7 @@ all =
                                 , Selector.id "buttonX"
                                 ]
                             )
-                        |> ComplexQuery.run
+                        |> run
                         |> Expect.equal
                             (Err
                                 ( [ "form", "button" ]
@@ -124,7 +128,7 @@ all =
                                 [ Selector.tag "nope"
                                 ]
                             )
-                        |> ComplexQuery.run
+                        |> run
                         |> Expect.equal
                             (Err
                                 ( []
@@ -147,3 +151,31 @@ all =
                             )
             ]
         ]
+
+
+type ForcedFailureContext a
+    = FindSucceeded (Maybe String) (List String) (ForcedFailureContext a)
+    | CheckSucceeded String (ForcedFailureContext ()) (ForcedFailureContext a)
+    | Description (Result String String) (ForcedFailureContext a)
+    | None a
+
+
+forceFailureContext : ComplexQuery.FailureContext a -> ForcedFailureContext a
+forceFailureContext failureContext =
+    case failureContext of
+        ComplexQuery.FindSucceeded desc selectors next ->
+            FindSucceeded desc (selectors ()) (forceFailureContext next)
+
+        ComplexQuery.CheckSucceeded desc check next ->
+            CheckSucceeded desc (forceFailureContext_ check) (forceFailureContext next)
+
+        ComplexQuery.Description desc next ->
+            Description desc (forceFailureContext next)
+
+        ComplexQuery.None a ->
+            None a
+
+
+forceFailureContext_ : ComplexQuery.FailureContext a -> ForcedFailureContext a
+forceFailureContext_ =
+    forceFailureContext
