@@ -156,9 +156,6 @@ all =
                         , """  ✓ has tag "option\""""
                         , """  ✓ has attribute "value" "george-value\""""
                         , """  ✓ has text "George\""""
-                        , """✓ find select:"""
-                        , """  ✓ has tag "select\""""
-                        , """  ✓ has attribute "id" "name-select\""""
                         , """✗ simulate change:"""
                         , """  ✗ Event.expectEvent: I found a node, but it does not listen for "change" events like I expected it would."""
                         ]

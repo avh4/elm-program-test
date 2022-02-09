@@ -77,7 +77,7 @@ simulate event target =
 -}
 check : String -> (a -> ComplexQuery msg ignored) -> ComplexQuery msg a -> ComplexQuery msg a
 check description checkQuery mainQuery =
-    mainQuery |> andThen (\a -> Check description (checkQuery a |> map (\_ -> ())) mainQuery)
+    mainQuery |> andThen (\a -> Check description (checkQuery a |> map (\_ -> ())) (Done a))
 
 
 andThen : (a -> ComplexQuery msg b) -> ComplexQuery msg a -> ComplexQuery msg b

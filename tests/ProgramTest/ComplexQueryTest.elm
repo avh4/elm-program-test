@@ -149,6 +149,47 @@ all =
                                     )
                                 )
                             )
+            , test "multiple checks should not duplicate context information" <|
+                \() ->
+                    ComplexQuery.succeed html
+                        |> ComplexQuery.check
+                            "text exists"
+                            (ComplexQuery.find Nothing [] [ Selector.text "Outer text" ])
+                        |> ComplexQuery.check "button exists"
+                            (ComplexQuery.find Nothing [] [ Selector.tag "button" ])
+                        |> ComplexQuery.andThen
+                            (ComplexQuery.find (Just "expected to fail")
+                                []
+                                [ Selector.tag "nope"
+                                ]
+                            )
+                        |> run
+                        |> Expect.equal
+                            (Err
+                                ( []
+                                , CheckSucceeded "text exists"
+                                    (FindSucceeded Nothing
+                                        [ "has text \"Outer text\"" ]
+                                        (None ())
+                                    )
+                                    (CheckSucceeded "button exists"
+                                        (FindSucceeded Nothing
+                                            [ "has tag \"button\"" ]
+                                            (None ())
+                                        )
+                                        (Description (Err "expected to fail")
+                                            (None
+                                                (QueryFailed
+                                                    (SelectorsFailed
+                                                        [ Err "has tag \"nope\""
+                                                        ]
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
             ]
         ]
 
