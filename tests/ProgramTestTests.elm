@@ -22,7 +22,7 @@ type TestEffect
 
 testInit : ( String, TestEffect )
 testInit =
-    ( "<INIT>"
+    ( "INIT"
     , NoOp
     )
 
@@ -117,12 +117,12 @@ all =
         [ test "has initial model" <|
             \() ->
                 start
-                    |> ProgramTest.expectModel (Expect.equal "<INIT>")
+                    |> ProgramTest.expectModel (Expect.equal "INIT")
         , test "can send a msg" <|
             \() ->
                 start
                     |> ProgramTest.update "A"
-                    |> ProgramTest.expectModel (Expect.equal "<INIT>;A")
+                    |> ProgramTest.expectModel (Expect.equal "INIT;A")
         , test "can create with flags" <|
             \() ->
                 ProgramTest.createElement
@@ -186,7 +186,7 @@ all =
             \_ assertView ->
                 start
                     |> assertView
-                        (Query.find [ Selector.tag "span" ] >> Query.has [ Selector.text "<INIT>" ])
+                        (Query.find [ Selector.tag "span" ] >> Query.has [ Selector.text "INIT" ])
         , test "can create with navigation and JSON string flags" <|
             \() ->
                 ProgramTest.createApplication
@@ -218,7 +218,7 @@ all =
                     |> ProgramTest.simulateDomEvent
                         (Query.find [ Selector.tag "strange" ])
                         ( "odd", Json.Encode.string "<ODD-VALUE>" )
-                    |> ProgramTest.expectModel (Expect.equal "<INIT>;<ODD-VALUE>")
+                    |> ProgramTest.expectModel (Expect.equal "INIT;<ODD-VALUE>")
         , testLastEffect "can assert on the last effect after init" <|
             \_ assertLastEffect ->
                 start
@@ -240,7 +240,7 @@ all =
                 start
                     |> ProgramTest.clickButton "Click Me"
                     |> ProgramTest.simulateLastEffect (\effect -> Ok [ Debug.toString effect ])
-                    |> ProgramTest.expectModel (Expect.equal "<INIT>;CLICK;LogUpdate \"CLICK\"")
+                    |> ProgramTest.expectModel (Expect.equal "INIT;CLICK;LogUpdate \"CLICK\"")
         , test "can force a failure via simulateLastEffect" <|
             \() ->
                 start
@@ -263,10 +263,10 @@ all =
                         (Query.find [ Selector.id "button-b" ])
                         (ProgramTest.clickButton "Ambiguous click")
                     |> ProgramTest.clickButton "Click Me"
-                    |> ProgramTest.expectModel (Expect.equal "<INIT>;CLICK-B;CLICK")
+                    |> ProgramTest.expectModel (Expect.equal "INIT;CLICK-B;CLICK")
         , test "can simulate setting a labeled checkbox field" <|
             \() ->
                 start
                     |> ProgramTest.check "checkbox-1" "Checkbox 1" True
-                    |> ProgramTest.expectModel (Expect.equal "<INIT>;Check:checkbox-1:True")
+                    |> ProgramTest.expectModel (Expect.equal "INIT;Check:checkbox-1:True")
         ]
