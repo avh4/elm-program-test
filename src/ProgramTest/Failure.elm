@@ -1,8 +1,9 @@
 module ProgramTest.Failure exposing (Failure(..), toString)
 
 import Html exposing (Html)
-import ProgramTest.ComplexQuery as ComplexQuery exposing (Failure(..), FailureContext(..))
+import ProgramTest.ComplexQuery as ComplexQuery exposing (Failure(..), FailureContext1(..))
 import ProgramTest.TestHtmlHacks as TestHtmlHacks
+import Set
 import String.Extra
 import Test.Html.Query as Query
 import Test.Runner.Failure
@@ -23,7 +24,7 @@ type Failure
     | NoMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | MultipleMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | EffectSimulationNotConfigured String
-    | ViewAssertionFailed String (Html ()) ComplexQuery.Highlight (ComplexQuery.FailureContext ComplexQuery.Failure)
+    | ViewAssertionFailed String (Html ()) ComplexQuery.Highlight ( ComplexQuery.FailureContext, ComplexQuery.Failure )
     | CustomFailure String String
 
 
@@ -144,13 +145,12 @@ toString failure =
         ViewAssertionFailed functionName html highlight reason ->
             let
                 highlighter =
-                    case highlight of
-                        [] ->
-                            \_ _ _ -> True
+                    if Set.isEmpty highlight then
+                        \_ _ _ -> True
 
-                        interestingTags ->
-                            \tag attrs children ->
-                                List.member tag interestingTags
+                    else
+                        \tag attrs children ->
+                            Set.member tag highlight
             in
             String.join "\n"
                 [ TestHtmlHacks.renderHtml showColors.dim highlighter (Query.fromHtml html)
@@ -164,48 +164,48 @@ toString failure =
             assertionName ++ ": " ++ message
 
 
-renderQueryFailureWithContext : (Int -> Bool -> a -> String) -> Int -> Bool -> ComplexQuery.FailureContext a -> String
+renderQueryFailureWithContext : (Int -> Bool -> a -> String) -> Int -> Bool -> ( ComplexQuery.FailureContext, a ) -> String
 renderQueryFailureWithContext renderInner indent color failure =
     let
         indentS =
             String.repeat indent " "
     in
     case failure of
-        None inner ->
+        ( [], inner ) ->
             renderInner indent color inner
 
-        Description description baseFailure ->
+        ( (Description description) :: baseFailure, inner ) ->
             String.join "\n" <|
                 List.filter ((/=) "")
                     [ indentS ++ renderDescriptionResult (colorsFor color) description ++ ":"
-                    , renderQueryFailureWithContext renderInner (indent + 2) color baseFailure
+                    , renderQueryFailureWithContext renderInner (indent + 2) color ( baseFailure, inner )
                     ]
 
-        CheckSucceeded description checkContext baseFailure ->
+        ( (CheckSucceeded description checkContext) :: baseFailure, inner ) ->
             String.join "\n" <|
                 List.filter ((/=) "")
                     [ indentS ++ renderDescriptionResult (colorsFor color) (Ok description) ++ ":"
-                    , renderQueryFailureWithContext_ (\_ _ () -> "") (indent + 2) color checkContext
-                    , renderQueryFailureWithContext renderInner indent color baseFailure
+                    , renderQueryFailureWithContext_ (\_ _ () -> "") (indent + 2) color ( checkContext, () )
+                    , renderQueryFailureWithContext renderInner indent color ( baseFailure, inner )
                     ]
 
-        FindSucceeded (Just description) successfulChecks baseFailure ->
+        ( (FindSucceeded (Just description) successfulChecks) :: baseFailure, inner ) ->
             String.join "\n" <|
                 List.filter ((/=) "")
                     [ indentS ++ renderDescriptionResult (colorsFor color) (Ok description) ++ ":"
                     , renderSelectorResults (indent + 2) (colorsFor color) (List.map Ok (successfulChecks ()))
-                    , renderQueryFailureWithContext renderInner indent color baseFailure
+                    , renderQueryFailureWithContext renderInner indent color ( baseFailure, inner )
                     ]
 
-        FindSucceeded Nothing successfulChecks baseFailure ->
+        ( (FindSucceeded Nothing successfulChecks) :: baseFailure, inner ) ->
             String.join "\n" <|
                 List.filter ((/=) "")
                     [ renderSelectorResults indent (colorsFor color) (List.map Ok (successfulChecks ()))
-                    , renderQueryFailureWithContext renderInner indent color baseFailure
+                    , renderQueryFailureWithContext renderInner indent color ( baseFailure, inner )
                     ]
 
 
-renderQueryFailureWithContext_ : (Int -> Bool -> a -> String) -> Int -> Bool -> ComplexQuery.FailureContext a -> String
+renderQueryFailureWithContext_ : (Int -> Bool -> a -> String) -> Int -> Bool -> ( ComplexQuery.FailureContext, a ) -> String
 renderQueryFailureWithContext_ =
     renderQueryFailureWithContext
 
@@ -250,7 +250,9 @@ renderQueryFailure indent color failure =
             String.join "\n" <|
                 List.concat
                     [ [ indentS ++ description ++ ", but there were multiple successful matches:" ]
-                    , List.map (\( desc, todo ) -> indentS ++ "- " ++ desc) matches
+                    , matches
+                        |> List.sortBy (\( _, prio, _ ) -> -prio)
+                        |> List.map (\( desc, _, todo ) -> indentS ++ "- " ++ desc)
                     , [ ""
                       , "If that's what you intended, use `ProgramTest.within` to focus in on a portion of"
                       , "the view that contains only one of the matches."
