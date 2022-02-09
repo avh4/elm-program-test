@@ -825,7 +825,7 @@ clickButton buttonText =
 
         checks : List ( String, Query.Single msg -> ComplexQuery msg msg )
         checks =
-            [ ( "<button> (not disabled) with onClick and text " ++ String.Extra.escape buttonText
+            [ ( "<button> with text"
               , findNotDisabled (Just "find button")
                     [ "button" ]
                     Nothing
@@ -834,7 +834,7 @@ clickButton buttonText =
                     ]
                     >> ComplexQuery.andThen (ComplexQuery.simulate Test.Html.Event.click)
               )
-            , ( "<button> (not disabled) with onClick containing an <img> with alt=" ++ String.Extra.escape buttonText
+            , ( "<button> with <img> with alt text"
               , findNotDisabled (Just "find button")
                     [ "button" ]
                     Nothing
@@ -846,7 +846,7 @@ clickButton buttonText =
                     ]
                     >> ComplexQuery.andThen (ComplexQuery.simulate Test.Html.Event.click)
               )
-            , ( "<button> (not disabled) with onClick and attribute aria-label=" ++ String.Extra.escape buttonText
+            , ( "<button> with aria-label"
               , findNotDisabled (Just "find button")
                     [ "button" ]
                     Nothing
@@ -855,7 +855,7 @@ clickButton buttonText =
                     ]
                     >> ComplexQuery.andThen (ComplexQuery.simulate Test.Html.Event.click)
               )
-            , ( "an element with role=\"button\" (not disabled) and onClick and text " ++ String.Extra.escape buttonText
+            , ( "any element with role=\"button\" and text"
               , findNotDisabled (Just "find button")
                     [ "button" ]
                     (Just [ Selector.tag "button" ])
@@ -864,7 +864,7 @@ clickButton buttonText =
                     ]
                     >> ComplexQuery.andThen (ComplexQuery.simulate Test.Html.Event.click)
               )
-            , ( "an element with role=\"button\" (not disabled) and onClick and aria-label=" ++ String.Extra.escape buttonText
+            , ( "any element with role=\"button\" and aria-label"
               , findNotDisabled (Just "find button")
                     [ "button" ]
                     (Just [ Selector.tag "button" ])
@@ -873,7 +873,7 @@ clickButton buttonText =
                     ]
                     >> ComplexQuery.andThen (ComplexQuery.simulate Test.Html.Event.click)
               )
-            , ( "a <form> with onSubmit containing a <button> (not disabled, not type=button) with text " ++ String.Extra.escape buttonText
+            , ( "<form> with submit <button> with text"
               , ComplexQuery.findButNot (Just "find form")
                     [ "form" ]
                     { good =
@@ -911,7 +911,7 @@ clickButton buttonText =
                     }
                     >> ComplexQuery.andThen (ComplexQuery.simulate Test.Html.Event.submit)
               )
-            , ( "a <form> with onSubmit containing an <input type=submit value=" ++ String.Extra.escape buttonText ++ "> (not disabled)"
+            , ( "<form> with submit <input> with value"
               , ComplexQuery.findButNot (Just "find form")
                     [ "form" ]
                     { good =
