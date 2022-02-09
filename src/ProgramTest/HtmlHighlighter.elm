@@ -67,6 +67,7 @@ highlight predicate =
                             bestId =
                                 List.concatMap identity
                                     [ List.filter (Tuple.first >> (==) "id") attrs
+                                    , List.filter (Tuple.first >> (==) "name") attrs
                                     , List.filter (Tuple.first >> (==) "class") attrs
                                     ]
                                     |> List.head

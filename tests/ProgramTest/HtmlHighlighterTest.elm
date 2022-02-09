@@ -24,4 +24,36 @@ all =
                             , Element "button" [] []
                             ]
                         )
+        , describe "hidden element descriptions"
+            [ test "prefers id" <|
+                \() ->
+                    Html.Parser.Element "div"
+                        [ ( "class", "C" )
+                        , ( "id", "I" )
+                        , ( "name", "N" )
+                        ]
+                        []
+                        |> HtmlHighlighter.highlight (\_ _ _ -> False)
+                        |> Expect.equal
+                            (Hidden "<div id=\"I\">...</div>")
+            , test "then prefers name" <|
+                \() ->
+                    Html.Parser.Element "input"
+                        [ ( "name", "N" )
+                        , ( "class", "C" )
+                        ]
+                        []
+                        |> HtmlHighlighter.highlight (\_ _ _ -> False)
+                        |> Expect.equal
+                            (Hidden "<input name=\"N\">...</input>")
+            , test "then prefers class" <|
+                \() ->
+                    Html.Parser.Element "div"
+                        [ ( "class", "C" )
+                        ]
+                        []
+                        |> HtmlHighlighter.highlight (\_ _ _ -> False)
+                        |> Expect.equal
+                            (Hidden "<div class=\"C\">...</div>")
+            ]
         ]
