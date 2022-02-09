@@ -73,8 +73,19 @@ highlight predicate =
                                     |> List.head
                                     |> Maybe.map (\( name, value ) -> " " ++ name ++ "=\"" ++ value ++ "\"")
                                     |> Maybe.withDefault ""
+
+                            bestContent =
+                                case foldedChildren of
+                                    [] ->
+                                        ""
+
+                                    [ Text single ] ->
+                                        truncate 15 (String.trim single)
+
+                                    _ ->
+                                        "..."
                         in
-                        Hidden ("<" ++ tag ++ bestId ++ ">...</" ++ tag ++ ">")
+                        Hidden ("<" ++ tag ++ bestId ++ ">" ++ bestContent ++ "</" ++ tag ++ ">")
 
                 CommentF string ->
                     Comment string
@@ -94,3 +105,12 @@ isNonHiddenElement node =
 
         Hidden _ ->
             False
+
+
+truncate : Int -> String -> String
+truncate max input =
+    if String.length input < max - 3 then
+        input
+
+    else
+        String.left (max - 3) input ++ "..."

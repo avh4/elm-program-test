@@ -142,7 +142,7 @@ all =
                         , "    <body>"
                         , "        <label>"
                         , "            Field 1"
-                        , "            <b>...</b>"
+                        , "            <b></b>"
                         , "        </label>"
                         , "    </body>"
                         , ""

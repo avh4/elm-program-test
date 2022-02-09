@@ -24,7 +24,7 @@ all =
                                 ]
                             ]
                         , Html.form []
-                            [ Html.input [] []
+                            [ Html.input [ HA.name "name" ] []
                             , Html.button [] [ Html.text "Save" ]
                             ]
                         , Html.div [ HA.id "footer" ]
@@ -43,7 +43,7 @@ all =
                         , "        <div class=\"container\">"
                         , "            <div class=\"header\">...</div>"
                         , "            <form>"
-                        , "                <input>...</input>"
+                        , "                <input name=\"name\"></input>"
                         , "                <button>"
                         , "                    Save"
                         , "                </button>"
