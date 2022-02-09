@@ -699,7 +699,7 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
         checks_ : String -> String -> List ( String, Query.Single msg -> ComplexQuery msg msg )
         checks_ article inputTag =
             if fieldId == "" then
-                [ ( "a <label> with text " ++ String.Extra.escape label ++ " containing " ++ article ++ " <" ++ inputTag ++ ">"
+                [ ( "<" ++ inputTag ++ "> with parent <label>"
                   , ComplexQuery.find (Just "find label")
                         [ "label" ]
                         [ Selector.tag "label"
@@ -709,7 +709,7 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
                             (ComplexQuery.find Nothing [ inputTag ] [ Selector.tag inputTag ])
                         >> ComplexQuery.andThen (ComplexQuery.simulate event)
                   )
-                , ( "<" ++ inputTag ++ " aria-label=" ++ String.Extra.escape label ++ ">"
+                , ( "<" ++ inputTag ++ "> with aria-label"
                   , ComplexQuery.find Nothing
                         [ inputTag ]
                         [ Selector.tag inputTag
@@ -720,7 +720,7 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
                 ]
 
             else
-                [ ( "<label for=" ++ String.Extra.escape fieldId ++ "> with text " ++ String.Extra.escape label ++ " and " ++ article ++ " <" ++ inputTag ++ " id=" ++ String.Extra.escape fieldId ++ ">"
+                [ ( "<" ++ inputTag ++ "> associated to <label> by id"
                   , ComplexQuery.succeed
                         >> ComplexQuery.check
                             "check label exists"
@@ -738,7 +738,7 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
                             )
                         >> ComplexQuery.andThen (ComplexQuery.simulate event)
                   )
-                , ( "<" ++ inputTag ++ " aria-label=" ++ String.Extra.escape label ++ " id=" ++ String.Extra.escape fieldId ++ ">"
+                , ( "<" ++ inputTag ++ "> with aria-label and id"
                   , ComplexQuery.find Nothing
                         [ inputTag ]
                         [ Selector.tag inputTag
