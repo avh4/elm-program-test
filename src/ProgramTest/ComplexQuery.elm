@@ -287,39 +287,19 @@ simulate event prev =
 
         QueryResult state prevHighlight prevContext (Ok source) ->
             case
-                -- This check is maybe not needed anymore since the previous finds should all short circuit their errors?
                 source
-                    |> Query.has []
-                    |> Test.Runner.getFailureReason
+                    |> Test.Html.Event.simulate event
+                    |> Test.Html.Event.toResult
             of
-                Just reason ->
+                Err message ->
                     QueryResult
                         state
                         prevHighlight
-                        prevContext
-                        --(Err (QueryFailed (TestHtmlHacks.parseFailureReason reason.description)))
-                        (Err (QueryFailed (TestHtmlHacks.parseFailureReason "XXX: Does this code ever run????")))
+                        (Description (Err ("simulate " ++ Tuple.first event)) :: prevContext)
+                        (Err (SimulateFailed (TestHtmlHacks.parseSimulateFailure message)))
 
-                Nothing ->
-                    -- Try to simulate the event, now that we know the target exists
-                    case
-                        source
-                            |> Test.Html.Event.simulate event
-                            |> Test.Html.Event.toResult
-                    of
-                        Err message ->
-                            QueryResult
-                                state
-                                prevHighlight
-                                (Description (Err ("simulate " ++ Tuple.first event)) :: prevContext)
-                                (Err (SimulateFailed (TestHtmlHacks.parseSimulateFailure message)))
-
-                        Ok msg ->
-                            QueryResult
-                                state
-                                prevHighlight
-                                prevContext
-                                (Ok msg)
+                Ok msg ->
+                    QueryResult state prevHighlight prevContext (Ok msg)
 
 
 {-| Ensure that the given query succeeds, but then ignore its result.

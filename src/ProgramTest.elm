@@ -1312,28 +1312,30 @@ then the following will allow you to simulate clicking the "Submit" button in th
 -}
 within : (Query.Single msg -> Query.Single msg) -> (ProgramTest model msg effect -> ProgramTest model msg effect) -> (ProgramTest model msg effect -> ProgramTest model msg effect)
 within findTarget onScopedTest =
-    andThen <|
-        \program state ->
-            case
-                Created
-                    { state = Ok state
-                    , program =
-                        { program
-                            | withinFocus = program.withinFocus >> findTarget
-                        }
-                    }
-                    |> onScopedTest
-            of
-                Created created ->
-                    case created.state of
-                        Ok s ->
-                            Ok s
+    andThen (expectViewHelper "within" (findTarget >> Query.has []))
+        >> (andThen <|
+                \program state ->
+                    case
+                        Created
+                            { state = Ok state
+                            , program =
+                                { program
+                                    | withinFocus = program.withinFocus >> findTarget
+                                }
+                            }
+                            |> onScopedTest
+                    of
+                        Created created ->
+                            case created.state of
+                                Ok s ->
+                                    Ok s
 
-                        Err e ->
-                            Err e.reason
+                                Err e ->
+                                    Err e.reason
 
-                FailedToCreate failure ->
-                    Err failure
+                        FailedToCreate failure ->
+                            Err failure
+           )
 
 
 {-| Asserts that an HTTP request to the specific url and method has been made.

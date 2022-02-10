@@ -7,6 +7,11 @@ New features:
     - All passing steps of a query up to the failure will be displayed
   - Failure messages simplify the HTML to show only what's relevant to the failure
 
+Bug fixes:
+
+  - Using `ensureViewHasNot` inside of `within` no longer passes when `within` fails to find its target.
+
+
 ## 3.6.1
 
 New features:
