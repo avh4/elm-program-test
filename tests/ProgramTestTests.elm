@@ -264,6 +264,71 @@ all =
                         (ProgramTest.clickButton "Ambiguous click")
                     |> ProgramTest.clickButton "Click Me"
                     |> ProgramTest.expectModel (Expect.equal "INIT;CLICK-B;CLICK")
+        , test "a failing within fails when containing assertViewHasNot" <|
+            \() ->
+                start
+                    |> ProgramTest.within
+                        (Query.findAll [ Selector.tag "not-there" ]
+                            >> Query.first
+                        )
+                        (ProgramTest.ensureViewHasNot [ Selector.text "NOT THERE" ])
+                    |> ProgramTest.done
+                    |> expectFailure
+                        [ """within:"""
+                        , """▼ Query.fromHtml"""
+                        , """"""
+                        , """    <div>"""
+                        , """        <span>"""
+                        , """            INIT"""
+                        , """        </span>"""
+                        , """        <button>"""
+                        , """            Click Me"""
+                        , """        </button>"""
+                        , """        <strange>"""
+                        , """        </strange>"""
+                        , """        <textarea>"""
+                        , """        </textarea>"""
+                        , """        <div>"""
+                        , """            <label htmlFor="field-1">"""
+                        , """                Field 1"""
+                        , """            </label>"""
+                        , """            <input id="field-1">"""
+                        , """            <label htmlFor="field-2">"""
+                        , """                Field 2"""
+                        , """            </label>"""
+                        , """            <input id="field-2">"""
+                        , """            <label htmlFor="checkbox-1">"""
+                        , """                Checkbox 1"""
+                        , """            </label>"""
+                        , """            <input id="checkbox-1" type="checkbox">"""
+                        , """        </div>"""
+                        , """        <div>"""
+                        , """            <div id="button-a">"""
+                        , """                <button>"""
+                        , """                    Ambiguous click"""
+                        , """                </button>"""
+                        , """            </div>"""
+                        , """            <div id="button-b">"""
+                        , """                <button>"""
+                        , """                    Ambiguous click"""
+                        , """                </button>"""
+                        , """            </div>"""
+                        , """        </div>"""
+                        , """    </div>"""
+                        , """"""
+                        , """"""
+                        , """▼ Query.findAll [ tag "not-there" ]"""
+                        , """"""
+                        , """0 matches found for this query."""
+                        , """"""
+                        , """"""
+                        , """▼ Query.first"""
+                        , """"""
+                        , """0 matches found for this query."""
+                        , """"""
+                        , """"""
+                        , """✗ Query.first always expects to find 1 element, but it found 0 instead."""
+                        ]
         , test "can simulate setting a labeled checkbox field" <|
             \() ->
                 start
