@@ -31,8 +31,7 @@ all =
                     |> ProgramTest.clickButton "Click Me"
                     |> ProgramTest.done
                     |> expectFailure
-                        [ "clickButton \"Click Me\":"
-                        , "▼ Query.fromHtml"
+                        [ "▼ Query.fromHtml"
                         , ""
                         , "    <body>"
                         , "        <button>"
@@ -41,13 +40,15 @@ all =
                         , "    </body>"
                         , ""
                         , ""
-                        , "▼ Query.has [ text \"HTML expected by the call to: clickButton \"Click Me\"\" ]"
-                        , ""
-                        , "✗ has text \"HTML expected by the call to: clickButton \"Click Me\"\""
+                        , "▼ ProgramTest.clickButton \"Click Me\""
                         , ""
                         , "Expected one of the following to exist:"
-                        , "- <button> (not disabled) with onClick and text \"Click Me\""
-                        , "    \u{001B}[1mEvent.expectEvent: I found a node, but it does not listen for \"click\" events like I expected it would.\u{001B}[22m"
+                        , "- <button> with text"
+                        , "    ✓ find button:"
+                        , "      ✓ has tag \"button\""
+                        , "      ✓ has containing [ text \"Click Me\" ]"
+                        , "    ✗ simulate click:"
+                        , "      ✗ Event.expectEvent: I found a node, but it does not listen for \"click\" events like I expected it would."
                         ]
         , test "can click a button containing an image with alt text" <|
             \() ->
@@ -154,8 +155,7 @@ all =
                     |> ProgramTest.clickButton "Click Me"
                     |> ProgramTest.done
                     |> expectFailure
-                        [ "clickButton \"Click Me\":"
-                        , "▼ Query.fromHtml"
+                        [ "▼ Query.fromHtml"
                         , ""
                         , "    <body>"
                         , "        <button disabled=true>"
@@ -164,15 +164,14 @@ all =
                         , "    </body>"
                         , ""
                         , ""
-                        , "▼ Query.has [ text \"HTML expected by the call to: clickButton \"Click Me\"\" ]"
-                        , ""
-                        , "✗ has text \"HTML expected by the call to: clickButton \"Click Me\"\""
+                        , "▼ ProgramTest.clickButton \"Click Me\""
                         , ""
                         , "Expected one of the following to exist:"
-                        , "- <button> (not disabled) with onClick and text \"Click Me\""
-                        , "    \u{001B}[32m✓\u{001B}[39m \u{001B}[1mhas tag \"button\"\u{001B}[22m"
-                        , "    \u{001B}[32m✓\u{001B}[39m \u{001B}[1mhas containing [ text \"Click Me\" ]\u{001B}[22m"
-                        , "    \u{001B}[31m✗ has attribute \"disabled\" False\u{001B}[39m"
+                        , "- <button> with text"
+                        , "    ✗ find button:"
+                        , "      ✓ has tag \"button\""
+                        , "      ✓ has containing [ text \"Click Me\" ]"
+                        , "      ✗ has attribute \"disabled\" False"
                         ]
         , test "fails when clicking a disabled button in a form" <|
             \() ->
@@ -215,8 +214,7 @@ all =
                     |> ProgramTest.clickButton "Click Me"
                     |> ProgramTest.done
                     |> expectFailure
-                        [ "clickButton \"Click Me\":"
-                        , "▼ Query.fromHtml"
+                        [ "▼ Query.fromHtml"
                         , ""
                         , "    <body>"
                         , "        <div>"
@@ -229,13 +227,11 @@ all =
                         , "    </body>"
                         , ""
                         , ""
-                        , "▼ Query.has [ text \"HTML expected by the call to: clickButton \"Click Me\"\" ]"
-                        , ""
-                        , "✗ has text \"HTML expected by the call to: clickButton \"Click Me\"\""
+                        , "▼ ProgramTest.clickButton \"Click Me\""
                         , ""
                         , "Expected one of the following to exist, but there were multiple successful matches:"
-                        , "- <button> (not disabled) with onClick and text \"Click Me\""
-                        , "- <button> (not disabled) with onClick and attribute aria-label=\"Click Me\""
+                        , "- <button> with text"
+                        , "- <button> with aria-label"
                         , ""
                         , "If that's what you intended, use `ProgramTest.within` to focus in on a portion of"
                         , "the view that contains only one of the matches."

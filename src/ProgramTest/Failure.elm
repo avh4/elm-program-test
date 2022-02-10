@@ -1,12 +1,11 @@
 module ProgramTest.Failure exposing (Failure(..), toString)
 
 import Html exposing (Html)
-import ProgramTest.ComplexQuery as ComplexQuery exposing (Failure(..))
+import ProgramTest.ComplexQuery as ComplexQuery exposing (Failure(..), FailureContext1(..))
 import ProgramTest.TestHtmlHacks as TestHtmlHacks
+import Set
 import String.Extra
 import Test.Html.Query as Query
-import Test.Html.Selector as Selector
-import Test.Runner
 import Test.Runner.Failure
 import Url exposing (Url)
 
@@ -25,7 +24,7 @@ type Failure
     | NoMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | MultipleMatchingHttpRequest Int Int String { method : String, url : String } (List ( String, String ))
     | EffectSimulationNotConfigured String
-    | ViewAssertionFailed String (Html ()) ComplexQuery.Failure
+    | ViewAssertionFailed String (Html ()) ComplexQuery.Highlight ( ComplexQuery.FailureContext, ComplexQuery.Failure )
     | CustomFailure String String
 
 
@@ -143,35 +142,80 @@ toString failure =
         EffectSimulationNotConfigured functionName ->
             "TEST SETUP ERROR: In order to use " ++ functionName ++ ", you MUST use ProgramTest.withSimulatedEffects before calling ProgramTest.start"
 
-        ViewAssertionFailed functionName html reason ->
+        ViewAssertionFailed functionName html highlight reason ->
+            let
+                highlighter =
+                    if Set.isEmpty highlight then
+                        \_ _ _ -> True
+
+                    else
+                        \tag attrs children ->
+                            Set.member tag highlight
+            in
             String.join "\n"
-                [ functionName ++ ":"
-                , renderHtml functionName "" html
+                [ TestHtmlHacks.renderHtml showColors.dim highlighter (Query.fromHtml html)
                 , ""
-                , renderQueryFailure 0 True reason
+                , "▼ " ++ functionName
+                , ""
+                , renderQueryFailureWithContext renderQueryFailure 0 True reason
                 ]
 
         CustomFailure assertionName message ->
             assertionName ++ ": " ++ message
 
 
-renderHtml : String -> String -> Html any -> String
-renderHtml functionName unique html =
-    case
-        Query.fromHtml html
-            |> Query.has [ Selector.text ("HTML expected by the call to: " ++ functionName ++ unique) ]
-            |> Test.Runner.getFailureReason
-    of
-        Nothing ->
-            -- We expect the fake query to fail -- if it doesn't for some reason, just try recursing with a different fake matching string until it does fail
-            renderHtml functionName (unique ++ "_") html
+renderQueryFailureWithContext : (Int -> Bool -> a -> String) -> Int -> Bool -> ( ComplexQuery.FailureContext, a ) -> String
+renderQueryFailureWithContext renderInner indent color failure =
+    let
+        indentS =
+            String.repeat indent " "
+    in
+    case failure of
+        ( [], inner ) ->
+            renderInner indent color inner
 
-        Just reason ->
-            reason.description
+        ( (Description description) :: baseFailure, inner ) ->
+            String.join "\n" <|
+                List.filter ((/=) "")
+                    [ indentS ++ renderDescriptionResult (colorsFor color) description ++ ":"
+                    , renderQueryFailureWithContext renderInner (indent + 2) color ( baseFailure, inner )
+                    ]
+
+        ( (CheckSucceeded description checkContext) :: baseFailure, inner ) ->
+            String.join "\n" <|
+                List.filter ((/=) "")
+                    [ indentS ++ renderDescriptionResult (colorsFor color) (Ok description) ++ ":"
+                    , renderQueryFailureWithContext_ (\_ _ () -> "") (indent + 2) color ( checkContext, () )
+                    , renderQueryFailureWithContext renderInner indent color ( baseFailure, inner )
+                    ]
+
+        ( (FindSucceeded (Just description) successfulChecks) :: baseFailure, inner ) ->
+            String.join "\n" <|
+                List.filter ((/=) "")
+                    [ indentS ++ renderDescriptionResult (colorsFor color) (Ok description) ++ ":"
+                    , renderSelectorResults (indent + 2) (colorsFor color) (List.map Ok (successfulChecks ()))
+                    , renderQueryFailureWithContext renderInner indent color ( baseFailure, inner )
+                    ]
+
+        ( (FindSucceeded Nothing successfulChecks) :: baseFailure, inner ) ->
+            String.join "\n" <|
+                List.filter ((/=) "")
+                    [ renderSelectorResults indent (colorsFor color) (List.map Ok (successfulChecks ()))
+                    , renderQueryFailureWithContext renderInner indent color ( baseFailure, inner )
+                    ]
+
+
+renderQueryFailureWithContext_ : (Int -> Bool -> a -> String) -> Int -> Bool -> ( ComplexQuery.FailureContext, a ) -> String
+renderQueryFailureWithContext_ =
+    renderQueryFailureWithContext
 
 
 renderQueryFailure : Int -> Bool -> ComplexQuery.Failure -> String
 renderQueryFailure indent color failure =
+    let
+        indentS =
+            String.repeat indent " "
+    in
     case failure of
         QueryFailed failureReason ->
             renderTestHtmlFailureReason indent (colorsFor color) failureReason
@@ -181,7 +225,7 @@ renderQueryFailure indent color failure =
                 colors =
                     colorsFor color
             in
-            String.repeat indent " " ++ colors.bold string
+            indentS ++ renderSelectorResult colors (Err string)
 
         NoMatches description options ->
             let
@@ -196,17 +240,19 @@ renderQueryFailure indent color failure =
             in
             String.join "\n" <|
                 List.concat
-                    [ [ description ++ ":" ]
+                    [ [ indentS ++ description ++ ":" ]
                     , sortedByPriority
                         |> List.filter (\( _, prio, _ ) -> prio > maxPriority - 2)
-                        |> List.map (\( desc, prio, reason ) -> "- " ++ desc ++ "\n" ++ renderQueryFailure (indent + 4) (color && prio >= maxPriority - 1) reason)
+                        |> List.map (\( desc, prio, reason ) -> indentS ++ "- " ++ desc ++ "\n" ++ renderQueryFailureWithContext renderQueryFailure (indent + 4) (color && prio >= maxPriority - 1) reason)
                     ]
 
         TooManyMatches description matches ->
             String.join "\n" <|
                 List.concat
-                    [ [ description ++ ", but there were multiple successful matches:" ]
-                    , List.map (\desc -> "- " ++ desc) matches
+                    [ [ indentS ++ description ++ ", but there were multiple successful matches:" ]
+                    , matches
+                        |> List.sortBy (\( _, prio, _ ) -> -prio)
+                        |> List.map (\( desc, _, todo ) -> indentS ++ "- " ++ desc)
                     , [ ""
                       , "If that's what you intended, use `ProgramTest.within` to focus in on a portion of"
                       , "the view that contains only one of the matches."
@@ -216,13 +262,26 @@ renderQueryFailure indent color failure =
 
 renderTestHtmlFailureReason : Int -> Colors -> TestHtmlHacks.FailureReason -> String
 renderTestHtmlFailureReason indent colors failureReason =
+    let
+        indentS =
+            String.repeat indent " "
+    in
     case failureReason of
         TestHtmlHacks.Simple string ->
-            String.repeat indent " " ++ string
+            indentS ++ string
 
         TestHtmlHacks.SelectorsFailed results ->
-            List.map ((++) (String.repeat indent " ") << renderSelectorResult colors) (upToFirstErr results)
-                |> String.join "\n"
+            renderSelectorResults indent colors results
+
+
+renderSelectorResults : Int -> Colors -> List (Result String String) -> String
+renderSelectorResults indent colors results =
+    let
+        indentS =
+            String.repeat indent " "
+    in
+    List.map ((++) indentS << renderSelectorResult colors) (upToFirstErr results)
+        |> String.join "\n"
 
 
 renderSelectorResult : Colors -> Result String String -> String
@@ -242,6 +301,24 @@ renderSelectorResult colors result =
                     , " "
                     , selector
                     ]
+
+
+renderDescriptionResult : Colors -> Result String String -> String
+renderDescriptionResult colors result =
+    case result of
+        Ok selector ->
+            String.concat
+                [ colors.green "✓"
+                , " "
+                , selector
+                ]
+
+        Err selector ->
+            String.concat
+                [ colors.red "✗"
+                , " "
+                , selector
+                ]
 
 
 upToFirstErr : List (Result x a) -> List (Result x a)
@@ -266,6 +343,7 @@ type alias Colors =
     { bold : String -> String
     , red : String -> String
     , green : String -> String
+    , dim : String -> String
     }
 
 
@@ -280,12 +358,17 @@ colorsFor show =
 
 showColors : Colors
 showColors =
-    { bold = \s -> String.concat [ "\u{001B}[1m", s, "\u{001B}[22m" ]
-    , red = \s -> String.concat [ "\u{001B}[31m", s, "\u{001B}[39m" ]
-    , green = \s -> String.concat [ "\u{001B}[32m", s, "\u{001B}[39m" ]
+    { bold = \s -> String.concat [ "\u{001B}[1m", s, "\u{001B}[0m" ]
+    , red = \s -> String.concat [ "\u{001B}[31m", s, "\u{001B}[0m" ]
+    , green = \s -> String.concat [ "\u{001B}[32m", s, "\u{001B}[0m" ]
+    , dim = \s -> String.concat [ "\u{001B}[2m", s, "\u{001B}[0m" ]
     }
 
 
 noColors : Colors
 noColors =
-    { bold = identity, red = identity, green = identity }
+    { bold = identity
+    , red = identity
+    , green = identity
+    , dim = identity
+    }

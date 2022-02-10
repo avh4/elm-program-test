@@ -689,74 +689,73 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
             , Selector.text label
             ]
 
-        checks source =
+        checks =
             if allowTextArea then
-                checks_ "an" "input" source ++ checks_ "a" "textarea" source
+                checks_ "input" ++ checks_ "textarea"
 
             else
-                checks_ "an" "input" source
+                checks_ "input"
 
-        checks_ : String -> String -> Query.Single msg -> List ( String, ComplexQuery msg msg )
-        checks_ article inputTag source =
+        checks_ : String -> List ( String, ComplexQuery (Query.Single msg) -> ComplexQuery msg )
+        checks_ inputTag =
             if fieldId == "" then
-                [ ( "a <label> with text " ++ String.Extra.escape label ++ " containing " ++ article ++ " <" ++ inputTag ++ ">"
-                  , ComplexQuery.find
+                [ ( "<" ++ inputTag ++ "> with parent <label>"
+                  , ComplexQuery.find (Just "find label")
+                        [ "label" ]
                         [ Selector.tag "label"
                         , Selector.containing [ Selector.text label ]
                         ]
-                        source
-                        |> ComplexQuery.andThen
-                            (ComplexQuery.find [ Selector.tag inputTag ])
-                        |> ComplexQuery.andThen (ComplexQuery.simulate event)
+                        >> ComplexQuery.find Nothing
+                            [ inputTag ]
+                            [ Selector.tag inputTag ]
+                        >> ComplexQuery.simulate event
                   )
-                , ( "<" ++ inputTag ++ " aria-label=" ++ String.Extra.escape label ++ ">"
-                  , ComplexQuery.find
+                , ( "<" ++ inputTag ++ "> with aria-label"
+                  , ComplexQuery.find Nothing
+                        [ inputTag ]
                         [ Selector.tag inputTag
                         , Selector.attribute (attribute "aria-label" label)
                         ]
-                        source
-                        |> ComplexQuery.andThen (ComplexQuery.simulate event)
+                        >> ComplexQuery.simulate event
                   )
                 ]
 
             else
-                [ ( "<label for=" ++ String.Extra.escape fieldId ++ "> with text " ++ String.Extra.escape label ++ " and " ++ article ++ " <" ++ inputTag ++ " id=" ++ String.Extra.escape fieldId ++ ">"
-                  , ComplexQuery.find associatedLabel source
-                        |> ComplexQuery.andThen
-                            (\_ ->
-                                ComplexQuery.find
-                                    (List.concat
-                                        [ [ Selector.tag inputTag
-                                          , Selector.id fieldId
-                                          ]
-                                        , additionalInputSelectors
-                                        ]
-                                    )
-                                    source
+                [ ( "<" ++ inputTag ++ "> associated to <label> by id"
+                  , ComplexQuery.check "check label exists"
+                        (ComplexQuery.find Nothing [ "label" ] associatedLabel)
+                        >> ComplexQuery.find (Just ("find " ++ inputTag))
+                            [ inputTag ]
+                            (List.concat
+                                [ [ Selector.tag inputTag
+                                  , Selector.id fieldId
+                                  ]
+                                , additionalInputSelectors
+                                ]
                             )
-                        |> ComplexQuery.andThen (ComplexQuery.simulate event)
+                        >> ComplexQuery.simulate event
                   )
-                , ( "<" ++ inputTag ++ " aria-label=" ++ String.Extra.escape label ++ " id=" ++ String.Extra.escape fieldId ++ ">"
-                  , ComplexQuery.find
+                , ( "<" ++ inputTag ++ "> with aria-label and id"
+                  , ComplexQuery.find Nothing
+                        [ inputTag ]
                         [ Selector.tag inputTag
                         , Selector.id fieldId
                         , Selector.attribute (attribute "aria-label" label)
                         ]
-                        source
-                        |> ComplexQuery.andThen (ComplexQuery.simulate event)
+                        >> ComplexQuery.simulate event
                   )
                 ]
     in
-    simulateComplexQuery functionDescription <|
-        \source ->
-            ComplexQuery.exactlyOneOf
-                ("Expected one of the following to exist and have an " ++ String.Extra.escape ("on" ++ Tuple.first event) ++ " handler")
-                (checks source)
+    simulateComplexQuery functionDescription
+        (ComplexQuery.exactlyOneOf
+            ("Expected one of the following to exist and have an " ++ String.Extra.escape ("on" ++ Tuple.first event) ++ " handler")
+            checks
+        )
 
 
 {-| TODO: have other internal functions use this to have more consistent error message.
 -}
-simulateComplexQuery : String -> (Query.Single msg -> ComplexQuery msg msg) -> ProgramTest model msg effect -> ProgramTest model msg effect
+simulateComplexQuery : String -> (ComplexQuery (Query.Single msg) -> ComplexQuery msg) -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateComplexQuery functionName complexQuery =
     andThen <|
         \program state ->
@@ -764,15 +763,15 @@ simulateComplexQuery functionName complexQuery =
                 view =
                     Program.renderView program state.currentModel
             in
-            case ComplexQuery.run (complexQuery view) of
-                Ok msg ->
+            case ComplexQuery.run (complexQuery (ComplexQuery.succeed view)) of
+                ( _, Ok msg ) ->
                     TestState.update msg program state
 
-                Err queryFailure ->
-                    Err (ViewAssertionFailed functionName (Html.map (\_ -> ()) (program.view state.currentModel)) queryFailure)
+                ( highlight, Err queryFailure ) ->
+                    Err (ViewAssertionFailed ("ProgramTest." ++ functionName) (Html.map (\_ -> ()) (program.view state.currentModel)) highlight queryFailure)
 
 
-assertComplexQuery : String -> (Query.Single msg -> ComplexQuery msg ()) -> ProgramTest model msg effect -> ProgramTest model msg effect
+assertComplexQuery : String -> (ComplexQuery (Query.Single msg) -> ComplexQuery ignored) -> ProgramTest model msg effect -> ProgramTest model msg effect
 assertComplexQuery functionName complexQuery =
     andThen <|
         \program state ->
@@ -780,12 +779,12 @@ assertComplexQuery functionName complexQuery =
                 view =
                     Program.renderView program state.currentModel
             in
-            case ComplexQuery.run (complexQuery view) of
-                Ok () ->
+            case ComplexQuery.run (complexQuery (ComplexQuery.succeed view)) of
+                ( _, Ok _ ) ->
                     Ok state
 
-                Err queryFailure ->
-                    Err (ViewAssertionFailed functionName (Html.map (\_ -> ()) (program.view state.currentModel)) queryFailure)
+                ( highlight, Err queryFailure ) ->
+                    Err (ViewAssertionFailed ("ProgramTest." ++ functionName) (Html.map (\_ -> ()) (program.view state.currentModel)) highlight queryFailure)
 
 
 {-| Simulates a custom DOM event.
@@ -821,53 +820,59 @@ clickButton buttonText =
         functionDescription =
             "clickButton " ++ String.Extra.escape buttonText
 
-        checks : Query.Single msg -> List ( String, ComplexQuery msg msg )
-        checks source =
-            [ ( "<button> (not disabled) with onClick and text " ++ String.Extra.escape buttonText
-              , findNotDisabled Nothing
+        checks : List ( String, ComplexQuery (Query.Single msg) -> ComplexQuery msg )
+        checks =
+            [ ( "<button> with text"
+              , findNotDisabled (Just "find button")
+                    [ "button" ]
+                    Nothing
                     [ Selector.tag "button"
                     , Selector.containing [ Selector.text buttonText ]
                     ]
-                    source
-                    |> ComplexQuery.andThen (ComplexQuery.simulate Test.Html.Event.click)
+                    >> ComplexQuery.simulate Test.Html.Event.click
               )
-            , ( "<button> (not disabled) with onClick containing an <img> with alt=" ++ String.Extra.escape buttonText
-              , findNotDisabled Nothing
+            , ( "<button> with <img> with alt text"
+              , findNotDisabled (Just "find button")
+                    [ "button" ]
+                    Nothing
                     [ Selector.tag "button"
                     , Selector.containing
                         [ Selector.tag "img"
                         , Selector.attribute (Html.Attributes.alt buttonText)
                         ]
                     ]
-                    source
-                    |> ComplexQuery.andThen (ComplexQuery.simulate Test.Html.Event.click)
+                    >> ComplexQuery.simulate Test.Html.Event.click
               )
-            , ( "<button> (not disabled) with onClick and attribute aria-label=" ++ String.Extra.escape buttonText
-              , findNotDisabled Nothing
+            , ( "<button> with aria-label"
+              , findNotDisabled (Just "find button")
+                    [ "button" ]
+                    Nothing
                     [ Selector.tag "button"
                     , Selector.attribute (Html.Attributes.attribute "aria-label" buttonText)
                     ]
-                    source
-                    |> ComplexQuery.andThen (ComplexQuery.simulate Test.Html.Event.click)
+                    >> ComplexQuery.simulate Test.Html.Event.click
               )
-            , ( "an element with role=\"button\" (not disabled) and onClick and text " ++ String.Extra.escape buttonText
-              , findNotDisabled (Just [ Selector.tag "button" ])
+            , ( "any element with role=\"button\" and text"
+              , findNotDisabled (Just "find button")
+                    [ "button" ]
+                    (Just [ Selector.tag "button" ])
                     [ Selector.attribute (Html.Attributes.attribute "role" "button")
                     , Selector.containing [ Selector.text buttonText ]
                     ]
-                    source
-                    |> ComplexQuery.andThen (ComplexQuery.simulate Test.Html.Event.click)
+                    >> ComplexQuery.simulate Test.Html.Event.click
               )
-            , ( "an element with role=\"button\" (not disabled) and onClick and aria-label=" ++ String.Extra.escape buttonText
-              , findNotDisabled (Just [ Selector.tag "button" ])
+            , ( "any element with role=\"button\" and aria-label"
+              , findNotDisabled (Just "find button")
+                    [ "button" ]
+                    (Just [ Selector.tag "button" ])
                     [ Selector.attribute (Html.Attributes.attribute "role" "button")
                     , Selector.attribute (Html.Attributes.attribute "aria-label" buttonText)
                     ]
-                    source
-                    |> ComplexQuery.andThen (ComplexQuery.simulate Test.Html.Event.click)
+                    >> ComplexQuery.simulate Test.Html.Event.click
               )
-            , ( "a <form> with onSubmit containing a <button> (not disabled, not type=button) with text " ++ String.Extra.escape buttonText
-              , ComplexQuery.findButNot
+            , ( "<form> with submit <button> with text"
+              , ComplexQuery.findButNot (Just "find form")
+                    [ "form" ]
                     { good =
                         [ Selector.tag "form"
                         , Selector.containing
@@ -901,11 +906,11 @@ clickButton buttonText =
                             ]
                         ]
                     }
-                    source
-                    |> ComplexQuery.andThen (ComplexQuery.simulate Test.Html.Event.submit)
+                    >> ComplexQuery.simulate Test.Html.Event.submit
               )
-            , ( "a <form> with onSubmit containing an <input type=submit value=" ++ String.Extra.escape buttonText ++ "> (not disabled)"
-              , ComplexQuery.findButNot
+            , ( "<form> with submit <input> with value"
+              , ComplexQuery.findButNot (Just "find form")
+                    [ "form" ]
                     { good =
                         [ Selector.tag "form"
                         , Selector.containing
@@ -934,22 +939,21 @@ clickButton buttonText =
                             ]
                         ]
                     }
-                    source
-                    |> ComplexQuery.andThen (ComplexQuery.simulate Test.Html.Event.submit)
+                    >> ComplexQuery.simulate Test.Html.Event.submit
               )
             ]
     in
-    simulateComplexQuery functionDescription <|
-        \source ->
-            ComplexQuery.exactlyOneOf "Expected one of the following to exist" (checks source)
+    simulateComplexQuery functionDescription
+        (ComplexQuery.exactlyOneOf "Expected one of the following to exist" checks)
 
 
-findNotDisabled : Maybe (List Selector) -> List Selector -> Query.Single msg -> ComplexQuery msg (Query.Single msg)
-findNotDisabled additionalBad selectors =
+findNotDisabled : Maybe String -> List String -> Maybe (List Selector) -> List Selector -> ComplexQuery (Query.Single msg) -> ComplexQuery (Query.Single msg)
+findNotDisabled description highlight additionalBad selectors =
     -- This is tricky because Test.Html doesn't provide a way to search for an attribute being *not* present.
     -- So we have to check if "disabled=True" *is* present, and manually force a failure if it is.
     -- (We can't just search for "disabled=False" because we need to allow elements that don't specify "disabled" at all.)
-    ComplexQuery.findButNot
+    ComplexQuery.findButNot description
+        highlight
         { good = selectors
         , bads =
             List.filterMap identity
@@ -1071,10 +1075,7 @@ clickLink linkText href programTest =
     in
     programTest
         |> assertComplexQuery functionDescription
-            (\source ->
-                ComplexQuery.find findLinkTag source
-                    |> ComplexQuery.map (\_ -> ())
-            )
+            (ComplexQuery.find Nothing [ "a" ] findLinkTag)
         |> tryClicking { otherwise = \_ -> TestState.simulateLoadUrlHelper functionDescription href >> Err }
 
 
@@ -1149,8 +1150,8 @@ see [`simulateDomEvent`](#simulateDomEvent).
 fillInTextarea : String -> ProgramTest model msg effect -> ProgramTest model msg effect
 fillInTextarea newContent =
     simulateComplexQuery "fillInTextarea" <|
-        (ComplexQuery.find [ Selector.tag "textarea" ]
-            >> ComplexQuery.andThen (ComplexQuery.simulate (Test.Html.Event.input newContent))
+        (ComplexQuery.find Nothing [ "textarea" ] [ Selector.tag "textarea" ]
+            >> ComplexQuery.simulate (Test.Html.Event.input newContent)
         )
 
 
@@ -1245,46 +1246,40 @@ selectOption fieldId label optionValue optionText =
                 ]
     in
     simulateComplexQuery functionDescription <|
-        \source ->
-            ComplexQuery.find
+        ComplexQuery.check
+            "check label exists"
+            (ComplexQuery.find Nothing
+                [ "label" ]
                 [ Selector.tag "label"
                 , Selector.attribute (Html.Attributes.for fieldId)
                 , Selector.text label
                 ]
-                source
-                |> ComplexQuery.andThen
-                    (\_ ->
-                        ComplexQuery.find
-                            [ Selector.tag "select"
-                            , Selector.id fieldId
-                            , Selector.containing
-                                [ Selector.tag "option"
-                                , Selector.attribute (Html.Attributes.value optionValue)
-                                , Selector.text optionText
-                                ]
-                            ]
-                            source
-                    )
-                |> ComplexQuery.andThen
-                    (\_ ->
-                        ComplexQuery.find
-                            [ Selector.tag "select"
-                            , Selector.id fieldId
-                            ]
-                            source
-                    )
-                |> ComplexQuery.andThen
-                    (ComplexQuery.simulate
-                        ( "change"
-                        , Json.Encode.object
-                            [ ( "target"
-                              , Json.Encode.object
-                                    [ ( "value", Json.Encode.string optionValue )
-                                    ]
-                              )
+            )
+            >> (ComplexQuery.find (Just "find select")
+                    [ "select" ]
+                    [ Selector.tag "select"
+                    , Selector.id fieldId
+                    ]
+                    >> ComplexQuery.check
+                        "check option exists"
+                        (ComplexQuery.find Nothing
+                            [ "option" ]
+                            [ Selector.tag "option"
+                            , Selector.attribute (Html.Attributes.value optionValue)
+                            , Selector.text optionText
                             ]
                         )
-                    )
+               )
+            >> ComplexQuery.simulate
+                ( "change"
+                , Json.Encode.object
+                    [ ( "target"
+                      , Json.Encode.object
+                            [ ( "value", Json.Encode.string optionValue )
+                            ]
+                      )
+                    ]
+                )
 
 
 {-| Focus on a part of the view for a particular operation.

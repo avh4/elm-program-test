@@ -6,7 +6,7 @@ import Html.Attributes exposing (for, id, value)
 import Html.Events exposing (on)
 import ProgramTest exposing (ProgramTest)
 import Test exposing (..)
-import Test.Runner
+import Test.Expect exposing (expectFailure)
 
 
 start : ProgramTest String String ()
@@ -50,17 +50,114 @@ all =
                 start
                     |> ProgramTest.selectOption "pet-select" "Choose a pet" "hamster-value" "Hamster"
                     |> ProgramTest.expectModel (Expect.equal "<INIT>;hamster-value")
+        , test "error message when option doesn't exist" <|
+            \() ->
+                start
+                    |> ProgramTest.selectOption "name-select" "Choose a name" "gean-value" "Gean"
+                    |> ProgramTest.done
+                    |> expectFailure
+                        [ """▼ Query.fromHtml"""
+                        , """"""
+                        , """    <div>"""
+                        , """        <label for="pet-select">"""
+                        , """            Choose a pet"""
+                        , """        </label>"""
+                        , """        <select id="pet-select">"""
+                        , """            <option value="dog-value">"""
+                        , """                Dog"""
+                        , """            </option>"""
+                        , """            <option value="cat-value">"""
+                        , """                Cat"""
+                        , """            </option>"""
+                        , """            <option value="hamster-value">"""
+                        , """                Hamster"""
+                        , """            </option>"""
+                        , """            <option>"""
+                        , """                Tegu"""
+                        , """            </option>"""
+                        , """        </select>"""
+                        , """        <label for="name-select">"""
+                        , """            Choose a name"""
+                        , """        </label>"""
+                        , """        <select id="name-select">"""
+                        , """            <option value="hamster-value">"""
+                        , """                Hamster"""
+                        , """            </option>"""
+                        , """            <option value="george-value">"""
+                        , """                George"""
+                        , """            </option>"""
+                        , """        </select>"""
+                        , """    </div>"""
+                        , """"""
+                        , """"""
+                        , """▼ ProgramTest.selectOption "name-select" "Choose a name" "gean-value" "Gean\""""
+                        , """"""
+                        , """✓ check label exists:"""
+                        , """  ✓ has tag "label\""""
+                        , """  ✓ has attribute "htmlFor" "name-select\""""
+                        , """  ✓ has text "Choose a name\""""
+                        , """✓ find select:"""
+                        , """  ✓ has tag "select\""""
+                        , """  ✓ has attribute "id" "name-select\""""
+                        , """✗ check option exists:"""
+                        , """  ✓ has tag "option\""""
+                        , """  ✗ has attribute "value" "gean-value\""""
+                        ]
         , test "fails if there is no onChange handler" <|
             \() ->
                 start
                     |> ProgramTest.selectOption "name-select" "Choose a name" "george-value" "George"
                     |> ProgramTest.done
-                    |> Test.Runner.getFailureReason
-                    |> Maybe.map .description
-                    |> Maybe.withDefault "<Expected selectOption to fail, but it succeeded>"
-                    |> Expect.all
-                        [ expectContains "selectOption"
-                        , expectContains "it does not listen for \"change\" events like I expected it would."
+                    |> expectFailure
+                        [ """▼ Query.fromHtml"""
+                        , """"""
+                        , """    <div>"""
+                        , """        <label for="pet-select">"""
+                        , """            Choose a pet"""
+                        , """        </label>"""
+                        , """        <select id="pet-select">"""
+                        , """            <option value="dog-value">"""
+                        , """                Dog"""
+                        , """            </option>"""
+                        , """            <option value="cat-value">"""
+                        , """                Cat"""
+                        , """            </option>"""
+                        , """            <option value="hamster-value">"""
+                        , """                Hamster"""
+                        , """            </option>"""
+                        , """            <option>"""
+                        , """                Tegu"""
+                        , """            </option>"""
+                        , """        </select>"""
+                        , """        <label for="name-select">"""
+                        , """            Choose a name"""
+                        , """        </label>"""
+                        , """        <select id="name-select">"""
+                        , """            <option value="hamster-value">"""
+                        , """                Hamster"""
+                        , """            </option>"""
+                        , """            <option value="george-value">"""
+                        , """                George"""
+                        , """            </option>"""
+                        , """        </select>"""
+                        , """    </div>"""
+                        , """"""
+                        , """"""
+                        , """▼ ProgramTest.selectOption "name-select" "Choose a name" "george-value" "George\""""
+                        , """"""
+                        , """✓ check label exists:"""
+                        , """  ✓ has tag "label\""""
+                        , """  ✓ has attribute "htmlFor" "name-select\""""
+                        , """  ✓ has text "Choose a name\""""
+                        , """✓ find select:"""
+                        , """  ✓ has tag "select\""""
+                        , """  ✓ has attribute "id" "name-select\""""
+                        , """✓ check option exists:"""
+                        , """  ✓ has tag "option\""""
+                        , """  ✓ has attribute "value" "george-value\""""
+                        , """  ✓ has text "George\""""
+                        , """✗ simulate change:"""
+                        , """  ✗ Event.expectEvent: I found a node, but it does not listen for "change" events like I expected it would."""
                         ]
         ]
 
