@@ -4,7 +4,6 @@ import Expect
 import Html
 import Html.Attributes as HtmlA
 import ProgramTest.ComplexQuery as ComplexQuery exposing (Failure(..))
-import ProgramTest.TestHtmlHacks exposing (FailureReason(..))
 import Set
 import Test exposing (..)
 import Test.Html.Query as Query
@@ -48,11 +47,9 @@ all =
                             , Err
                                 ( []
                                 , QueryFailed
-                                    (SelectorsFailed
-                                        [ Ok "has tag \"form\""
-                                        , Err "has attribute \"id\" \"formX\""
-                                        ]
-                                    )
+                                    [ Ok "has tag \"form\""
+                                    , Err "has attribute \"id\" \"formX\""
+                                    ]
                                 )
                             )
             ]
@@ -72,11 +69,9 @@ all =
                             , Err
                                 ( [ Description (Err "expected bad") ]
                                 , QueryFailed
-                                    (SelectorsFailed
-                                        [ Ok "has tag \"form\""
-                                        , Err "has attribute \"id\" \"form<notA>\""
-                                        ]
-                                    )
+                                    [ Ok "has tag \"form\""
+                                    , Err "has attribute \"id\" \"form<notA>\""
+                                    ]
                                 )
                             )
             ]
@@ -101,11 +96,9 @@ all =
                                   , Description (Err "expected to fail")
                                   ]
                                 , QueryFailed
-                                    (SelectorsFailed
-                                        [ Ok "has tag \"button\""
-                                        , Err "has attribute \"id\" \"buttonX\""
-                                        ]
-                                    )
+                                    [ Ok "has tag \"button\""
+                                    , Err "has attribute \"id\" \"buttonX\""
+                                    ]
                                 )
                             )
             , test "failing after a check should include the check success" <|
@@ -128,10 +121,8 @@ all =
                                   , Description (Err "expected to fail")
                                   ]
                                 , QueryFailed
-                                    (SelectorsFailed
-                                        [ Err "has tag \"nope\""
-                                        ]
-                                    )
+                                    [ Err "has tag \"nope\""
+                                    ]
                                 )
                             )
             , test "multiple checks should not duplicate context information" <|
@@ -160,10 +151,8 @@ all =
                                   , Description (Err "expected to fail")
                                   ]
                                 , QueryFailed
-                                    (SelectorsFailed
-                                        [ Err "has tag \"nope\""
-                                        ]
-                                    )
+                                    [ Err "has tag \"nope\""
+                                    ]
                                 )
                             )
             ]

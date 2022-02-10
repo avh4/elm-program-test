@@ -1,8 +1,8 @@
 module ProgramTest.ComplexQuery exposing (ComplexQuery, Failure(..), FailureContext, FailureContext1(..), Highlight, Priority, check, exactlyOneOf, find, findButNot, run, simulate, succeed)
 
-import Expect exposing (Expectation)
 import Json.Encode as Json
 import ProgramTest.TestHtmlHacks as TestHtmlHacks
+import ProgramTest.TestHtmlParser as TestHtmlParser
 import Set exposing (Set)
 import Test.Html.Event
 import Test.Html.Query as Query
@@ -35,7 +35,7 @@ initState =
 
 
 type Failure
-    = QueryFailed TestHtmlHacks.FailureReason
+    = QueryFailed (List (Result String String))
     | SimulateFailed String
     | NoMatches String (List ( String, Priority, ( List FailureContext1, Failure ) ))
     | TooManyMatches String (List ( String, Priority, List FailureContext1 ))
@@ -79,8 +79,8 @@ find description highlight selectors prev =
                     let
                         error =
                             firstErrorOf source
-                                [ Query.has selectors
-                                , Query.has [ Selector.all selectors ]
+                                [ selectors
+                                , [ Selector.all selectors ]
                                 ]
 
                         context =
@@ -239,10 +239,10 @@ findButNot description highlight { good, bads, onError } prev =
                                     let
                                         error =
                                             firstErrorOf source
-                                                [ Query.has good
-                                                , Query.has [ Selector.all good ]
-                                                , Query.has onError
-                                                , Query.has [ Selector.all onError ]
+                                                [ good
+                                                , [ Selector.all good ]
+                                                , onError
+                                                , [ Selector.all onError ]
                                                 ]
                                     in
                                     QueryResult
@@ -264,8 +264,8 @@ findButNot description highlight { good, bads, onError } prev =
                     let
                         error =
                             firstErrorOf source
-                                [ Query.has good
-                                , Query.has [ Selector.all good ]
+                                [ good
+                                , [ Selector.all good ]
                                 ]
                     in
                     QueryResult
@@ -331,29 +331,32 @@ check description checkQuery prev =
                         (Ok source)
 
 
-firstErrorOf : Query.Single msg -> List (Query.Single msg -> Expectation) -> TestHtmlHacks.FailureReason
+firstErrorOf : Query.Single msg -> List (List Selector) -> List (Result String String)
 firstErrorOf source choices =
     case choices of
         [] ->
-            TestHtmlHacks.parseFailureReason "PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: firstErrorOf: asked to report an error but none of the choices failed"
+            [ Err "PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: firstErrorOf: asked to report an error but none of the choices failed" ]
 
         next :: rest ->
-            case Test.Runner.getFailureReason (next source) of
+            case Test.Runner.getFailureReason (Query.has next source) of
                 Just reason ->
-                    TestHtmlHacks.parseFailureReason reason.description
+                    case TestHtmlHacks.parseFailureReport reason.description of
+                        Ok (TestHtmlParser.QueryFailure _ _ (TestHtmlParser.Has _ results)) ->
+                            results
+
+                        Ok (TestHtmlParser.EventFailure name _) ->
+                            [ Err ("PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: firstErrorOf: got unexpected EventFailure \"" ++ name ++ "\"") ]
+
+                        Err err ->
+                            [ Err ("PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: firstErrorOf: couldn't parse failure report: " ++ err) ]
 
                 Nothing ->
                     firstErrorOf source rest
 
 
-countSuccesses : TestHtmlHacks.FailureReason -> Int
-countSuccesses failureReason =
-    case failureReason of
-        TestHtmlHacks.Simple string ->
-            0
-
-        TestHtmlHacks.SelectorsFailed results ->
-            List.length (List.filter isOk results)
+countSuccesses : List (Result String String) -> Int
+countSuccesses results =
+    List.length (List.filter isOk results)
 
 
 isOk : Result x a -> Bool
