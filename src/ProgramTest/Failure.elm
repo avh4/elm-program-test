@@ -218,7 +218,7 @@ renderQueryFailure indent color failure =
     in
     case failure of
         QueryFailed failureReason ->
-            renderTestHtmlFailureReason indent (colorsFor color) failureReason
+            renderSelectorResults indent (colorsFor color) failureReason
 
         ComplexQuery.SimulateFailed string ->
             let
@@ -258,20 +258,6 @@ renderQueryFailure indent color failure =
                       , "the view that contains only one of the matches."
                       ]
                     ]
-
-
-renderTestHtmlFailureReason : Int -> Colors -> TestHtmlHacks.FailureReason -> String
-renderTestHtmlFailureReason indent colors failureReason =
-    let
-        indentS =
-            String.repeat indent " "
-    in
-    case failureReason of
-        TestHtmlHacks.Simple string ->
-            indentS ++ string
-
-        TestHtmlHacks.SelectorsFailed results ->
-            renderSelectorResults indent colors results
 
 
 renderSelectorResults : Int -> Colors -> List (Result String String) -> String

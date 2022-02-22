@@ -1,4 +1,4 @@
-module ProgramTest.HtmlParserHacks exposing (parse)
+module ProgramTest.HtmlParserHacks exposing (parse, trimText)
 
 import Html.Parser
 import Parser
@@ -39,3 +39,20 @@ fixError errs input =
 
                 _ ->
                     fixError rest input
+
+
+trimText : Html.Parser.Node -> Html.Parser.Node
+trimText node =
+    case node of
+        Html.Parser.Text string ->
+            Html.Parser.Text (String.trim string)
+
+        Html.Parser.Element string list nodes ->
+            Html.Parser.Element string
+                list
+                (List.map trimText nodes
+                    |> List.filter ((/=) (Html.Parser.Text ""))
+                )
+
+        Html.Parser.Comment string ->
+            Html.Parser.Comment string

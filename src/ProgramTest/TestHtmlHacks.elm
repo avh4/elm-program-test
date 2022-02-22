@@ -1,9 +1,11 @@
-module ProgramTest.TestHtmlHacks exposing (FailureReason(..), getPassingSelectors, parseFailureReason, parseSimulateFailure, renderHtml)
+module ProgramTest.TestHtmlHacks exposing (getPassingSelectors, parseFailureReport, parseSimulateFailure, renderHtml)
 
 import Html.Parser
+import Parser
+import Parser.Extra
 import ProgramTest.HtmlHighlighter as HtmlHighlighter
-import ProgramTest.HtmlParserHacks as HtmlParserHacks
 import ProgramTest.HtmlRenderer as HtmlRenderer
+import ProgramTest.TestHtmlParser as TestHtmlParser exposing (Assertion(..), FailureReport(..))
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector exposing (Selector)
 import Test.Runner
@@ -16,39 +18,34 @@ pleaseReport description =
 renderHtml : (String -> String) -> (String -> List Html.Parser.Attribute -> List Html.Parser.Node -> Bool) -> Query.Single any -> String
 renderHtml colorHidden highlightPredicate single =
     case forceFailureReport [] single of
-        ( "▼ Query.fromHtml", UnparsedSection a ) :: _ ->
-            "▼ Query.fromHtml\n\n" ++ a
-
-        ( "▼ Query.fromHtml", HtmlSection nodes ) :: _ ->
+        Ok (QueryFailure node _ _) ->
             let
                 tryHighlight =
-                    List.map
-                        (HtmlHighlighter.highlight highlightPredicate)
-                        nodes
+                    HtmlHighlighter.highlight highlightPredicate
+                        node
 
                 finalHighlighted =
-                    if List.any HtmlHighlighter.isNonHiddenElement tryHighlight then
+                    if HtmlHighlighter.isNonHiddenElement tryHighlight then
                         tryHighlight
 
                     else
-                        List.map
-                            (HtmlHighlighter.highlight (\_ _ _ -> True))
-                            nodes
+                        HtmlHighlighter.highlight (\_ _ _ -> True)
+                            node
             in
             "▼ Query.fromHtml\n\n"
-                ++ HtmlRenderer.render colorHidden 4 finalHighlighted
+                ++ HtmlRenderer.render colorHidden 4 [ finalHighlighted ]
 
-        ( first, _ ) :: _ ->
-            pleaseReport ("unexpected failure report" ++ first)
+        Ok (EventFailure name _) ->
+            pleaseReport ("renderHtml: unexpected EventFailure: \"" ++ name ++ "\"")
 
-        [] ->
-            pleaseReport "renderHtml: empty failure report"
+        Err err ->
+            pleaseReport ("renderHtml: couldn't parse failure report: " ++ err)
 
 
 getPassingSelectors : List Selector -> Query.Single msg -> List String
 getPassingSelectors selectors single =
-    case List.reverse (forceFailureReport selectors single) of
-        ( _, FailureSection (SelectorsFailed results) ) :: _ ->
+    case forceFailureReport selectors single of
+        Ok (QueryFailure _ _ (Has _ results)) ->
             case List.reverse results of
                 (Ok _) :: _ ->
                     [ pleaseReport "getPassingSelectors: forced selector didn't fail" ]
@@ -56,19 +53,19 @@ getPassingSelectors selectors single =
                 _ ->
                     List.filterMap Result.toMaybe results
 
-        ( _, FailureSection _ ) :: _ ->
-            [ pleaseReport "getPassingSelectors: failure section didn't have selectors" ]
+        Ok (EventFailure name _) ->
+            [ pleaseReport ("getPassingSelectors: got unexpected EventFailure \"" ++ name ++ "\"") ]
 
-        _ ->
-            [ pleaseReport "getPassingSelectors: no failure section" ]
+        Err err ->
+            [ pleaseReport ("getPassingSelectors: couldn't parse failure report: " ++ err) ]
 
 
-forceFailureReport : List Selector -> Query.Single any -> List ( String, Section )
+forceFailureReport : List Selector -> Query.Single any -> Result String FailureReport
 forceFailureReport selectors =
     forceFailureReport_ selectors "ProgramTest.TestHtmlHacks is trying to force a failure to collect the error message %%"
 
 
-forceFailureReport_ : List Selector -> String -> Query.Single any -> List ( String, Section )
+forceFailureReport_ : List Selector -> String -> Query.Single any -> Result String FailureReport
 forceFailureReport_ selectors unique single =
     case
         single
@@ -83,16 +80,10 @@ forceFailureReport_ selectors unique single =
             parseFailureReport reason.description
 
 
-parseFailureReport : String -> List ( String, Section )
+parseFailureReport : String -> Result String FailureReport
 parseFailureReport string =
-    String.lines string
-        |> partitionSections
-        |> List.map parseNamedSection
-
-
-partitionSections : List String -> List (List String)
-partitionSections lines =
-    partitionSections_ [] [] lines
+    Parser.run TestHtmlParser.parser string
+        |> Result.mapError Parser.Extra.deadEndsToString
 
 
 partitionSections_ : List String -> List (List String) -> List String -> List (List String)
@@ -114,74 +105,17 @@ partitionSections_ accLines accSections remaining =
                 partitionSections_ (next :: accLines) accSections rest
 
 
-parseNamedSection : List String -> ( String, Section )
-parseNamedSection lines =
-    case lines of
-        [] ->
-            ( pleaseReport "empty section", UnparsedSection (pleaseReport "empty section") )
-
-        first :: "" :: rest ->
-            ( first, parseSection rest )
-
-        _ ->
-            ( pleaseReport "parseNamedSection _", UnparsedSection (String.join "\n" lines) )
-
-
-type Section
-    = UnparsedSection String
-    | HtmlSection (List Html.Parser.Node)
-    | FailureSection FailureReason
-
-
-parseSection : List String -> Section
-parseSection lines =
-    case List.filterMap parseSelectorResult lines of
-        [] ->
-            case HtmlParserHacks.parse (String.join "\n" lines) of
-                Ok node ->
-                    HtmlSection node
-
-                Err err ->
-                    UnparsedSection (String.join "\n" lines)
-
-        some ->
-            FailureSection (SelectorsFailed some)
-
-
-type FailureReason
-    = Simple String
-    | SelectorsFailed (List (Result String String))
-
-
-parseFailureReason : String -> FailureReason
-parseFailureReason string =
-    let
-        lines =
-            String.lines string
-    in
-    case List.filterMap parseSelectorResult lines of
-        [] ->
-            Simple (pleaseReport "Got a failure message from Test.Html.Query that we couldn't parse: " ++ string)
-
-        some ->
-            SelectorsFailed some
-
-
-parseSelectorResult : String -> Maybe (Result String String)
-parseSelectorResult string =
-    case String.left 2 string of
-        "✓ " ->
-            Just (Ok (String.trimRight (String.dropLeft 2 string)))
-
-        "✗ " ->
-            Just (Err (String.trimRight (String.dropLeft 2 string)))
-
-        _ ->
-            Nothing
-
-
 parseSimulateFailure : String -> String
 parseSimulateFailure string =
-    String.lines string
-        |> List.head
-        |> Maybe.withDefault string
+    let
+        simpleFailure result =
+            case result of
+                EventFailure name html ->
+                    Ok ("Event.expectEvent: I found a node, but it does not listen for \"" ++ name ++ "\" events like I expected it would.")
+
+                _ ->
+                    Err (pleaseReport "Got a failure message from Test.Html.Query that we couldn't parse: " ++ string)
+    in
+    parseFailureReport string
+        |> Result.andThen simpleFailure
+        |> Result.withDefault (pleaseReport "Got a failure message from Test.Html.Query that we couldn't parse: " ++ string)
