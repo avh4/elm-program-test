@@ -4,7 +4,7 @@
 - Commit changes
 - `git tag -a <new version> -m "new release"`
 - `git push origin <new version>`
-- run CI: `./ci/run-in-docker.sh https://github.com/avh4/elm-program-test.git <new version>`
+- wait for CI to pass: <https://github.com/avh4/elm-program-test/actions>
 - if everything succeeds, `npx elm publish`
 - `git push -u origin HEAD`
 - create a new PR for the release branch, and merge it
