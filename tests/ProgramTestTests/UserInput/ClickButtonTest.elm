@@ -236,4 +236,20 @@ all =
                         , "If that's what you intended, use `ProgramTest.within` to focus in on a portion of"
                         , "the view that contains only one of the matches."
                         ]
+        , -- https://github.com/avh4/elm-program-test/issues/149
+          test "finds role='button' span when another button is also present" <|
+            \() ->
+                TestingProgram.startView
+                    (Html.span []
+                        [ Html.span
+                            [ Html.Attributes.attribute "role" "button"
+                            , Html.Events.onClick (Log "CLICK")
+                            , Html.Attributes.disabled False
+                            ]
+                            [ Html.map never (Html.text "Clickable element") ]
+                        , Html.button [] [ Html.text "Panda" ]
+                        ]
+                    )
+                    |> ProgramTest.clickButton "Clickable element"
+                    |> ProgramTest.done
         ]

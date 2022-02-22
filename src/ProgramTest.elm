@@ -855,7 +855,13 @@ clickButton buttonText =
             , ( "any element with role=\"button\" and text"
               , findNotDisabled (Just "find button")
                     [ "button" ]
-                    (Just [ Selector.tag "button" ])
+                    (Just
+                        [ Selector.all
+                            [ Selector.tag "button"
+                            , Selector.attribute (Html.Attributes.attribute "role" "button")
+                            ]
+                        ]
+                    )
                     [ Selector.attribute (Html.Attributes.attribute "role" "button")
                     , Selector.containing [ Selector.text buttonText ]
                     ]
@@ -864,7 +870,13 @@ clickButton buttonText =
             , ( "any element with role=\"button\" and aria-label"
               , findNotDisabled (Just "find button")
                     [ "button" ]
-                    (Just [ Selector.tag "button" ])
+                    (Just
+                        [ Selector.all
+                            [ Selector.tag "button"
+                            , Selector.attribute (Html.Attributes.attribute "role" "button")
+                            ]
+                        ]
+                    )
                     [ Selector.attribute (Html.Attributes.attribute "role" "button")
                     , Selector.attribute (Html.Attributes.attribute "aria-label" buttonText)
                     ]

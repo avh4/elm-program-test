@@ -10,6 +10,7 @@ New features:
 Bug fixes:
 
   - Using `ensureViewHasNot` inside of `within` no longer passes when `within` fails to find its target.
+  - `clickButton` works correctly with `role=button` elements when there are other `<button>` elements in view.
 
 
 ## 3.6.1
