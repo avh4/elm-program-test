@@ -236,23 +236,14 @@ all =
                         , "If that's what you intended, use `ProgramTest.within` to focus in on a portion of"
                         , "the view that contains only one of the matches."
                         ]
-        , issue144
-        ]
-
-
-issue144 : Test
-issue144 =
-    describe "regression test for #144"
-        [ test "finds role='button' span when another button is also present" <|
+        , -- https://github.com/avh4/elm-program-test/issues/149
+          test "finds role='button' span when another button is also present" <|
             \() ->
                 TestingProgram.startView
                     (Html.span []
                         [ Html.span
-                            [ -- not including tabindex or other necessary attributes for test simplicity
-                              Html.Attributes.attribute "role" "button"
+                            [ Html.Attributes.attribute "role" "button"
                             , Html.Events.onClick (Log "CLICK")
-
-                            -- Comment the following line in order to get a slighlty different failure:
                             , Html.Attributes.disabled False
                             ]
                             [ Html.map never (Html.text "Clickable element") ]
