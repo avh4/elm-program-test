@@ -1,3 +1,18 @@
+## 3.6.2
+
+New features:
+
+  - Functions to simulate DOM events display errors more nicely:
+    - Extra junk like "`✗ has text "HTML expected by the call to: ..."`" has been removed
+    - All passing steps of a query up to the failure will be displayed
+  - Failure messages simplify the HTML to show only what's relevant to the failure
+
+Bug fixes:
+
+  - Using `ensureViewHasNot` inside of `within` no longer passes when `within` fails to find its target.
+  - `clickButton` works correctly with `role=button` elements when there are other `<button>` elements in view.
+
+
 ## 3.6.1
 
 New features:

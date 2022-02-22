@@ -1,40 +1,121 @@
-module ProgramTest.TestHtmlHacks exposing (FailureReason(..), parseFailureReason, parseSimulateFailure)
+module ProgramTest.TestHtmlHacks exposing (getPassingSelectors, parseFailureReport, parseSimulateFailure, renderHtml)
+
+import Html.Parser
+import Parser
+import Parser.Extra
+import ProgramTest.HtmlHighlighter as HtmlHighlighter
+import ProgramTest.HtmlRenderer as HtmlRenderer
+import ProgramTest.TestHtmlParser as TestHtmlParser exposing (Assertion(..), FailureReport(..))
+import Test.Html.Query as Query
+import Test.Html.Selector as Selector exposing (Selector)
+import Test.Runner
 
 
-type FailureReason
-    = Simple String
-    | SelectorsFailed (List (Result String String))
+pleaseReport description =
+    "PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: " ++ description
 
 
-parseFailureReason : String -> FailureReason
-parseFailureReason string =
-    let
-        lines =
-            String.lines string
-    in
-    case List.filterMap parseSelectorResult lines of
+renderHtml : (String -> String) -> (String -> List Html.Parser.Attribute -> List Html.Parser.Node -> Bool) -> Query.Single any -> String
+renderHtml colorHidden highlightPredicate single =
+    case forceFailureReport [] single of
+        Ok (QueryFailure node _ _) ->
+            let
+                tryHighlight =
+                    HtmlHighlighter.highlight highlightPredicate
+                        node
+
+                finalHighlighted =
+                    if HtmlHighlighter.isNonHiddenElement tryHighlight then
+                        tryHighlight
+
+                    else
+                        HtmlHighlighter.highlight (\_ _ _ -> True)
+                            node
+            in
+            "▼ Query.fromHtml\n\n"
+                ++ HtmlRenderer.render colorHidden 4 [ finalHighlighted ]
+
+        Ok (EventFailure name _) ->
+            pleaseReport ("renderHtml: unexpected EventFailure: \"" ++ name ++ "\"")
+
+        Err err ->
+            pleaseReport ("renderHtml: couldn't parse failure report: " ++ err)
+
+
+getPassingSelectors : List Selector -> Query.Single msg -> List String
+getPassingSelectors selectors single =
+    case forceFailureReport selectors single of
+        Ok (QueryFailure _ _ (Has _ results)) ->
+            case List.reverse results of
+                (Ok _) :: _ ->
+                    [ pleaseReport "getPassingSelectors: forced selector didn't fail" ]
+
+                _ ->
+                    List.filterMap Result.toMaybe results
+
+        Ok (EventFailure name _) ->
+            [ pleaseReport ("getPassingSelectors: got unexpected EventFailure \"" ++ name ++ "\"") ]
+
+        Err err ->
+            [ pleaseReport ("getPassingSelectors: couldn't parse failure report: " ++ err) ]
+
+
+forceFailureReport : List Selector -> Query.Single any -> Result String FailureReport
+forceFailureReport selectors =
+    forceFailureReport_ selectors "ProgramTest.TestHtmlHacks is trying to force a failure to collect the error message %%"
+
+
+forceFailureReport_ : List Selector -> String -> Query.Single any -> Result String FailureReport
+forceFailureReport_ selectors unique single =
+    case
+        single
+            |> Query.has (selectors ++ [ Selector.text unique ])
+            |> Test.Runner.getFailureReason
+    of
+        Nothing ->
+            -- We expect the fake query to fail -- if it doesn't for some reason, just try recursing with a different fake matching string until it does fail
+            forceFailureReport_ selectors (unique ++ "_") single
+
+        Just reason ->
+            parseFailureReport reason.description
+
+
+parseFailureReport : String -> Result String FailureReport
+parseFailureReport string =
+    Parser.run TestHtmlParser.parser string
+        |> Result.mapError Parser.Extra.deadEndsToString
+
+
+partitionSections_ : List String -> List (List String) -> List String -> List (List String)
+partitionSections_ accLines accSections remaining =
+    case remaining of
         [] ->
-            Simple ("PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: Got a failure message from Test.Html.Query that we couldn't parse: " ++ string)
+            case List.reverse (List.reverse accLines :: accSections) of
+                [] :: rest ->
+                    rest
 
-        some ->
-            SelectorsFailed some
+                all ->
+                    all
 
+        next :: rest ->
+            if String.startsWith "▼ " next then
+                partitionSections_ [ next ] (List.reverse accLines :: accSections) rest
 
-parseSelectorResult : String -> Maybe (Result String String)
-parseSelectorResult string =
-    case String.left 2 string of
-        "✓ " ->
-            Just (Ok (String.trimRight (String.dropLeft 2 string)))
-
-        "✗ " ->
-            Just (Err (String.trimRight (String.dropLeft 2 string)))
-
-        _ ->
-            Nothing
+            else
+                partitionSections_ (next :: accLines) accSections rest
 
 
 parseSimulateFailure : String -> String
 parseSimulateFailure string =
-    String.lines string
-        |> List.head
-        |> Maybe.withDefault string
+    let
+        simpleFailure result =
+            case result of
+                EventFailure name html ->
+                    Ok ("Event.expectEvent: I found a node, but it does not listen for \"" ++ name ++ "\" events like I expected it would.")
+
+                _ ->
+                    Err (pleaseReport "Got a failure message from Test.Html.Query that we couldn't parse: " ++ string)
+    in
+    parseFailureReport string
+        |> Result.andThen simpleFailure
+        |> Result.withDefault (pleaseReport "Got a failure message from Test.Html.Query that we couldn't parse: " ++ string)

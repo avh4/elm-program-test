@@ -1,84 +1,22 @@
-module ProgramTest.ComplexQuery exposing (ComplexQuery, Failure(..), Priority, andThen, exactlyOneOf, find, findButNot, map, run, simulate)
+module ProgramTest.ComplexQuery exposing (ComplexQuery, Failure(..), FailureContext, FailureContext1(..), Highlight, Priority, check, exactlyOneOf, find, findButNot, run, simulate, succeed)
 
-import Expect exposing (Expectation)
 import Json.Encode as Json
 import ProgramTest.TestHtmlHacks as TestHtmlHacks
+import ProgramTest.TestHtmlParser as TestHtmlParser
+import Set exposing (Set)
 import Test.Html.Event
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector exposing (Selector)
 import Test.Runner
 
 
-type ComplexQueryF msg a
-    = Find (List Selector) (Query.Single msg) (Query.Single msg -> a)
-    | FindButNot
-        { good : List Selector
-        , bads : List (List Selector)
-        , onError : List Selector
-        }
-        (Query.Single msg)
-        (Query.Single msg -> a)
-    | Simulate ( String, Json.Value ) (Query.Single msg) (msg -> a)
-    | ExactlyOneOf String (List ( String, ComplexQuery msg a ))
+type ComplexQuery a
+    = QueryResult State Highlight (List FailureContext1) (Result Failure a)
 
 
-mapF : (a -> b) -> ComplexQueryF msg a -> ComplexQueryF msg b
-mapF f complexQuery =
-    case complexQuery of
-        FindButNot config source next ->
-            FindButNot config source (next >> f)
-
-        Find selectors source next ->
-            Find selectors source (next >> f)
-
-        Simulate event target next ->
-            Simulate event target (next >> f)
-
-        ExactlyOneOf desc options ->
-            ExactlyOneOf desc (List.map (Tuple.mapSecond (map f)) options)
-
-
-find : List Selector -> Query.Single msg -> ComplexQuery msg (Query.Single msg)
-find selectors source =
-    Continue (Find selectors source Done)
-
-
-{-|
-
-  - `good`: the primary selector that must match
-  - `bads`: a list of selectors that must NOT match
-  - `onError`: the selector to use to produce an error message if any of the checks fail
-
--}
-findButNot :
-    { good : List Selector
-    , bads : List (List Selector)
-    , onError : List Selector
-    }
-    -> Query.Single msg
-    -> ComplexQuery msg (Query.Single msg)
-findButNot config source =
-    Continue (FindButNot config source Done)
-
-
-exactlyOneOf : String -> List ( String, ComplexQuery msg a ) -> ComplexQuery msg a
-exactlyOneOf description options =
-    Continue (ExactlyOneOf description (List.map (Tuple.mapSecond (map Done)) options))
-
-
-simulate : ( String, Json.Value ) -> Query.Single msg -> ComplexQuery msg msg
-simulate event target =
-    Continue (Simulate event target Done)
-
-
-andThen : (a -> ComplexQuery msg b) -> ComplexQuery msg a -> ComplexQuery msg b
-andThen f queryChain =
-    case queryChain of
-        Done a ->
-            f a
-
-        Continue start ->
-            Continue (mapF (andThen f) start)
+succeed : a -> ComplexQuery a
+succeed a =
+    QueryResult initState Set.empty [] (Ok a)
 
 
 type alias Priority =
@@ -90,120 +28,205 @@ type alias State =
     }
 
 
+initState : State
+initState =
+    { priority = 0
+    }
+
+
 type Failure
-    = QueryFailed TestHtmlHacks.FailureReason
+    = QueryFailed (List (Result String String))
     | SimulateFailed String
-    | NoMatches String (List ( String, Priority, Failure ))
-    | TooManyMatches String (List String)
+    | NoMatches String (List ( String, Priority, ( List FailureContext1, Failure ) ))
+    | TooManyMatches String (List ( String, Priority, List FailureContext1 ))
 
 
-type ComplexQuery msg a
-    = Done a
-    | Continue (ComplexQueryF msg (ComplexQuery msg a))
+type alias FailureContext =
+    List FailureContext1
 
 
-map : (a -> b) -> ComplexQuery msg a -> ComplexQuery msg b
-map f complexQuery =
-    case complexQuery of
-        Done a ->
-            Done (f a)
-
-        Continue next ->
-            Continue (mapF (map f) next)
+type FailureContext1
+    = FindSucceeded (Maybe String) (() -> List String)
+    | CheckSucceeded String (List FailureContext1)
+    | Description (Result String String)
 
 
-run : ComplexQuery msg a -> Result Failure a
-run complexQuery =
-    let
-        ( _, result ) =
-            stepChain
-                { priority = 0
-                }
-                complexQuery
-    in
-    result
+type alias Highlight =
+    Set String
 
 
-stepChain : State -> ComplexQuery msg a -> ( State, Result Failure a )
-stepChain state query =
-    case query of
-        Done a ->
-            ( state, Ok a )
+run : ComplexQuery a -> ( Highlight, Result ( List FailureContext1, Failure ) a )
+run (QueryResult _ highlight context result) =
+    ( highlight
+    , case result of
+        Ok a ->
+            Ok a
 
-        Continue next ->
-            case step state next of
-                ( newState, Err x ) ->
-                    ( newState, Err x )
-
-                ( newState, Ok nextChain ) ->
-                    stepChain newState nextChain
+        Err error ->
+            Err ( List.reverse context, error )
+    )
 
 
-step : State -> ComplexQueryF msg a -> ( State, Result Failure a )
-step state complexQuery =
-    case complexQuery of
-        Find selectors source next ->
+find : Maybe String -> List String -> List Selector -> ComplexQuery (Query.Single msg) -> ComplexQuery (Query.Single msg)
+find description highlight selectors prev =
+    case prev of
+        QueryResult _ _ _ (Err _) ->
+            prev
+
+        QueryResult state prevHighlight prevContext (Ok source) ->
             case Test.Runner.getFailureReason (Query.has [ Selector.all selectors ] source) of
                 Just _ ->
                     let
                         error =
                             firstErrorOf source
-                                [ Query.has selectors
-                                , Query.has [ Selector.all selectors ]
+                                [ selectors
+                                , [ Selector.all selectors ]
                                 ]
+
+                        context =
+                            case description of
+                                Nothing ->
+                                    []
+
+                                Just desc ->
+                                    [ Description (Err desc) ]
                     in
-                    ( { state | priority = state.priority + countSuccesses error }
-                    , Err (QueryFailed error)
-                    )
+                    QueryResult
+                        { state
+                            | priority = state.priority + countSuccesses error
+                        }
+                        (Set.union (Set.fromList highlight) prevHighlight)
+                        (context ++ prevContext)
+                        (Err (QueryFailed error))
 
                 Nothing ->
-                    ( { state | priority = state.priority + List.length selectors }
-                    , Ok (next (Query.find selectors source))
-                    )
+                    QueryResult
+                        { state
+                            | priority = state.priority + List.length selectors
+                        }
+                        (Set.union (Set.fromList highlight) prevHighlight)
+                        (FindSucceeded description (\() -> TestHtmlHacks.getPassingSelectors selectors source) :: prevContext)
+                        (Ok (Query.find selectors source))
 
-        ExactlyOneOf description options ->
+
+exactlyOneOf : String -> List ( String, ComplexQuery a -> ComplexQuery b ) -> ComplexQuery a -> ComplexQuery b
+exactlyOneOf description options prev =
+    case prev of
+        QueryResult state prevHighlight prevContext (Err err) ->
+            QueryResult state prevHighlight prevContext (Err err)
+
+        QueryResult state prevHighlight prevContext (Ok _) ->
             let
+                results : List ( String, ComplexQuery b )
                 results =
-                    List.map (Tuple.mapSecond (stepChain state)) options
+                    List.map (Tuple.mapSecond (\option -> option prev)) options
 
+                successes : List ( String, ComplexQuery b )
                 successes =
-                    List.filterMap checkSuccess results
+                    List.filter (isSuccess << Tuple.second) results
 
-                checkSuccess ( desc, ( newState, result ) ) =
-                    case result of
-                        Ok a ->
-                            Just ( desc, ( newState, Ok a ) )
+                isSuccess res =
+                    case res of
+                        QueryResult _ _ _ (Err _) ->
+                            False
 
-                        Err _ ->
-                            Nothing
+                        QueryResult _ _ _ (Ok _) ->
+                            True
 
-                collectError ( desc, ( newState, result ) ) =
+                collectHighlight (QueryResult _ highlight _ _) =
+                    highlight
+
+                highlights =
+                    List.map (collectHighlight << Tuple.second) results
+                        |> List.foldl Set.union Set.empty
+
+                collectError ( desc, QueryResult newState _ context result ) =
                     case result of
                         Ok _ ->
                             Nothing
 
                         Err x ->
-                            Just ( desc, newState.priority, x )
+                            Just
+                                ( desc
+                                , newState.priority
+                                , ( List.reverse context, x )
+                                )
             in
             case successes of
                 [ ( _, one ) ] ->
                     one
 
                 [] ->
-                    ( state, Err (NoMatches description (List.filterMap collectError results)) )
+                    let
+                        failures =
+                            List.filterMap collectError results
+                    in
+                    QueryResult
+                        state
+                        (Set.union highlights prevHighlight)
+                        prevContext
+                        (Err (NoMatches description failures))
 
                 many ->
-                    ( state, Err (TooManyMatches description (List.map Tuple.first many)) )
+                    let
+                        matches =
+                            List.map
+                                (\( desc, QueryResult newState _ context _ ) ->
+                                    ( desc, newState.priority, context )
+                                )
+                                many
+                    in
+                    QueryResult
+                        state
+                        (Set.union highlights prevHighlight)
+                        prevContext
+                        (Err (TooManyMatches description matches))
 
-        FindButNot { good, bads, onError } source next ->
+
+{-|
+
+  - `good`: the primary selector that must match
+  - `bads`: a list of selectors that must NOT match
+  - `onError`: the selector to use to produce an error message if any of the checks fail
+
+-}
+findButNot :
+    Maybe String
+    -> List String
+    ->
+        { good : List Selector
+        , bads : List (List Selector)
+        , onError : List Selector
+        }
+    -> ComplexQuery (Query.Single msg)
+    -> ComplexQuery (Query.Single msg)
+findButNot description highlight { good, bads, onError } prev =
+    case prev of
+        QueryResult _ _ _ (Err _) ->
+            prev
+
+        QueryResult state prevHighlight prevContext (Ok source) ->
             -- This is tricky because Test.Html doesn't provide a way to search for an attribute being *not* present.
             -- So we have to check if a selector we don't want *is* present, and manually force a failure if it is.
             let
-                checkBads : Priority -> List (List Selector) -> Query.Single msg -> ( State, Result Failure a )
+                addDescription =
+                    case description of
+                        Nothing ->
+                            []
+
+                        Just desc ->
+                            [ Description (Err desc) ]
+
+                checkBads : Priority -> List (List Selector) -> Query.Single msg -> ComplexQuery (Query.Single msg)
                 checkBads extraPriority bads_ found =
                     case bads_ of
                         [] ->
-                            ( { state | priority = state.priority + extraPriority + 1 }, Ok (next found) )
+                            QueryResult
+                                { state | priority = state.priority + extraPriority + 1 }
+                                (Set.union (Set.fromList highlight) prevHighlight)
+                                -- TODO: add the not bads to the context (or alternatively, add the "onErrors", but convert them all to successes)
+                                (FindSucceeded description (\() -> TestHtmlHacks.getPassingSelectors good source) :: prevContext)
+                                (Ok found)
 
                         nextBad :: rest ->
                             let
@@ -216,15 +239,17 @@ step state complexQuery =
                                     let
                                         error =
                                             firstErrorOf source
-                                                [ Query.has good
-                                                , Query.has [ Selector.all good ]
-                                                , Query.has onError
-                                                , Query.has [ Selector.all onError ]
+                                                [ good
+                                                , [ Selector.all good ]
+                                                , onError
+                                                , [ Selector.all onError ]
                                                 ]
                                     in
-                                    ( { state | priority = state.priority + extraPriority + countSuccesses error }
-                                    , Err (QueryFailed error)
-                                    )
+                                    QueryResult
+                                        { state | priority = state.priority + extraPriority + countSuccesses error }
+                                        (Set.union (Set.fromList highlight) prevHighlight)
+                                        (addDescription ++ prevContext)
+                                        (Err (QueryFailed error))
 
                                 Just _ ->
                                     -- the element we found is not bad; continue on to the next check
@@ -239,66 +264,99 @@ step state complexQuery =
                     let
                         error =
                             firstErrorOf source
-                                [ Query.has good
-                                , Query.has [ Selector.all good ]
+                                [ good
+                                , [ Selector.all good ]
                                 ]
                     in
-                    ( { state | priority = state.priority + countSuccesses error }
-                    , Err (QueryFailed error)
-                    )
+                    QueryResult
+                        { state | priority = state.priority + countSuccesses error }
+                        (Set.union (Set.fromList highlight) prevHighlight)
+                        prevContext
+                        (Err (QueryFailed error))
 
                 Nothing ->
                     Query.find good source
                         |> checkBads (List.length good) bads
 
-        Simulate event source next ->
+
+simulate : ( String, Json.Value ) -> ComplexQuery (Query.Single msg) -> ComplexQuery msg
+simulate event prev =
+    case prev of
+        QueryResult state prevHighlight prevContext (Err err) ->
+            QueryResult state prevHighlight prevContext (Err err)
+
+        QueryResult state prevHighlight prevContext (Ok source) ->
             case
-                -- This check is maybe not needed anymore since the previous finds should all short circuit their errors?
                 source
-                    |> Query.has []
-                    |> Test.Runner.getFailureReason
+                    |> Test.Html.Event.simulate event
+                    |> Test.Html.Event.toResult
             of
-                Just reason ->
-                    --( state, Err (QueryFailed (TestHtmlHacks.parseFailureReason reason.description)) )
-                    ( state, Err (QueryFailed (TestHtmlHacks.parseFailureReason "XXX: Does this code ever run????")) )
+                Err message ->
+                    QueryResult
+                        state
+                        prevHighlight
+                        (Description (Err ("simulate " ++ Tuple.first event)) :: prevContext)
+                        (Err (SimulateFailed (TestHtmlHacks.parseSimulateFailure message)))
 
-                Nothing ->
-                    -- Try to simulate the event, now that we know the target exists
-                    case
-                        source
-                            |> Test.Html.Event.simulate event
-                            |> Test.Html.Event.toResult
-                    of
-                        Err message ->
-                            ( state, Err (SimulateFailed (TestHtmlHacks.parseSimulateFailure message)) )
-
-                        Ok msg ->
-                            ( state, Ok (next msg) )
+                Ok msg ->
+                    QueryResult state prevHighlight prevContext (Ok msg)
 
 
-firstErrorOf : Query.Single msg -> List (Query.Single msg -> Expectation) -> TestHtmlHacks.FailureReason
+{-| Ensure that the given query succeeds, but then ignore its result.
+-}
+check : String -> (ComplexQuery a -> ComplexQuery ignored) -> ComplexQuery a -> ComplexQuery a
+check description checkQuery prev =
+    case prev of
+        QueryResult _ _ _ (Err _) ->
+            prev
+
+        QueryResult state prevHighlight prevContext (Ok source) ->
+            let
+                (QueryResult checkedState highlight checkContext checkResult) =
+                    checkQuery (QueryResult state prevHighlight [] (Ok source))
+            in
+            case checkResult of
+                Err failure ->
+                    QueryResult
+                        checkedState
+                        (Set.union highlight prevHighlight)
+                        (Description (Err description) :: checkContext ++ prevContext)
+                        (Err failure)
+
+                Ok _ ->
+                    QueryResult
+                        { state | priority = checkedState.priority }
+                        (Set.union highlight prevHighlight)
+                        (CheckSucceeded description checkContext :: prevContext)
+                        (Ok source)
+
+
+firstErrorOf : Query.Single msg -> List (List Selector) -> List (Result String String)
 firstErrorOf source choices =
     case choices of
         [] ->
-            TestHtmlHacks.parseFailureReason "PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: firstErrorOf: asked to report an error but none of the choices failed"
+            [ Err "PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: firstErrorOf: asked to report an error but none of the choices failed" ]
 
         next :: rest ->
-            case Test.Runner.getFailureReason (next source) of
+            case Test.Runner.getFailureReason (Query.has next source) of
                 Just reason ->
-                    TestHtmlHacks.parseFailureReason reason.description
+                    case TestHtmlHacks.parseFailureReport reason.description of
+                        Ok (TestHtmlParser.QueryFailure _ _ (TestHtmlParser.Has _ results)) ->
+                            results
+
+                        Ok (TestHtmlParser.EventFailure name _) ->
+                            [ Err ("PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: firstErrorOf: got unexpected EventFailure \"" ++ name ++ "\"") ]
+
+                        Err err ->
+                            [ Err ("PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: firstErrorOf: couldn't parse failure report: " ++ err) ]
 
                 Nothing ->
                     firstErrorOf source rest
 
 
-countSuccesses : TestHtmlHacks.FailureReason -> Int
-countSuccesses failureReason =
-    case failureReason of
-        TestHtmlHacks.Simple string ->
-            0
-
-        TestHtmlHacks.SelectorsFailed results ->
-            List.length (List.filter isOk results)
+countSuccesses : List (Result String String) -> Int
+countSuccesses results =
+    List.length (List.filter isOk results)
 
 
 isOk : Result x a -> Bool

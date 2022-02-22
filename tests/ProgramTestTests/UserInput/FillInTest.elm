@@ -87,32 +87,105 @@ all =
                     ]
                     |> ProgramTest.fillIn "field-id" "Field 1" "value99"
                     |> ProgramTest.expectModel (Expect.equal "<INIT>;Input:field-1:value99")
+        , test "error message with labelled input" <|
+            \() ->
+                start
+                    [ Html.label
+                        [ for "field-1"
+                        ]
+                        [ Html.text "Field 1"
+                        ]
+                    ]
+                    |> ProgramTest.fillIn "field-1" "Field 1" "value99"
+                    |> ProgramTest.done
+                    |> expectFailure
+                        [ "▼ Query.fromHtml"
+                        , ""
+                        , "    <body>"
+                        , "        <label for=\"field-1\">"
+                        , "            Field 1"
+                        , "        </label>"
+                        , "    </body>"
+                        , ""
+                        , ""
+                        , """▼ ProgramTest.fillIn "Field 1\""""
+                        , ""
+                        , "Expected one of the following to exist and have an \"oninput\" handler:"
+                        , """- <input> associated to <label> by id"""
+                        , """    ✓ check label exists:"""
+                        , """      ✓ has tag "label\""""
+                        , """      ✓ has attribute "htmlFor" "field-1\""""
+                        , """      ✓ has text "Field 1\""""
+                        , """    ✗ find input:"""
+                        , """      ✗ has tag "input\""""
+                        , """- <textarea> associated to <label> by id"""
+                        , """    ✓ check label exists:"""
+                        , """      ✓ has tag "label\""""
+                        , """      ✓ has attribute "htmlFor" "field-1\""""
+                        , """      ✓ has text "Field 1\""""
+                        , """    ✗ find textarea:"""
+                        , """      ✗ has tag "textarea\""""
+                        ]
+        , test "error message for when an input is in a label" <|
+            \() ->
+                start
+                    [ Html.label []
+                        [ Html.text "Field 1"
+                        , Html.b [] []
+                        ]
+                    ]
+                    |> ProgramTest.fillIn "" "Field 1" "value99"
+                    |> ProgramTest.done
+                    |> expectFailure
+                        [ "▼ Query.fromHtml"
+                        , ""
+                        , "    <body>"
+                        , "        <label>"
+                        , "            Field 1"
+                        , "            <b></b>"
+                        , "        </label>"
+                        , "    </body>"
+                        , ""
+                        , ""
+                        , """▼ ProgramTest.fillIn "Field 1\""""
+                        , ""
+                        , "Expected one of the following to exist and have an \"oninput\" handler:"
+                        , """- <input> with parent <label>"""
+                        , """    ✓ find label:"""
+                        , """      ✓ has tag "label\""""
+                        , """      ✓ has containing [ text "Field 1" ]"""
+                        , """    ✗ has tag "input\""""
+                        , """- <textarea> with parent <label>"""
+                        , """    ✓ find label:"""
+                        , """      ✓ has tag "label\""""
+                        , """      ✓ has containing [ text "Field 1" ]"""
+                        , """    ✗ has tag "textarea\""""
+                        ]
         , test "shows a useful error when the input doesn't exist" <|
             \() ->
                 start [ Html.text "no input" ]
                     |> ProgramTest.fillIn "field-id" "Field 1" "value99"
                     |> ProgramTest.done
                     |> expectFailure
-                        [ """fillIn "Field 1":"""
-                        , "▼ Query.fromHtml"
+                        [ "▼ Query.fromHtml"
                         , ""
                         , "    <body>"
                         , "        no input"
                         , "    </body>"
                         , ""
                         , ""
-                        , """▼ Query.has [ text "HTML expected by the call to: fillIn "Field 1"" ]"""
-                        , ""
-                        , """✗ has text "HTML expected by the call to: fillIn "Field 1\"\""""
+                        , """▼ ProgramTest.fillIn "Field 1\""""
                         , ""
                         , "Expected one of the following to exist and have an \"oninput\" handler:"
-                        , """- <label for="field-id"> with text "Field 1" and an <input id="field-id">"""
-                        , """    \u{001B}[31m✗ has tag "label"\u{001B}[39m"""
-                        , """- <input aria-label="Field 1" id="field-id">"""
-                        , """    \u{001B}[31m✗ has tag "input"\u{001B}[39m"""
-                        , """- <label for="field-id"> with text "Field 1" and a <textarea id="field-id">"""
-                        , """    \u{001B}[31m✗ has tag "label"\u{001B}[39m"""
-                        , """- <textarea aria-label="Field 1" id="field-id">"""
-                        , """    \u{001B}[31m✗ has tag "textarea"\u{001B}[39m"""
+                        , """- <input> associated to <label> by id"""
+                        , """    ✗ check label exists:"""
+                        , """      ✗ has tag "label\""""
+                        , """- <input> with aria-label and id"""
+                        , """    ✗ has tag "input\""""
+                        , """- <textarea> associated to <label> by id"""
+                        , """    ✗ check label exists:"""
+                        , """      ✗ has tag "label\""""
+                        , """- <textarea> with aria-label and id"""
+                        , """    ✗ has tag "textarea\""""
                         ]
         ]
