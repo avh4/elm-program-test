@@ -1,3 +1,10 @@
+## 3.6.3
+
+Bug fixes:
+
+  - Performance regression in 3.6.2 for passing tests is fixed.
+
+
 ## 3.6.2
 
 New features:
