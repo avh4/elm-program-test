@@ -6,13 +6,13 @@ import Parser.Extra.String
 import ProgramTest.HtmlParserHacks as HtmlParserHacks
 
 
-type FailureReport
-    = QueryFailure Html.Parser.Node (List Step) Assertion
-    | EventFailure String Html.Parser.Node
+type FailureReport html
+    = QueryFailure html (List (Step html)) Assertion
+    | EventFailure String html
 
 
-type Step
-    = FindStep (List Selector) Html.Parser.Node
+type Step html
+    = FindStep (List Selector) html
 
 
 type Selector
@@ -27,7 +27,7 @@ type Assertion
     = Has (List Selector) (List (Result String String))
 
 
-parser : Parser FailureReport
+parser : Parser (FailureReport Html.Parser.Node)
 parser =
     Parser.oneOf
         [ Parser.succeed QueryFailure
@@ -53,7 +53,7 @@ trimmedHtml =
     Parser.map HtmlParserHacks.trimText Html.Parser.node
 
 
-stepsParser : Parser (List Step)
+stepsParser : Parser (List (Step Html.Parser.Node))
 stepsParser =
     Parser.loop [] <|
         \acc ->
@@ -65,7 +65,7 @@ stepsParser =
                 ]
 
 
-stepParser : Parser Step
+stepParser : Parser (Step Html.Parser.Node)
 stepParser =
     Parser.oneOf
         [ Parser.succeed FindStep

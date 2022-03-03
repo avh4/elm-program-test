@@ -60,12 +60,12 @@ getPassingSelectors selectors single =
             [ pleaseReport ("getPassingSelectors: couldn't parse failure report: " ++ err) ]
 
 
-forceFailureReport : List Selector -> Query.Single any -> Result String FailureReport
+forceFailureReport : List Selector -> Query.Single any -> Result String (FailureReport Html.Parser.Node)
 forceFailureReport selectors =
     forceFailureReport_ selectors "ProgramTest.TestHtmlHacks is trying to force a failure to collect the error message %%"
 
 
-forceFailureReport_ : List Selector -> String -> Query.Single any -> Result String FailureReport
+forceFailureReport_ : List Selector -> String -> Query.Single any -> Result String (FailureReport Html.Parser.Node)
 forceFailureReport_ selectors unique single =
     case
         single
@@ -80,7 +80,7 @@ forceFailureReport_ selectors unique single =
             parseFailureReport reason.description
 
 
-parseFailureReport : String -> Result String FailureReport
+parseFailureReport : String -> Result String (FailureReport Html.Parser.Node)
 parseFailureReport string =
     Parser.run TestHtmlParser.parser string
         |> Result.mapError Parser.Extra.deadEndsToString
