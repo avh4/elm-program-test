@@ -190,7 +190,7 @@ all =
         ]
 
 
-getHtml : FailureReport -> Result String Html.Parser.Node
+getHtml : FailureReport Html.Parser.Node -> Result String Html.Parser.Node
 getHtml report =
     case report of
         QueryFailure node _ _ ->
@@ -200,7 +200,7 @@ getHtml report =
             Err ("Expected QueryFailure, but got: " ++ Debug.toString report)
 
 
-getAssertion : FailureReport -> Result String Assertion
+getAssertion : FailureReport html -> Result String Assertion
 getAssertion report =
     case report of
         QueryFailure _ _ assertion ->
@@ -210,7 +210,7 @@ getAssertion report =
             Err ("Expected QueryFailure, but got: " ++ Debug.toString report)
 
 
-getSteps : FailureReport -> Result String (List Step)
+getSteps : FailureReport html -> Result String (List (Step html))
 getSteps report =
     case report of
         QueryFailure _ steps _ ->
