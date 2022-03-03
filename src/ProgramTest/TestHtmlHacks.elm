@@ -1,4 +1,4 @@
-module ProgramTest.TestHtmlHacks exposing (getPassingSelectors, parseFailureReport, parseSimulateFailure, renderHtml)
+module ProgramTest.TestHtmlHacks exposing (getPassingSelectors, parseFailureReport, parseFailureReportWithoutHtml, parseSimulateFailure, renderHtml)
 
 import Html.Parser
 import Parser
@@ -44,7 +44,7 @@ renderHtml colorHidden highlightPredicate single =
 
 getPassingSelectors : List Selector -> Query.Single msg -> List String
 getPassingSelectors selectors single =
-    case forceFailureReport selectors single of
+    case forceFailureReportWithoutHtml selectors single of
         Ok (QueryFailure _ _ (Has _ results)) ->
             case List.reverse results of
                 (Ok _) :: _ ->
@@ -62,11 +62,16 @@ getPassingSelectors selectors single =
 
 forceFailureReport : List Selector -> Query.Single any -> Result String (FailureReport Html.Parser.Node)
 forceFailureReport selectors =
-    forceFailureReport_ selectors "ProgramTest.TestHtmlHacks is trying to force a failure to collect the error message %%"
+    forceFailureReport_ parseFailureReport selectors "ProgramTest.TestHtmlHacks is trying to force a failure to collect the error message %%"
 
 
-forceFailureReport_ : List Selector -> String -> Query.Single any -> Result String (FailureReport Html.Parser.Node)
-forceFailureReport_ selectors unique single =
+forceFailureReportWithoutHtml : List Selector -> Query.Single any -> Result String (FailureReport ())
+forceFailureReportWithoutHtml selectors =
+    forceFailureReport_ parseFailureReportWithoutHtml selectors "ProgramTest.TestHtmlHacks is trying to force a failure to collect the error message %%"
+
+
+forceFailureReport_ : (String -> result) -> List Selector -> String -> Query.Single any -> result
+forceFailureReport_ parseFailure selectors unique single =
     case
         single
             |> Query.has (selectors ++ [ Selector.text unique ])
@@ -74,15 +79,21 @@ forceFailureReport_ selectors unique single =
     of
         Nothing ->
             -- We expect the fake query to fail -- if it doesn't for some reason, just try recursing with a different fake matching string until it does fail
-            forceFailureReport_ selectors (unique ++ "_") single
+            forceFailureReport_ parseFailure selectors (unique ++ "_") single
 
         Just reason ->
-            parseFailureReport reason.description
+            parseFailure reason.description
 
 
 parseFailureReport : String -> Result String (FailureReport Html.Parser.Node)
 parseFailureReport string =
     Parser.run TestHtmlParser.parser string
+        |> Result.mapError Parser.Extra.deadEndsToString
+
+
+parseFailureReportWithoutHtml : String -> Result String (FailureReport ())
+parseFailureReportWithoutHtml string =
+    Parser.run TestHtmlParser.parserWithoutHtml string
         |> Result.mapError Parser.Extra.deadEndsToString
 
 

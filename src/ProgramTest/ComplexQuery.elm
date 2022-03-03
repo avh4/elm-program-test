@@ -340,7 +340,7 @@ firstErrorOf source choices =
         next :: rest ->
             case Test.Runner.getFailureReason (Query.has next source) of
                 Just reason ->
-                    case TestHtmlHacks.parseFailureReport reason.description of
+                    case TestHtmlHacks.parseFailureReportWithoutHtml reason.description of
                         Ok (TestHtmlParser.QueryFailure _ _ (TestHtmlParser.Has _ results)) ->
                             results
 

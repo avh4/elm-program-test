@@ -1,4 +1,4 @@
-module ProgramTest.TestHtmlParser exposing (Assertion(..), FailureReport(..), Selector(..), Step(..), parser)
+module ProgramTest.TestHtmlParser exposing (Assertion(..), FailureReport(..), Selector(..), Step(..), parser, parserWithoutHtml)
 
 import Html.Parser
 import Parser exposing ((|.), (|=), Parser)
@@ -27,14 +27,14 @@ type Assertion
     = Has (List Selector) (List (Result String String))
 
 
-parser : Parser (FailureReport Html.Parser.Node)
-parser =
+parser_ : Parser html -> Parser (FailureReport html)
+parser_ parseHtml =
     Parser.oneOf
         [ Parser.succeed QueryFailure
             |. Parser.keyword "▼ Query.fromHtml"
             |. Parser.symbol "\n\n    "
-            |= trimmedHtml
-            |= stepsParser trimmedHtml
+            |= parseHtml
+            |= stepsParser parseHtml
             |= assertionParser
             |. Parser.end
         , Parser.succeed EventFailure
@@ -42,9 +42,14 @@ parser =
             |. Parser.symbol " I found a node, but it does not listen for \""
             |= (Parser.getChompedString <| Parser.chompUntil "\"")
             |. Parser.symbol "\" events like I expected it would.\n\n"
-            |= trimmedHtml
+            |= parseHtml
             |. Parser.end
         ]
+
+
+parser : Parser (FailureReport Html.Parser.Node)
+parser =
+    parser_ trimmedHtml
 
 
 trimmedHtml : Parser Html.Parser.Node
@@ -54,6 +59,16 @@ trimmedHtml =
             [ Parser.symbol "\n\n\n"
             , Parser.end
             ]
+
+
+parserWithoutHtml : Parser (FailureReport ())
+parserWithoutHtml =
+    parser_ ignoreHtml
+
+
+ignoreHtml : Parser ()
+ignoreHtml =
+    Parser.chompUntilEndOr "▼"
 
 
 stepsParser : Parser html -> Parser (List (Step html))
