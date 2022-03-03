@@ -34,8 +34,7 @@ parser =
             |. Parser.keyword "▼ Query.fromHtml"
             |. Parser.symbol "\n\n    "
             |= trimmedHtml
-            |. Parser.symbol "\n\n\n"
-            |= stepsParser
+            |= stepsParser trimmedHtml
             |= assertionParser
             |. Parser.end
         , Parser.succeed EventFailure
@@ -51,29 +50,32 @@ parser =
 trimmedHtml : Parser Html.Parser.Node
 trimmedHtml =
     Parser.map HtmlParserHacks.trimText Html.Parser.node
+        |. Parser.oneOf
+            [ Parser.symbol "\n\n\n"
+            , Parser.end
+            ]
 
 
-stepsParser : Parser (List (Step Html.Parser.Node))
-stepsParser =
+stepsParser : Parser html -> Parser (List (Step html))
+stepsParser parseHtml =
     Parser.loop [] <|
         \acc ->
             Parser.oneOf
                 [ Parser.succeed (\stmt -> Parser.Loop (stmt :: acc))
-                    |= stepParser
+                    |= stepParser parseHtml
                 , Parser.succeed ()
                     |> Parser.map (\_ -> Parser.Done (List.reverse acc))
                 ]
 
 
-stepParser : Parser (Step Html.Parser.Node)
-stepParser =
+stepParser : Parser html -> Parser (Step html)
+stepParser parseHtml =
     Parser.oneOf
         [ Parser.succeed FindStep
             |. Parser.keyword "▼ Query.find "
             |= selectorsParser
             |. Parser.symbol "\n\n    1)  "
-            |= trimmedHtml
-            |. Parser.symbol "\n\n\n"
+            |= parseHtml
         ]
 
 
