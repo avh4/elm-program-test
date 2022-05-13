@@ -136,7 +136,7 @@ start =
         , view = Main.view
         }
         |> ProgramTest.withSimulatedEffects simulateEffects
-        |> ProgramTest.withSimulatedSubscriptions simulateSub
+        |> ProgramTest.withSimulatedSubscriptions simulateSubscriptions
         |> ProgramTest.start ()
 ```
 
