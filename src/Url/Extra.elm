@@ -16,7 +16,10 @@ resolve base url =
         |> Maybe.withDefault
             { base
                 | path =
-                    if String.startsWith "/" url then
+                    if String.startsWith "#" url || String.startsWith "?" url then
+                        base.path
+
+                    else if String.startsWith "/" url then
                         url
 
                     else
@@ -26,6 +29,16 @@ resolve base url =
                             |> List.reverse
                             |> (\l -> l ++ String.split "/" url)
                             |> String.join "/"
-                , query = Nothing
-                , fragment = Nothing
+                , query =
+                    if String.startsWith "?" url then
+                        Just (String.dropLeft 1 url)
+
+                    else
+                        Nothing
+                , fragment =
+                    if String.startsWith "#" url then
+                        Just (String.dropLeft 1 url)
+
+                    else
+                        Nothing
             }

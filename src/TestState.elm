@@ -1,5 +1,6 @@
-module TestState exposing (TestState, advanceTime, drain, queueEffect, routeChangeHelper, simulateLoadUrlHelper, update, withSimulation)
+module TestState exposing (TestState, advanceTime, drain, queueEffect, simulateLoadUrlHelper, update, urlChangeHelper, urlRequestHelper, withSimulation)
 
+import Browser
 import Dict
 import PairingHeap
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
@@ -84,10 +85,10 @@ queueSimulatedEffect program effect state =
                         }
 
                 SimulatedEffect.PushUrl url ->
-                    routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.pushUrl " ++ String.Extra.escape url) 0 url program state
+                    urlChangeHelper ("simulating effect: SimulatedEffect.Navigation.pushUrl " ++ String.Extra.escape url) 0 url program state
 
                 SimulatedEffect.ReplaceUrl url ->
-                    routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.replaceUrl " ++ String.Extra.escape url) 1 url program state
+                    urlChangeHelper ("simulating effect: SimulatedEffect.Navigation.replaceUrl " ++ String.Extra.escape url) 1 url program state
 
                 SimulatedEffect.Back n ->
                     case state.navigation of
@@ -106,7 +107,7 @@ queueSimulatedEffect program effect state =
                                         Ok state
 
                                     Just first ->
-                                        routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.Back " ++ String.fromInt n) 2 (Url.toString first) program state
+                                        urlChangeHelper ("simulating effect: SimulatedEffect.Navigation.Back " ++ String.fromInt n) 2 (Url.toString first) program state
 
                 SimulatedEffect.Load url ->
                     Err (simulateLoadUrlHelper ("simulating effect: SimulatedEffect.Navigation.load " ++ url) url state)
@@ -143,8 +144,36 @@ simulateLoadUrlHelper functionDescription href state =
                     ChangedPage functionDescription location
 
 
-routeChangeHelper : String -> Int -> String -> Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
-routeChangeHelper functionName removeFromBackStack url program state =
+urlRequestHelper : String -> String -> Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
+urlRequestHelper functionDescription href program state =
+    case Maybe.map .currentLocation state.navigation of
+        Just location ->
+            let
+                urlRequest url =
+                    if url.host == location.host && url.port_ == location.port_ then
+                        Browser.Internal url
+
+                    else
+                        Browser.External href
+            in
+            case program.onUrlRequest (urlRequest (Url.Extra.resolve location href)) of
+                Just msg ->
+                    update msg program state
+
+                Nothing ->
+                    Err (ChangedPage functionDescription (Url.Extra.resolve location href))
+
+        Nothing ->
+            case Url.fromString href of
+                Nothing ->
+                    Err (NoBaseUrl functionDescription href)
+
+                Just location ->
+                    Err (ChangedPage functionDescription location)
+
+
+urlChangeHelper : String -> Int -> String -> Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
+urlChangeHelper functionName removeFromBackStack url program state =
     case state.navigation of
         Nothing ->
             Err (ProgramDoesNotSupportNavigation functionName)
@@ -155,7 +184,7 @@ routeChangeHelper functionName removeFromBackStack url program state =
                     Url.Extra.resolve currentLocation url
 
                 processRouteChange =
-                    case program.onRouteChange newLocation of
+                    case program.onUrlChange newLocation of
                         Nothing ->
                             Ok
 

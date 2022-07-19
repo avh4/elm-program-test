@@ -303,7 +303,8 @@ createHelper :
     { init : ( model, effect )
     , update : msg -> model -> ( model, effect )
     , view : model -> Html msg
-    , onRouteChange : Url -> Maybe msg
+    , onUrlRequest : Browser.UrlRequest -> Maybe msg
+    , onUrlChange : Url -> Maybe msg
     }
     -> ProgramOptions model msg effect
     -> ProgramTest model msg effect
@@ -312,7 +313,8 @@ createHelper program options =
         program_ =
             { update = program.update
             , view = program.view
-            , onRouteChange = program.onRouteChange
+            , onUrlRequest = program.onUrlRequest
+            , onUrlChange = program.onUrlChange
             , subscriptions = options.subscriptions
             , withinFocus = identity
             }
@@ -365,7 +367,8 @@ createSandbox program =
                 { init = ( program.init, () )
                 , update = \msg model -> ( program.update msg model, () )
                 , view = program.view
-                , onRouteChange = \_ -> Nothing
+                , onUrlRequest = \_ -> Nothing
+                , onUrlChange = \_ -> Nothing
                 }
 
 
@@ -388,7 +391,8 @@ createWorker program =
                 { init = program.init flags
                 , update = program.update
                 , view = \_ -> Html.text "** Programs created with ProgramTest.createWorker do not have a view.  Use ProgramTest.createElement instead if you meant to provide a view function. **"
-                , onRouteChange = \_ -> Nothing
+                , onUrlRequest = \_ -> Nothing
+                , onUrlChange = \_ -> Nothing
                 }
 
 
@@ -412,7 +416,8 @@ createElement program =
                 { init = program.init flags
                 , update = program.update
                 , view = program.view
-                , onRouteChange = \_ -> Nothing
+                , onUrlRequest = \_ -> Nothing
+                , onUrlChange = \_ -> Nothing
                 }
 
 
@@ -530,7 +535,8 @@ createDocument program =
                 { init = program.init flags
                 , update = program.update
                 , view = \model -> Html.node "body" [] (program.view model).body
-                , onRouteChange = \_ -> Nothing
+                , onUrlRequest = \_ -> Nothing
+                , onUrlChange = \_ -> Nothing
                 }
 
 
@@ -567,7 +573,8 @@ createApplication program =
                         { init = program.init flags url ()
                         , update = program.update
                         , view = \model -> Html.node "body" [] (program.view model).body
-                        , onRouteChange = program.onUrlChange >> Just
+                        , onUrlRequest = program.onUrlRequest >> Just
+                        , onUrlChange = program.onUrlChange >> Just
                         }
 
 
@@ -1088,7 +1095,7 @@ clickLink linkText href programTest =
     programTest
         |> assertComplexQuery functionDescription
             (ComplexQuery.find Nothing [ "a" ] findLinkTag)
-        |> tryClicking { otherwise = \_ -> TestState.simulateLoadUrlHelper functionDescription href >> Err }
+        |> tryClicking { otherwise = TestState.urlRequestHelper functionDescription href }
 
 
 {-| Simulates replacing the text in an input field labeled with the given label.
@@ -1865,7 +1872,7 @@ The parameter may be an absolute URL or relative URL.
 -}
 routeChange : String -> ProgramTest model msg effect -> ProgramTest model msg effect
 routeChange url =
-    andThen (TestState.routeChangeHelper "routeChange" 0 url)
+    andThen (TestState.urlChangeHelper "routeChange" 0 url)
 
 
 {-| Make an assertion about the current state of a `ProgramTest`'s model.
