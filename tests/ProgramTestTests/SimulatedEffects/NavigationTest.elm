@@ -8,6 +8,8 @@ import SimulatedEffect.Navigation
 import Test exposing (..)
 import Test.Expect exposing (expectFailure)
 import TestingProgram exposing (Msg(..))
+import Url.Parser as Parser exposing ((</>), (<?>))
+import Url.Parser.Query as QueryParser
 
 
 all : Test
@@ -33,16 +35,6 @@ all =
                 TestingProgram.application SimulatedEffect.Cmd.none
                     |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.pushUrl "new"))
                     |> ProgramTest.expectBrowserUrl (Expect.equal "https://example.com/new")
-        , test "simulating a pushUrl with a relative URL containing a query and fragment triggers an onUrlChange" <|
-            \() ->
-                TestingProgram.application SimulatedEffect.Cmd.none
-                    |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.pushUrl "new?query#fragment"))
-                    |> ProgramTest.expectModel (Expect.equal [ "OnUrlChange: https://example.com/new?query#fragment" ])
-        , test "simulating a pushUrl with a relative URL containing a query changes the browser URL" <|
-            \() ->
-                TestingProgram.application SimulatedEffect.Cmd.none
-                    |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.pushUrl "new?query#fragment"))
-                    |> ProgramTest.expectBrowserUrl (Expect.equal "https://example.com/new?query#fragment")
         , test "simulating a replaceUrl triggers an onUrlChange" <|
             \() ->
                 TestingProgram.application SimulatedEffect.Cmd.none
@@ -126,4 +118,45 @@ all =
                 TestingProgram.application SimulatedEffect.Cmd.none
                     |> ProgramTest.expectPageChange "https://example.com/"
                     |> expectFailure [ "expectPageChange: expected to have navigated to a different URL, but no links were clicked and no browser navigation was simulated" ]
+        , pushUrlWithQueryAndFragment
+        ]
+
+
+pushUrlWithQueryAndFragment : Test
+pushUrlWithQueryAndFragment =
+    describe "simulating pushUrl with query and/or fragment and parsing the result gives the correct route" <|
+        let
+            parser =
+                Parser.map
+                    (\q f ->
+                        "NEW"
+                            ++ (Maybe.map ((++) " QUERY:") q |> Maybe.withDefault "")
+                            ++ (Maybe.map ((++) " FRAGMENT:") f |> Maybe.withDefault "")
+                    )
+                    (Parser.s "new" <?> QueryParser.string "query" </> Parser.fragment identity)
+
+            check url expected =
+                test ("pushUrl " ++ url) <|
+                    \_ ->
+                        ProgramTest.createApplication
+                            { onUrlChange = \location -> Log ("Route: " ++ (Parser.parse parser location |> Maybe.withDefault "NOMATCH"))
+                            , onUrlRequest = \_ -> Debug.todo "ProgramTestTests-2:onUrlRequest"
+                            , init = \() location key -> ( [], SimulatedEffect.Cmd.none )
+                            , update = TestingProgram.update
+                            , view =
+                                \_ ->
+                                    { title = "page title"
+                                    , body = []
+                                    }
+                            }
+                            |> ProgramTest.withSimulatedEffects identity
+                            |> ProgramTest.withBaseUrl "https://example.com/path"
+                            |> ProgramTest.start ()
+                            |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.pushUrl url))
+                            |> ProgramTest.expectModel (Expect.equal [ "Route: " ++ expected ])
+        in
+        [ check "new" "NEW"
+        , check "new?query=q" "NEW QUERY:q"
+        , check "new#fragment" "NEW FRAGMENT:fragment"
+        , check "new?query=q#fragment" "NEW QUERY:q FRAGMENT:fragment"
         ]
