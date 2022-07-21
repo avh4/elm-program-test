@@ -12,28 +12,28 @@ import Url exposing (Protocol(..), Url)
 -}
 resolve : Url -> String -> Url
 resolve base url =
-    -- TODO: This passes all the tests (except one), but could probably be nicer. The query and fragment don't necessarily end up in the right place in the record.
+    -- TODO: This passes all the tests (except one), but could probably be nicer.
     case Url.fromString url of
         Just newUrl ->
             newUrl
 
         Nothing ->
-            if String.isEmpty url then
+            (if String.isEmpty url then
                 base
 
-            else if String.startsWith "#" url then
+             else if String.startsWith "#" url then
                 { base | fragment = Just (String.dropLeft 1 url) }
 
-            else if String.startsWith "?" url then
+             else if String.startsWith "?" url then
                 { base
                     | query = Just (String.dropLeft 1 url)
                     , fragment = Nothing
                 }
 
-            else if String.startsWith "//" url then
+             else if String.startsWith "//" url then
                 { base | host = String.dropLeft 2 url, path = "", fragment = Nothing, query = Nothing }
 
-            else
+             else
                 { base
                     | path =
                         if String.startsWith "/" url then
@@ -67,6 +67,13 @@ resolve base url =
                     , fragment = Nothing
                     , query = Nothing
                 }
+            )
+                |> (\u ->
+                        -- pass back through Url.fromString just to get the query and fragment in the right place
+                        Url.toString u
+                            |> Url.fromString
+                            |> Maybe.withDefault u
+                   )
 
 
 parseDoubleDots : String -> List String -> String
