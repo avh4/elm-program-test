@@ -33,6 +33,16 @@ all =
                 TestingProgram.application SimulatedEffect.Cmd.none
                     |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.pushUrl "new"))
                     |> ProgramTest.expectBrowserUrl (Expect.equal "https://example.com/new")
+        , test "simulating a pushUrl with a relative URL containing a query and fragment triggers an onUrlChange" <|
+            \() ->
+                TestingProgram.application SimulatedEffect.Cmd.none
+                    |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.pushUrl "new?query#fragment"))
+                    |> ProgramTest.expectModel (Expect.equal [ "OnUrlChange: https://example.com/new?query#fragment" ])
+        , test "simulating a pushUrl with a relative URL containing a query changes the browser URL" <|
+            \() ->
+                TestingProgram.application SimulatedEffect.Cmd.none
+                    |> ProgramTest.update (ProduceEffects (SimulatedEffect.Navigation.pushUrl "new?query#fragment"))
+                    |> ProgramTest.expectBrowserUrl (Expect.equal "https://example.com/new?query#fragment")
         , test "simulating a replaceUrl triggers an onUrlChange" <|
             \() ->
                 TestingProgram.application SimulatedEffect.Cmd.none
