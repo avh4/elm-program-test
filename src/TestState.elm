@@ -148,15 +148,7 @@ urlRequestHelper : String -> String -> Program model msg effect sub -> TestState
 urlRequestHelper functionDescription href program state =
     case Maybe.map .currentLocation state.navigation of
         Just location ->
-            let
-                urlRequest url =
-                    if url.host == location.host && url.port_ == location.port_ then
-                        Browser.Internal url
-
-                    else
-                        Browser.External href
-            in
-            case program.onUrlRequest (urlRequest (Url.Extra.resolve location href)) of
+            case program.onUrlRequest (Url.Extra.toUrlRequest location href) of
                 Just msg ->
                     update msg program state
 
