@@ -7,12 +7,13 @@
 (including `Test.Html`)
 for testing your Elm programs as complete units.
 
-## How to install
+## How to install 
 
 1. Install the [elm-explorations/test](https://package.elm-lang.org/packages/elm-explorations/test/latest/).
 2. Install the elm-program-test using the command
 
-   `elm-test install avh4/elm-program-test`
+    ```elm-test install avh4/elm-program-test```
+
 
 ## [Guidebooks](https://elm-program-test.netlify.com/#guidebooks)
 
@@ -29,6 +30,7 @@ For more detailed documentation, the following guides show examples of how to us
 - [Testing programs with ports](https://elm-program-test.netlify.com/ports.html) &mdash; shows testing a program
   that uses ports to interface with JavaScript
 - [Upgrading from elm-program-test 2.x to 3.x](https://elm-program-test.netlify.com/upgrade-3.0.0.html)
+
 
 ## Basic example
 
@@ -61,6 +63,7 @@ exampleProgramTest =
                     ]
 ```
 
+
 ## Testing programs with flags and/or navigation
 
 This example tests a program that requires both [flags](https://guide.elm-lang.org/interop/flags.html) and [navigation](https://package.elm-lang.org/packages/elm/browser/latest/Browser#application).
@@ -76,7 +79,8 @@ import MyProgram exposing (Flags, Msg, Model) -- just an imaginary example
 start : String -> Flags -> ProgramTest Model Msg (Cmd Msg)
 start initialUrl flags =
     ProgramTest.createApplication
-        { onUrlChange = MyProgram.onUrlChange
+        { onUrlChange = MyProgram.OnUrlChange
+        , onUrlRequest = MyProgram.OnUrlRequest
         , init =
             -- NOTE: the type of MyProgram.init is:
             -- MyProgram.Flags -> Navigation.Location -> (MyProgram.Model, Cmd MyProgram.Msg)
@@ -98,6 +102,7 @@ exampleProgramTest =
                     , attribute (href "https://super.social.example.com/avh4")
                     ]
 ```
+
 
 ## Testing view modules (not full programs)
 
