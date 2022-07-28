@@ -20,9 +20,8 @@ all =
                                     Expect.fail ("Unable to parse base url: " ++ base)
 
                                 Just b ->
-                                    Url.Extra.resolve b relative
-                                        |> Url.toString
-                                        |> Expect.equal expected
+                                    Just (Url.Extra.resolve b relative)
+                                        |> Expect.equal (Url.fromString expected)
             in
             [ check "https://example.com/path" "https://example.com/new" "https://example.com/new"
             , check "https://example.com/path" "/new" "https://example.com/new"
