@@ -1,11 +1,12 @@
 module ProgramTestTests.UserInput.ClickLinkTest exposing (all)
 
 import Expect
-import Html exposing (Html)
+import Html
 import Html.Attributes exposing (href)
 import Html.Events
 import Json.Decode
 import ProgramTest exposing (ProgramTest)
+import SimulatedEffect
 import Test exposing (..)
 import Test.Expect exposing (expectFailure)
 import TestingProgram exposing (Msg(..))
@@ -52,7 +53,7 @@ all =
                 linkProgram
                     |> ProgramTest.clickLink "Relative" "/settings"
                     |> ProgramTest.expectPageChange "http://localhost:3000/settings"
-        , test "can verify an internal (single-page app) link" <|
+        , test "can verify an internal (single-page app) link with onClick handler" <|
             \() ->
                 ProgramTest.createApplication
                     { onUrlChange = .path
@@ -75,6 +76,18 @@ all =
                     |> ProgramTest.start ()
                     |> ProgramTest.clickLink "SPA" "#search"
                     |> ProgramTest.expectModel (Expect.equal "<INIT:/>;GoToSearch")
+        , test "internal (single-page app) link causes url change" <|
+            \() ->
+                TestingProgram.application SimulatedEffect.None
+                    |> ProgramTest.clickLink "SPA" "/search?q=query"
+                    |> ProgramTest.ensureBrowserHistory (Expect.equal [ "https://example.com/path" ])
+                    |> ProgramTest.ensureBrowserUrl (Expect.equal "https://example.com/search?q=query")
+                    |> ProgramTest.expectModel (Expect.equal [ "OnUrlChange: https://example.com/search?q=query" ])
+        , test "external link changes page" <|
+            \() ->
+                TestingProgram.application SimulatedEffect.None
+                    |> ProgramTest.clickLink "External" "http://external.com/test"
+                    |> ProgramTest.expectPageChange "http://external.com/test"
         , test "gives accessibility advice for links with bad onClick" <|
             \() ->
                 TestingProgram.startView

@@ -1,11 +1,11 @@
-module TestState exposing (TestState, advanceTime, drain, queueEffect, routeChangeHelper, simulateLoadUrlHelper, update, withSimulation)
+module TestState exposing (TestState, advanceTime, drain, queueEffect, update, urlChangeHelper, urlRequestHelper, withSimulation)
 
 import Dict
 import PairingHeap
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
 import ProgramTest.Failure exposing (Failure(..))
 import ProgramTest.Program exposing (Program)
-import SimulatedEffect exposing (SimulatedEffect, SimulatedSub)
+import SimulatedEffect exposing (SimulatedEffect)
 import String.Extra
 import Url exposing (Url)
 import Url.Extra
@@ -84,10 +84,10 @@ queueSimulatedEffect program effect state =
                         }
 
                 SimulatedEffect.PushUrl url ->
-                    routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.pushUrl " ++ String.Extra.escape url) 0 url program state
+                    urlChangeHelper ("simulating effect: SimulatedEffect.Navigation.pushUrl " ++ String.Extra.escape url) 0 url program state
 
                 SimulatedEffect.ReplaceUrl url ->
-                    routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.replaceUrl " ++ String.Extra.escape url) 1 url program state
+                    urlChangeHelper ("simulating effect: SimulatedEffect.Navigation.replaceUrl " ++ String.Extra.escape url) 1 url program state
 
                 SimulatedEffect.Back n ->
                     case state.navigation of
@@ -106,7 +106,7 @@ queueSimulatedEffect program effect state =
                                         Ok state
 
                                     Just first ->
-                                        routeChangeHelper ("simulating effect: SimulatedEffect.Navigation.Back " ++ String.fromInt n) 2 (Url.toString first) program state
+                                        urlChangeHelper ("simulating effect: SimulatedEffect.Navigation.Back " ++ String.fromInt n) 2 (Url.toString first) program state
 
                 SimulatedEffect.Load url ->
                     Err (simulateLoadUrlHelper ("simulating effect: SimulatedEffect.Navigation.load " ++ url) url state)
@@ -143,8 +143,28 @@ simulateLoadUrlHelper functionDescription href state =
                     ChangedPage functionDescription location
 
 
-routeChangeHelper : String -> Int -> String -> Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
-routeChangeHelper functionName removeFromBackStack url program state =
+urlRequestHelper : String -> String -> Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
+urlRequestHelper functionDescription href program state =
+    case Maybe.map .currentLocation state.navigation of
+        Just location ->
+            case program.onUrlRequest of
+                Just onUrlRequest ->
+                    update (onUrlRequest (Url.Extra.toUrlRequest location href)) program state
+
+                Nothing ->
+                    Err (ChangedPage functionDescription (Url.Extra.resolve location href))
+
+        Nothing ->
+            case Url.fromString href of
+                Nothing ->
+                    Err (NoBaseUrl functionDescription href)
+
+                Just location ->
+                    Err (ChangedPage functionDescription location)
+
+
+urlChangeHelper : String -> Int -> String -> Program model msg effect sub -> TestState model msg effect -> Result Failure (TestState model msg effect)
+urlChangeHelper functionName removeFromBackStack url program state =
     case state.navigation of
         Nothing ->
             Err (ProgramDoesNotSupportNavigation functionName)
@@ -155,13 +175,13 @@ routeChangeHelper functionName removeFromBackStack url program state =
                     Url.Extra.resolve currentLocation url
 
                 processRouteChange =
-                    case program.onRouteChange newLocation of
+                    case program.onUrlChange of
                         Nothing ->
                             Ok
 
-                        Just msg ->
+                        Just onUrlChange ->
                             -- TODO: should this be set before or after?
-                            update msg program
+                            update (onUrlChange newLocation) program
             in
             { state
                 | navigation =
