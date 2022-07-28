@@ -34,6 +34,11 @@ all =
             , check "https://example.com/path?query#fragment" "?q" "https://example.com/path?q"
             , check "https://example.com/path?query#fragment" "" "https://example.com/path?query#fragment"
             , check "https://example.com/path?query#fragment" "../path2" "https://example.com/path2"
+            , check "https://example.com/path" "/new?q#f" "https://example.com/new?q#f"
+            , check "https://example.com/path" "/new?q" "https://example.com/new?q"
+            , check "https://example.com/path" "/new#f" "https://example.com/new#f"
+            , check "https://example.com/path" "//new.example.com?q#f" "https://new.example.com?q#f"
+            , check "https://example.com/path" "//new.example.com/new?q#f" "https://new.example.com/new?q#f"
             , describe "W3 reference examples" <|
                 let
                     baseUri =
