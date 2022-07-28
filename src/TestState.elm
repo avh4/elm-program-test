@@ -148,9 +148,9 @@ urlRequestHelper : String -> String -> Program model msg effect sub -> TestState
 urlRequestHelper functionDescription href program state =
     case Maybe.map .currentLocation state.navigation of
         Just location ->
-            case program.onUrlRequest (Url.Extra.toUrlRequest location href) of
-                Just msg ->
-                    update msg program state
+            case program.onUrlRequest of
+                Just onUrlRequest ->
+                    update (onUrlRequest (Url.Extra.toUrlRequest location href)) program state
 
                 Nothing ->
                     Err (ChangedPage functionDescription (Url.Extra.resolve location href))
@@ -176,13 +176,13 @@ urlChangeHelper functionName removeFromBackStack url program state =
                     Url.Extra.resolve currentLocation url
 
                 processRouteChange =
-                    case program.onUrlChange newLocation of
+                    case program.onUrlChange of
                         Nothing ->
                             Ok
 
-                        Just msg ->
+                        Just onUrlChange ->
                             -- TODO: should this be set before or after?
-                            update msg program
+                            update (onUrlChange newLocation) program
             in
             { state
                 | navigation =

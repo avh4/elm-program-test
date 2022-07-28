@@ -303,8 +303,8 @@ createHelper :
     { init : ( model, effect )
     , update : msg -> model -> ( model, effect )
     , view : model -> Html msg
-    , onUrlRequest : Browser.UrlRequest -> Maybe msg
-    , onUrlChange : Url -> Maybe msg
+    , onUrlRequest : Maybe (Browser.UrlRequest -> msg)
+    , onUrlChange : Maybe (Url -> msg)
     }
     -> ProgramOptions model msg effect
     -> ProgramTest model msg effect
@@ -367,8 +367,8 @@ createSandbox program =
                 { init = ( program.init, () )
                 , update = \msg model -> ( program.update msg model, () )
                 , view = program.view
-                , onUrlRequest = \_ -> Nothing
-                , onUrlChange = \_ -> Nothing
+                , onUrlRequest = Nothing
+                , onUrlChange = Nothing
                 }
 
 
@@ -391,8 +391,8 @@ createWorker program =
                 { init = program.init flags
                 , update = program.update
                 , view = \_ -> Html.text "** Programs created with ProgramTest.createWorker do not have a view.  Use ProgramTest.createElement instead if you meant to provide a view function. **"
-                , onUrlRequest = \_ -> Nothing
-                , onUrlChange = \_ -> Nothing
+                , onUrlRequest = Nothing
+                , onUrlChange = Nothing
                 }
 
 
@@ -416,8 +416,8 @@ createElement program =
                 { init = program.init flags
                 , update = program.update
                 , view = program.view
-                , onUrlRequest = \_ -> Nothing
-                , onUrlChange = \_ -> Nothing
+                , onUrlRequest = Nothing
+                , onUrlChange = Nothing
                 }
 
 
@@ -535,8 +535,8 @@ createDocument program =
                 { init = program.init flags
                 , update = program.update
                 , view = \model -> Html.node "body" [] (program.view model).body
-                , onUrlRequest = \_ -> Nothing
-                , onUrlChange = \_ -> Nothing
+                , onUrlRequest = Nothing
+                , onUrlChange = Nothing
                 }
 
 
@@ -573,8 +573,8 @@ createApplication program =
                         { init = program.init flags url ()
                         , update = program.update
                         , view = \model -> Html.node "body" [] (program.view model).body
-                        , onUrlRequest = program.onUrlRequest >> Just
-                        , onUrlChange = program.onUrlChange >> Just
+                        , onUrlRequest = Just program.onUrlRequest
+                        , onUrlChange = Just program.onUrlChange
                         }
 
 

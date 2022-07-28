@@ -16,8 +16,8 @@ Note that we also parameterize `effect` and `sub` separately because
 type alias Program model msg effect sub =
     { update : msg -> model -> ( model, effect )
     , view : model -> Html msg
-    , onUrlRequest : Browser.UrlRequest -> Maybe msg
-    , onUrlChange : Url -> Maybe msg
+    , onUrlRequest : Maybe (Browser.UrlRequest -> msg)
+    , onUrlChange : Maybe (Url -> msg)
     , subscriptions : Maybe (model -> sub)
     , withinFocus : Query.Single msg -> Query.Single msg
     }
