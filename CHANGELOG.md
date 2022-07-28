@@ -1,9 +1,9 @@
 ## 3.6.4
 
-Bug fixes:
+New features:
 
 - `clickLink` now works for internal links when testing a `Browser.application`
-- `pushUrl` now works for relative urls with query and/or fragment
+- `pushUrl` now works properly for relative urls with query and/or fragment
 
 
 ## 3.6.3
