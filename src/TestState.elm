@@ -1,12 +1,11 @@
-module TestState exposing (TestState, advanceTime, drain, queueEffect, simulateLoadUrlHelper, update, urlChangeHelper, urlRequestHelper, withSimulation)
+module TestState exposing (TestState, advanceTime, drain, queueEffect, update, urlChangeHelper, urlRequestHelper, withSimulation)
 
-import Browser
 import Dict
 import PairingHeap
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
 import ProgramTest.Failure exposing (Failure(..))
 import ProgramTest.Program exposing (Program)
-import SimulatedEffect exposing (SimulatedEffect, SimulatedSub)
+import SimulatedEffect exposing (SimulatedEffect)
 import String.Extra
 import Url exposing (Url)
 import Url.Extra
