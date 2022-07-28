@@ -80,6 +80,8 @@ all =
             \() ->
                 TestingProgram.application SimulatedEffect.None
                     |> ProgramTest.clickLink "SPA" "/search?q=query"
+                    |> ProgramTest.ensureBrowserHistory (Expect.equal [ "https://example.com/path" ])
+                    |> ProgramTest.ensureBrowserUrl (Expect.equal "https://example.com/search?q=query")
                     |> ProgramTest.expectModel (Expect.equal [ "OnUrlChange: https://example.com/search?q=query" ])
         , test "external link changes page" <|
             \() ->
