@@ -1009,11 +1009,38 @@ clickLink linkText href programTest =
         functionDescription =
             "clickLink " ++ String.Extra.escape linkText
 
-        findLinkTag =
-            [ Selector.tag "a"
-            , Selector.attribute (Html.Attributes.href href)
-            , Selector.containing [ Selector.text linkText ]
+        findLinkQuery =
+            [ ( "<a> with text"
+              , ComplexQuery.find (Just "find link")
+                    [ "link" ]
+                    [ Selector.tag "a"
+                    , Selector.attribute (Html.Attributes.href href)
+                    , Selector.containing [ Selector.text linkText ]
+                    ]
+              )
+            , ( "<a> with aria-label"
+              , ComplexQuery.find (Just "find link")
+                    [ "link" ]
+                    [ Selector.tag "a"
+                    , Selector.attribute (Html.Attributes.href href)
+                    , Selector.attribute (Html.Attributes.attribute "aria-label" linkText)
+                    ]
+              )
+            , ( "<a> with <img> with alt text"
+              , ComplexQuery.find (Just "find link")
+                    [ "link" ]
+                    [ Selector.tag "a"
+                    , Selector.attribute (Html.Attributes.href href)
+                    , Selector.containing
+                        [ Selector.tag "img"
+                        , Selector.attribute (Html.Attributes.alt linkText)
+                        ]
+                    ]
+              )
             ]
+
+        simulateEventOnLink event =
+            List.map (Tuple.mapSecond (\s -> s >> ComplexQuery.simulate event)) findLinkQuery
 
         normalClick =
             ( "click"
@@ -1048,17 +1075,12 @@ clickLink linkText href programTest =
             -> ProgramTest model msg effect
             -> ProgramTest model msg effect
         tryClicking { otherwise } =
-            andThen <|
-                \program state ->
-                    let
-                        link =
-                            Program.renderView program state.currentModel
-                                |> Query.find findLinkTag
-                    in
-                    if respondsTo normalClick link then
-                        -- there is a click handler
-                        -- first make sure the handler properly respects "Open in new tab", etc
-                        if respondsTo ctrlClick link || respondsTo metaClick link then
+            if respondsTo normalClick then
+                -- there is a click handler
+                -- first make sure the handler properly respects "Open in new tab", etc
+                if respondsTo ctrlClick || respondsTo metaClick then
+                    andThen <|
+                        \_ _ ->
                             Err
                                 (CustomFailure functionDescription
                                     (String.concat
@@ -1072,29 +1094,21 @@ clickLink linkText href programTest =
                                     )
                                 )
 
-                        else
-                            -- everything looks good, so simulate that event and ignore the `href`
-                            simulateHelper functionDescription (Query.find findLinkTag) normalClick program state
+                else
+                    -- everything looks good, so simulate that event and ignore the `href`
+                    simulateComplexQuery functionDescription (ComplexQuery.exactlyOneOf "Expected one of the following to exist" (simulateEventOnLink normalClick))
 
-                    else
-                        -- the link doesn't have a click handler
-                        otherwise program state
+            else
+                -- the link doesn't have a click handler
+                andThen otherwise
 
-        respondsTo event single =
-            case
-                single
-                    |> Test.Html.Event.simulate event
-                    |> Test.Html.Event.toResult
-            of
-                Err _ ->
-                    False
-
-                Ok _ ->
-                    True
+        respondsTo event =
+            assertComplexQuery functionDescription (ComplexQuery.exactlyOneOf "Expected one of the following to exist" (simulateEventOnLink event)) programTest
+                |> toFailure
+                |> (==) Nothing
     in
     programTest
-        |> assertComplexQuery functionDescription
-            (ComplexQuery.find Nothing [ "a" ] findLinkTag)
+        |> assertComplexQuery functionDescription (ComplexQuery.exactlyOneOf "Expected one of the following to exist" findLinkQuery)
         |> tryClicking { otherwise = TestState.urlRequestHelper functionDescription href }
 
 
