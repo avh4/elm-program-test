@@ -760,38 +760,42 @@ simulateLabeledInputHelper functionDescription fieldId label allowTextArea addit
         )
 
 
+runComplexQuery :
+    String
+    -> (ComplexQuery (Query.Single msg) -> ComplexQuery a)
+    ->
+        (a
+         -> Program model msg effect (SimulatedSub msg)
+         -> TestState model msg effect
+         -> Result Failure (TestState model msg effect)
+        )
+    -> ProgramTest model msg effect
+    -> ProgramTest model msg effect
+runComplexQuery functionName complexQuery fn =
+    andThen <|
+        \program state ->
+            let
+                view =
+                    Program.renderView program state.currentModel
+            in
+            case ComplexQuery.run (complexQuery (ComplexQuery.succeed view)) of
+                ( _, Ok a ) ->
+                    fn a program state
+
+                ( highlight, Err queryFailure ) ->
+                    Err (ViewAssertionFailed ("ProgramTest." ++ functionName) (Html.map (\_ -> ()) (program.view state.currentModel)) highlight queryFailure)
+
+
 {-| TODO: have other internal functions use this to have more consistent error message.
 -}
 simulateComplexQuery : String -> (ComplexQuery (Query.Single msg) -> ComplexQuery msg) -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateComplexQuery functionName complexQuery =
-    andThen <|
-        \program state ->
-            let
-                view =
-                    Program.renderView program state.currentModel
-            in
-            case ComplexQuery.run (complexQuery (ComplexQuery.succeed view)) of
-                ( _, Ok msg ) ->
-                    TestState.update msg program state
-
-                ( highlight, Err queryFailure ) ->
-                    Err (ViewAssertionFailed ("ProgramTest." ++ functionName) (Html.map (\_ -> ()) (program.view state.currentModel)) highlight queryFailure)
+    runComplexQuery functionName complexQuery TestState.update
 
 
 assertComplexQuery : String -> (ComplexQuery (Query.Single msg) -> ComplexQuery ignored) -> ProgramTest model msg effect -> ProgramTest model msg effect
 assertComplexQuery functionName complexQuery =
-    andThen <|
-        \program state ->
-            let
-                view =
-                    Program.renderView program state.currentModel
-            in
-            case ComplexQuery.run (complexQuery (ComplexQuery.succeed view)) of
-                ( _, Ok _ ) ->
-                    Ok state
-
-                ( highlight, Err queryFailure ) ->
-                    Err (ViewAssertionFailed ("ProgramTest." ++ functionName) (Html.map (\_ -> ()) (program.view state.currentModel)) highlight queryFailure)
+    runComplexQuery functionName complexQuery (\_ _ state -> Ok state)
 
 
 {-| Simulates a custom DOM event.
@@ -1004,43 +1008,41 @@ sets `preventDefault`, but this will be done in the future after
 
 -}
 clickLink : String -> String -> ProgramTest model msg effect -> ProgramTest model msg effect
-clickLink linkText href programTest =
+clickLink linkText href =
     let
         functionDescription =
             "clickLink " ++ String.Extra.escape linkText
 
-        findLinkQuery =
-            [ ( "<a> with text"
-              , ComplexQuery.find (Just "find link")
-                    [ "link" ]
-                    [ Selector.tag "a"
-                    , Selector.attribute (Html.Attributes.href href)
-                    , Selector.containing [ Selector.text linkText ]
-                    ]
-              )
-            , ( "<a> with aria-label"
-              , ComplexQuery.find (Just "find link")
-                    [ "link" ]
-                    [ Selector.tag "a"
-                    , Selector.attribute (Html.Attributes.href href)
-                    , Selector.attribute (Html.Attributes.attribute "aria-label" linkText)
-                    ]
-              )
-            , ( "<a> with <img> with alt text"
-              , ComplexQuery.find (Just "find link")
-                    [ "link" ]
-                    [ Selector.tag "a"
-                    , Selector.attribute (Html.Attributes.href href)
-                    , Selector.containing
-                        [ Selector.tag "img"
-                        , Selector.attribute (Html.Attributes.alt linkText)
+        findLink =
+            ComplexQuery.exactlyOneOf "Expected one of the following to exist"
+                [ ( "<a> with text"
+                  , ComplexQuery.find (Just "find link")
+                        [ "a" ]
+                        [ Selector.tag "a"
+                        , Selector.attribute (Html.Attributes.href href)
+                        , Selector.containing [ Selector.text linkText ]
                         ]
-                    ]
-              )
-            ]
-
-        simulateEventOnLink event =
-            List.map (Tuple.mapSecond (\s -> s >> ComplexQuery.simulate event)) findLinkQuery
+                  )
+                , ( "<a> with aria-label"
+                  , ComplexQuery.find (Just "find link")
+                        [ "a" ]
+                        [ Selector.tag "a"
+                        , Selector.attribute (Html.Attributes.href href)
+                        , Selector.attribute (Html.Attributes.attribute "aria-label" linkText)
+                        ]
+                  )
+                , ( "<a> with <img> with alt text"
+                  , ComplexQuery.find (Just "find link")
+                        [ "a" ]
+                        [ Selector.tag "a"
+                        , Selector.attribute (Html.Attributes.href href)
+                        , Selector.containing
+                            [ Selector.tag "img"
+                            , Selector.attribute (Html.Attributes.alt linkText)
+                            ]
+                        ]
+                  )
+                ]
 
         normalClick =
             ( "click"
@@ -1066,50 +1068,55 @@ clickLink linkText href programTest =
                 ]
             )
 
+        simulateEventOnLink event single =
+            single
+                |> Test.Html.Event.simulate event
+                |> Test.Html.Event.toResult
+
+        respondsTo event single =
+            simulateEventOnLink event single
+                |> Result.toMaybe
+                |> (/=) Nothing
+
         tryClicking :
             { otherwise :
                 Program model msg effect (SimulatedSub msg)
                 -> TestState model msg effect
                 -> Result Failure (TestState model msg effect)
             }
-            -> ProgramTest model msg effect
-            -> ProgramTest model msg effect
-        tryClicking { otherwise } =
-            if respondsTo normalClick then
+            -> Query.Single msg
+            -> Program model msg effect (SimulatedSub msg)
+            -> TestState model msg effect
+            -> Result Failure (TestState model msg effect)
+        tryClicking { otherwise } single program state =
+            if respondsTo normalClick single then
                 -- there is a click handler
                 -- first make sure the handler properly respects "Open in new tab", etc
-                if respondsTo ctrlClick || respondsTo metaClick then
-                    andThen <|
-                        \_ _ ->
-                            Err
-                                (CustomFailure functionDescription
-                                    (String.concat
-                                        [ "Found an `<a href=\"...\">` tag has an onClick handler, "
-                                        , "but the handler is overriding ctrl-click and meta-click.\n\n"
-                                        , "A properly behaved single-page app should not override ctrl- and meta-clicks on `<a>` tags "
-                                        , "because this prevents users from opening links in new tabs/windows.\n\n"
-                                        , "Use `onClickPreventDefaultForLinkWithHref` defined at <https://gist.github.com/avh4/712d43d649b7624fab59285a70610707> instead of `onClick` to fix this problem.\n\n"
-                                        , "See discussion of this issue at <https://github.com/elm-lang/navigation/issues/13>."
-                                        ]
-                                    )
-                                )
+                if respondsTo ctrlClick single || respondsTo metaClick single then
+                    Err
+                        (CustomFailure functionDescription
+                            (String.concat
+                                [ "Found an `<a href=\"...\">` tag has an onClick handler, "
+                                , "but the handler is overriding ctrl-click and meta-click.\n\n"
+                                , "A properly behaved single-page app should not override ctrl- and meta-clicks on `<a>` tags "
+                                , "because this prevents users from opening links in new tabs/windows.\n\n"
+                                , "Use `onClickPreventDefaultForLinkWithHref` defined at <https://gist.github.com/avh4/712d43d649b7624fab59285a70610707> instead of `onClick` to fix this problem.\n\n"
+                                , "See discussion of this issue at <https://github.com/elm-lang/navigation/issues/13>."
+                                ]
+                            )
+                        )
 
                 else
                     -- everything looks good, so simulate that event and ignore the `href`
-                    simulateComplexQuery functionDescription (ComplexQuery.exactlyOneOf "Expected one of the following to exist" (simulateEventOnLink normalClick))
+                    simulateEventOnLink normalClick single
+                        |> Result.mapError (SimulateFailed functionDescription)
+                        |> Result.andThen (\msg -> TestState.update msg program state)
 
             else
                 -- the link doesn't have a click handler
-                andThen otherwise
-
-        respondsTo event =
-            assertComplexQuery functionDescription (ComplexQuery.exactlyOneOf "Expected one of the following to exist" (simulateEventOnLink event)) programTest
-                |> toFailure
-                |> (==) Nothing
+                otherwise program state
     in
-    programTest
-        |> assertComplexQuery functionDescription (ComplexQuery.exactlyOneOf "Expected one of the following to exist" findLinkQuery)
-        |> tryClicking { otherwise = TestState.urlRequestHelper functionDescription href }
+    runComplexQuery functionDescription findLink (tryClicking { otherwise = TestState.urlRequestHelper functionDescription href })
 
 
 {-| Simulates replacing the text in an input field labeled with the given label.
