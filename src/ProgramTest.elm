@@ -210,6 +210,7 @@ import ProgramTest.ComplexQuery as ComplexQuery exposing (ComplexQuery)
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
 import ProgramTest.Failure as Failure exposing (Failure(..))
 import ProgramTest.Program as Program exposing (Program)
+import Result.Extra
 import SimulatedEffect exposing (SimulatedEffect, SimulatedSub, SimulatedTask)
 import String.Extra
 import Test.Html.Event
@@ -1068,15 +1069,11 @@ clickLink linkText href =
                 ]
             )
 
-        simulateEventOnLink event single =
+        respondsTo event single =
             single
                 |> Test.Html.Event.simulate event
                 |> Test.Html.Event.toResult
-
-        respondsTo event single =
-            simulateEventOnLink event single
-                |> Result.toMaybe
-                |> (/=) Nothing
+                |> Result.Extra.isOk
 
         tryClicking :
             { otherwise :
@@ -1108,7 +1105,9 @@ clickLink linkText href =
 
                 else
                     -- everything looks good, so simulate that event and ignore the `href`
-                    simulateEventOnLink normalClick single
+                    single
+                        |> Test.Html.Event.simulate normalClick
+                        |> Test.Html.Event.toResult
                         |> Result.mapError (SimulateFailed functionDescription)
                         |> Result.andThen (\msg -> TestState.update msg program state)
 
