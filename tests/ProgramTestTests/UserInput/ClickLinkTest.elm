@@ -34,6 +34,12 @@ linkProgram =
                 Html.div []
                     [ Html.a [ href "https://example.com/link" ] [ Html.text "External" ]
                     , Html.a [ href "/settings" ] [ Html.text "Relative" ]
+                    , Html.a
+                        [ href "https://example.com/link"
+                        , Html.Attributes.attribute "aria-label" "Aria"
+                        ]
+                        []
+                    , Html.a [ href "https://example.com/link" ] [ Html.img [ Html.Attributes.alt "Alt Text" ] [] ]
                     ]
         }
         |> ProgramTest.withBaseUrl "http://localhost:3000/Main.elm"
@@ -47,6 +53,16 @@ all =
             \() ->
                 linkProgram
                     |> ProgramTest.clickLink "External" "https://example.com/link"
+                    |> ProgramTest.expectPageChange "https://example.com/link"
+        , test "can verify a link with aria-label" <|
+            \() ->
+                linkProgram
+                    |> ProgramTest.clickLink "Aria" "https://example.com/link"
+                    |> ProgramTest.expectPageChange "https://example.com/link"
+        , test "can verify a link with img and alt text" <|
+            \() ->
+                linkProgram
+                    |> ProgramTest.clickLink "Alt Text" "https://example.com/link"
                     |> ProgramTest.expectPageChange "https://example.com/link"
         , test "can verify a relative link" <|
             \() ->
