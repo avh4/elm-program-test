@@ -28,4 +28,12 @@ all =
             \() ->
                 startTask (Task.succeed 5 |> Task.andThen ((+) 10 >> Task.fail))
                     |> ProgramTest.expectModel (Expect.equal [ "Err 15" ])
+        , test "simulated Task.sequence" <|
+            \() ->
+                startTask (Task.sequence [ Task.succeed 1, Task.succeed 2 ])
+                    |> ProgramTest.expectModel (Expect.equal [ "Ok [1,2]" ])
+        , test "simulated Task.sequence fail" <|
+            \() ->
+                startTask (Task.sequence [ Task.succeed 1, Task.fail () ])
+                    |> ProgramTest.expectModel (Expect.equal [ "Err ()" ])
         ]
