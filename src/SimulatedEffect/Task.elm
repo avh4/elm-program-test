@@ -1,6 +1,6 @@
 module SimulatedEffect.Task exposing
     ( perform, attempt
-    , andThen, succeed, fail
+    , andThen, succeed, fail, sequence
     , map, map2, map3, map4, map5
     , mapError, onError
     )
@@ -20,7 +20,7 @@ to help you implement the function to provide when using [`ProgramTest.withSimul
 
 # Chains
 
-@docs andThen, succeed, fail
+@docs andThen, succeed, fail, sequence
 
 
 # Maps
@@ -96,6 +96,16 @@ succeed =
 fail : x -> SimulatedTask x a
 fail =
     SimulatedEffect.Fail
+
+
+{-| Start with a list of tasks, and turn them into a single task that returns a
+list. The tasks will be run in order one-by-one and if any task fails the whole
+sequence fails.
+sequence [ succeed 1, succeed 2 ] == succeed [ 1, 2 ]
+-}
+sequence : List (SimulatedTask x a) -> SimulatedTask x (List a)
+sequence tasks =
+    List.foldr (map2 (::)) (succeed []) tasks
 
 
 {-| Transform a task.
