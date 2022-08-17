@@ -1,9 +1,12 @@
-## 3.6.4
+## 3.7.0
 
 New features:
 
 - `clickLink` now works for internal links when testing a `Browser.application`
+- `clickLink` now works for links with aria-label
+- `clickLink` now works for links containing img with alt text
 - `pushUrl` now works properly for relative urls with query and/or fragment
+- Added `SimulatedEffect.Task.sequence`
 
 
 ## 3.6.3
