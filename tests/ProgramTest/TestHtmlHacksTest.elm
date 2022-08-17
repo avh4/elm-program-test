@@ -186,6 +186,13 @@ all =
                                     )
                                 )
                             )
+            , Test.test "parses Query.find always expects to find 1 element error" <|
+                \() ->
+                    parse
+                        [ "Query.find always expects to find 1 element, but it found 2 instead."
+                        , "HINT: If you actually expected 2 elements, use Query.findAll instead of Query.find."
+                        ]
+                        |> Expect.equal (Ok (MultipleElementsFailure 2))
             ]
         ]
 

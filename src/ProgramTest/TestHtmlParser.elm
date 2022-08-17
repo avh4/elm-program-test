@@ -9,6 +9,7 @@ import ProgramTest.HtmlParserHacks as HtmlParserHacks
 type FailureReport html
     = QueryFailure html (List (Step html)) Assertion
     | EventFailure String html
+    | MultipleElementsFailure Int
 
 
 type Step html
@@ -44,6 +45,10 @@ parser_ parseHtml =
             |. Parser.symbol "\" events like I expected it would.\n\n"
             |= parseHtml
             |. Parser.end
+        , Parser.succeed MultipleElementsFailure
+            |. Parser.symbol "Query.find always expects to find 1 element, but it found "
+            |= Parser.int
+            |. Parser.symbol " instead."
         ]
 
 

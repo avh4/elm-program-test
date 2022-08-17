@@ -38,6 +38,9 @@ renderHtml colorHidden highlightPredicate single =
         Ok (EventFailure name _) ->
             pleaseReport ("renderHtml: unexpected EventFailure: \"" ++ name ++ "\"")
 
+        Ok (MultipleElementsFailure _) ->
+            pleaseReport "renderHtml: unexpected MultipleElementsFailure"
+
         Err err ->
             pleaseReport ("renderHtml: couldn't parse failure report: " ++ err)
 
@@ -58,6 +61,9 @@ getPassingSelectors selectors single =
 
         Err err ->
             [ pleaseReport ("getPassingSelectors: couldn't parse failure report: " ++ err) ]
+
+        Ok (MultipleElementsFailure _) ->
+            [ pleaseReport "getPassingSelectors: got unexpected MultipleElementsFailure" ]
 
 
 forceFailureReport : List Selector -> Query.Single any -> Result String (FailureReport Html.Parser.Node)
@@ -123,6 +129,9 @@ parseSimulateFailure string =
             case result of
                 EventFailure name html ->
                     Ok ("Event.expectEvent: I found a node, but it does not listen for \"" ++ name ++ "\" events like I expected it would.")
+
+                MultipleElementsFailure num ->
+                    Ok ("Query.find always expects to find 1 element, but it found " ++ String.fromInt num ++ " instead.")
 
                 _ ->
                     Err (pleaseReport "Got a failure message from Test.Html.Query that we couldn't parse: " ++ string)

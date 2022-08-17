@@ -348,6 +348,9 @@ firstErrorOf source choices =
                         Ok (TestHtmlParser.EventFailure name _) ->
                             [ Err ("PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: firstErrorOf: got unexpected EventFailure \"" ++ name ++ "\"") ]
 
+                        Ok (TestHtmlParser.MultipleElementsFailure _) ->
+                            [ Err "PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: firstErrorOf: got unexpected MultipleElementsFailure" ]
+
                         Err err ->
                             [ Err ("PLEASE REPORT THIS AT <https://github.com/avh4/elm-program-test/issues>: firstErrorOf: couldn't parse failure report: " ++ err) ]
 
