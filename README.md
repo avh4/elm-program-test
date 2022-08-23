@@ -79,7 +79,8 @@ import MyProgram exposing (Flags, Msg, Model) -- just an imaginary example
 start : String -> Flags -> ProgramTest Model Msg (Cmd Msg)
 start initialUrl flags =
     ProgramTest.createApplication
-        { onUrlChange = MyProgram.OnRouteChange
+        { onUrlChange = MyProgram.OnUrlChange
+        , onUrlRequest = MyProgram.OnUrlRequest
         , init =
             -- NOTE: the type of MyProgram.init is:
             -- MyProgram.Flags -> Navigation.Location -> (MyProgram.Model, Cmd MyProgram.Msg)

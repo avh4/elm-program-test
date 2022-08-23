@@ -3,9 +3,12 @@ module TestingProgram exposing (Model, Msg(..), ProgramTest, application, startE
 {-| This is a generic program for use in tests for many elm-program-test modules.
 -}
 
+import Browser
 import Html exposing (Html)
+import Html.Attributes
 import ProgramTest exposing (SimulatedEffect)
 import SimulatedEffect.Cmd
+import SimulatedEffect.Navigation
 import Url
 
 
@@ -38,13 +41,16 @@ application : SimulatedEffect Msg -> ProgramTest
 application initialEffects =
     ProgramTest.createApplication
         { onUrlChange = \location -> Log ("OnUrlChange: " ++ Url.toString location)
-        , onUrlRequest = \_ -> Debug.todo "ProgramTestTests-2:onUrlRequest"
+        , onUrlRequest = UrlRequested
         , init = \() location key -> ( [], initialEffects )
         , update = update
         , view =
             \_ ->
                 { title = "page title"
-                , body = []
+                , body =
+                    [ Html.a [ Html.Attributes.href "/search?q=query" ] [ Html.text "SPA" ]
+                    , Html.a [ Html.Attributes.href "http://external.com/test" ] [ Html.text "External" ]
+                    ]
                 }
         }
         |> ProgramTest.withSimulatedEffects identity
@@ -60,6 +66,7 @@ type Msg
     = Clear
     | Log String
     | ProduceEffects (SimulatedEffect Msg)
+    | UrlRequested Browser.UrlRequest
 
 
 update : Msg -> Model -> ( Model, SimulatedEffect Msg )
@@ -79,3 +86,11 @@ update msg model =
             ( model
             , effect
             )
+
+        UrlRequested urlRequest ->
+            case urlRequest of
+                Browser.Internal url ->
+                    ( model, SimulatedEffect.Navigation.pushUrl (Url.toString url) )
+
+                Browser.External href ->
+                    ( model, SimulatedEffect.Navigation.load href )
