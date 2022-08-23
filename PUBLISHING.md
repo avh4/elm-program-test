@@ -1,4 +1,5 @@
 - `git switch -c release/<new version>`
+- Optionally update javascript dependencies with `npx npm-check-updates` and commit changes
 - `npx elm bump`
 - Update CHANGELOG.md (replace "main" with the new version number, and review the notes for the new version)
 - Commit changes

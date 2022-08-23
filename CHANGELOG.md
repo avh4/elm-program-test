@@ -1,15 +1,20 @@
-## 3.6.4
-
-New features:
-
-- `clickLink` now works for internal links when testing a `Browser.application`
-- `pushUrl` now works properly for relative urls with query and/or fragment
-- `clickLink` looks for links with aria-label or containing img with alt text
-- Added `SimulatedEffect.Task.sequence`
+## develop
 
 Bug fixes:
 
 - Parses `Query.find always expects to find 1 element` errors
+
+
+## 3.7.0
+
+New features:
+
+- `clickLink` now works for internal links when testing a `Browser.application`
+- `clickLink` now works for links with aria-label
+- `clickLink` now works for links containing img with alt text
+- `pushUrl` now works properly for relative urls with query and/or fragment
+- Added `SimulatedEffect.Task.sequence`
+
 
 ## 3.6.3
 
