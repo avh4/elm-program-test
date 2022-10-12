@@ -38,11 +38,13 @@ all =
                         |> assertOutgoingPortValues "other" (Decode.null ()) (Expect.equal [ () ])
                         |> expectFailure
                             [ assert ++ "OutgoingPortValues: values sent to port \"other\" did not match:"
+                            , "  "
                             , "[]"
-                            , "╵"
-                            , "│ Expect.equal"
                             , "╷"
+                            , "│ Expect.equal"
+                            , "╵"
                             , "[()]"
+                            , " ▲▲ "
                             ]
             , testOutgoingPortValues "clears values after checking" <|
                 \_ assertOutgoingPortValues ->

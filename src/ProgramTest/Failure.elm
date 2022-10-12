@@ -8,6 +8,8 @@ import String.Extra
 import Test.Html.Query as Query
 import Test.Runner.Failure
 import Url exposing (Url)
+import Vendored.Failure
+import Vendored.FormatMonochrome
 
 
 type Failure
@@ -35,7 +37,12 @@ toString failure =
             cause ++ " caused the program to end by navigating to " ++ String.Extra.escape (Url.toString finalLocation) ++ ".  NOTE: If this is what you intended, use ProgramTest.expectPageChange to end your test."
 
         ExpectFailed expectationName description reason ->
-            expectationName ++ ":\n" ++ Test.Runner.Failure.format description reason
+            expectationName
+                ++ ":\n"
+                ++ Vendored.Failure.format
+                    Vendored.FormatMonochrome.formatEquality
+                    description
+                    reason
 
         SimulateFailed functionName message ->
             functionName ++ ":\n" ++ message

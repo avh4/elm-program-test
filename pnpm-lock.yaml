@@ -5,8 +5,8 @@ specifiers:
   chokidar-cli: ^3.0.0
   concurrently: ^7.3.0
   elm-doc-preview: ^5.0.5
-  elm-test: ^0.19.1-revision9
-  elm-tooling: ^1.8.0
+  elm-test: ^0.19.1-revision10
+  elm-tooling: ^1.9.0
   vuepress: ^1.9.7
 
 devDependencies:
@@ -14,8 +14,8 @@ devDependencies:
   chokidar-cli: 3.0.0
   concurrently: 7.3.0
   elm-doc-preview: 5.0.5
-  elm-test: 0.19.1-revision9
-  elm-tooling: 1.8.0
+  elm-test: 0.19.1-revision10
+  elm-tooling: 1.9.0
   vuepress: 1.9.7
 
 packages:
@@ -3644,8 +3644,8 @@ packages:
     resolution: {integrity: sha512-A05XKZKhzM8vWTo8KvNR4g1ICt9iMPOAMfo79OK25c+tQaLSfQ8iMYvW6XgSEd+SgRfM5VSKX4hKEiH6iTiWsg==}
     dev: true
 
-  /elm-test/0.19.1-revision9:
-    resolution: {integrity: sha512-lvHJbh16sy7oUBBPIEMN+0v6dGDZFmfvwq+V+TnGPk5ZlI64vcykx8E8+zLt/E+Ja42UKMMXXgN1ZHQ1V6Ic2Q==}
+  /elm-test/0.19.1-revision10:
+    resolution: {integrity: sha512-33jXpA15alVcYjX+UJOkiOmQIQxjd3c0eeg3960VyhEf8tG8O4g4B5ipMmu6KAllncrSxSQrYzKJnNJM/8ZiCg==}
     engines: {node: '>=12.20.0'}
     hasBin: true
     dependencies:
@@ -3661,8 +3661,8 @@ packages:
       xmlbuilder: 15.1.1
     dev: true
 
-  /elm-tooling/1.8.0:
-    resolution: {integrity: sha512-IjMvW/VHqxLidlJSAocBGDBmqiZ1NS0lK/UCMRU4ULEEaTVjpSd/9Dv0mH2ok0H0egSTYx19GnrdL4Lq9h+z+A==}
+  /elm-tooling/1.9.0:
+    resolution: {integrity: sha512-FuMsshhsnjAizktA/j5JWLHLHZDt6CSmXbGQZtgOTNz86Z9eUxTupoZZ8czpW2aRWBUiD6IhJNWDQjJsgNuEIg==}
     hasBin: true
     dev: true
 
