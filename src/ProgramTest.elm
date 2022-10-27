@@ -1929,15 +1929,18 @@ This way you can access the data inside the current model coming from the curren
 
 -}
 withModel : (model -> ProgramTest model msg effect -> ProgramTest model msg effect) -> ProgramTest model msg effect -> ProgramTest model msg effect
-withModel fn =
-    andThen <|
-        \program state ->
-            case fn state.currentModel program of
-                Created newProgram ->
-                    Ok newProgram.state
+withModel fn programTest =
+    case programTest of
+        Created created ->
+            case created.state of
+                Err { reason } ->
+                    FailedToCreate reason
 
-                FailedToCreate failure ->
-                    Err failure
+                Ok state ->
+                    fn state.currentModel programTest
+
+        FailedToCreate failure ->
+            FailedToCreate failure
 
 
 {-| Simulate the outcome of the last effect produced by the program being tested
