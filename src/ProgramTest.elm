@@ -1928,7 +1928,10 @@ For example, let's say that you are storing the currentDay on your model, and yo
 This way you can access the data inside the current model coming from the current state of your program.
 
 -}
-withModel : (model -> ProgramTest model msg effect -> ProgramTest model msg effect) -> ProgramTest model msg effect -> ProgramTest model msg effect
+withModel :
+    (model -> ProgramTest model msg effect -> ProgramTest model msg effect)
+    -> ProgramTest model msg effect
+    -> ProgramTest model msg effect
 withModel fn programTest =
     case programTest of
         Created created ->
