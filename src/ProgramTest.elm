@@ -28,7 +28,7 @@ module ProgramTest exposing
     , simulateLastEffect
     , fail, createFailed
     , getOutgoingPortValues
-    , elmMajorVersionHack_3
+    , elmMajorVersionHack_4
     )
 
 {-| A `ProgramTest` simulates the execution of an Elm program
@@ -198,7 +198,7 @@ These functions may be useful if you are writing your own custom assertion funct
 
 # Elm language workaround
 
-@docs elmMajorVersionHack_3
+@docs elmMajorVersionHack_4
 
 -}
 
@@ -2353,6 +2353,6 @@ and [elm diff / publish is unaware of breaking visual changes · Issue #2145 · 
 are addressed, this is required to allow the major version of this package to be updated.
 
 -}
-elmMajorVersionHack_3 : ()
-elmMajorVersionHack_3 =
+elmMajorVersionHack_4 : ()
+elmMajorVersionHack_4 =
     ()

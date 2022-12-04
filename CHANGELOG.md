@@ -1,3 +1,8 @@
+## 4.0.0
+
+- Upgrade to elm-explorations/test 2.0.0
+
+
 ## 3.8.0
 
 - Added an unused definition to workaround issues with `elm publish`
