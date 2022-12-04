@@ -1,3 +1,8 @@
+## 3.8.0
+
+- Added an unused definition to workaround issues with `elm publish`
+
+
 ## 3.7.0
 
 New features:
