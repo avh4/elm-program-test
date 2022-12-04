@@ -3,7 +3,7 @@
     "name": "avh4/elm-program-test",
     "summary": "Test Elm programs",
     "license": "MIT",
-    "version": "3.7.0",
+    "version": "3.8.0",
     "exposed-modules": [
         "ProgramTest",
         "SimulatedEffect.Cmd",
