@@ -3,7 +3,7 @@
     "name": "avh4/elm-program-test",
     "summary": "Test Elm programs",
     "license": "MIT",
-    "version": "3.7.0",
+    "version": "4.0.0",
     "exposed-modules": [
         "ProgramTest",
         "SimulatedEffect.Cmd",
@@ -28,7 +28,7 @@
         "elm/time": "1.0.0 <= v < 2.0.0",
         "elm/url": "1.0.0 <= v < 2.0.0",
         "elm-community/list-extra": "8.0.0 <= v < 9.0.0",
-        "elm-explorations/test": "1.2.1 <= v < 2.0.0",
+        "elm-explorations/test": "2.0.0 <= v < 3.0.0",
         "hecrj/html-parser": "2.3.3 <= v < 3.0.0",
         "mgold/elm-nonempty-list": "4.0.0 <= v < 5.0.0"
     },

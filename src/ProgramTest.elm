@@ -28,6 +28,7 @@ module ProgramTest exposing
     , simulateLastEffect
     , fail, createFailed
     , getOutgoingPortValues
+    , elmMajorVersionHack_4
     )
 
 {-| A `ProgramTest` simulates the execution of an Elm program
@@ -193,6 +194,11 @@ These functions may be useful if you are writing your own custom assertion funct
 
 @docs fail, createFailed
 @docs getOutgoingPortValues
+
+
+# Elm language workaround
+
+@docs elmMajorVersionHack_4
 
 -}
 
@@ -2337,3 +2343,16 @@ getOutgoingPortValues portName programTest =
                             Dict.get portName effects.outgoingPortValues
                                 |> Maybe.withDefault []
                                 |> Ok
+
+
+{-| Unused. This is a workaround for issues with publishing this package.
+
+Until [Allow package authors to request major versions if API is the same, but behavior is not · Issue #2099 · elm/compiler](https://github.com/elm/compiler/issues/2099),
+[Inaccuracy: Elm does not enforce semantic versioning · Issue #868 · elm/elm-lang.org](https://github.com/elm/elm-lang.org/issues/868),
+and [elm diff / publish is unaware of breaking visual changes · Issue #2145 · elm/compiler](https://github.com/elm/compiler/issues/2145)
+are addressed, this is required to allow the major version of this package to be updated.
+
+-}
+elmMajorVersionHack_4 : ()
+elmMajorVersionHack_4 =
+    ()
