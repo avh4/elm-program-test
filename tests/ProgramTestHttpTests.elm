@@ -160,11 +160,13 @@ all =
                             (.body >> Expect.equal """{"ok":900}""")
                         |> expectFailure
                             [ expect ++ "HttpRequest:"
+                            , "         ▼▼▼▼  "
                             , """"{\\"ok\\":true}\""""
-                            , "╵"
-                            , "│ Expect.equal"
                             , "╷"
+                            , "│ Expect.equal"
+                            , "╵"
                             , """"{\\"ok\\":900}\""""
+                            , "         ▲▲▲  "
                             ]
             , testRequest "can assert on request headers" <|
                 \expect assertHttpRequest ->

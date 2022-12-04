@@ -59,10 +59,11 @@ expectFailureContaining expectedSubstring actualResult =
             Expect.fail "Expected a failure, but got a pass"
 
         Just actualInfo ->
-            Expect.true
-                ("Expected failure message to contain: "
-                    ++ expectedSubstring
-                    ++ "but got\n\n"
-                    ++ actualInfo.description
-                )
-                (String.contains expectedSubstring actualInfo.description)
+            String.contains expectedSubstring actualInfo.description
+                |> Expect.equal True
+                |> Expect.onFail
+                    ("Expected failure message to contain: "
+                        ++ expectedSubstring
+                        ++ "but got\n\n"
+                        ++ actualInfo.description
+                    )
