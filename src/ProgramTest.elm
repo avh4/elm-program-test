@@ -24,6 +24,7 @@ module ProgramTest exposing
     , routeChange
     , update
     , expectModel
+    , withModel
     , expectLastEffect, ensureLastEffect
     , simulateLastEffect
     , fail, createFailed
@@ -180,6 +181,7 @@ but you may find them useful to test things that are not yet directly supported 
 
 @docs update
 @docs expectModel
+@docs withModel
 
 
 ## Low-level functions for effects
@@ -1921,6 +1923,33 @@ expectModel assertion =
                     Err (ExpectFailed "expectModel" reason.description reason.reason)
     )
         >> done
+
+
+{-| A way to use the current model in your simulations.
+
+When possible, you should not rely on your internal model but on the view to check that your program is behaving as expected.
+This function can be very helpful if your model contains data that you need in order to compute a value to test against.
+
+For example, let's say that you are storing the currentDay on your model, and you want to compute a date in the future to assert that a certain behaviour occurs.
+This way you can access the data inside the current model coming from the current state of your program.
+
+-}
+withModel :
+    (model -> ProgramTest model msg effect -> ProgramTest model msg effect)
+    -> ProgramTest model msg effect
+    -> ProgramTest model msg effect
+withModel fn programTest =
+    case programTest of
+        Created created ->
+            case created.state of
+                Err { reason } ->
+                    FailedToCreate reason
+
+                Ok state ->
+                    fn state.currentModel programTest
+
+        FailedToCreate failure ->
+            FailedToCreate failure
 
 
 {-| Simulate the outcome of the last effect produced by the program being tested
