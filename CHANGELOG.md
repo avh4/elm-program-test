@@ -1,3 +1,11 @@
+## 4.1.0
+
+New features:
+
+  - Added `ProgramTest.getViewHtml` for extracting the rendered view HTML as a string
+  - Added `ProgramTest.getModel` for extracting the current model value
+
+
 ## 4.0.0
 
 - Upgrade to elm-explorations/test 2.0.0
