@@ -1,4 +1,4 @@
-module ProgramTest.TestHtmlHacks exposing (getPassingSelectors, parseFailureReport, parseFailureReportWithoutHtml, parseSimulateFailure, renderHtml)
+module ProgramTest.TestHtmlHacks exposing (forceFailureReport, getPassingSelectors, parseFailureReport, parseFailureReportWithoutHtml, parseSimulateFailure, renderHtml)
 
 import Html.Parser
 import Parser

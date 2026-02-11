@@ -28,6 +28,7 @@ module ProgramTest exposing
     , simulateLastEffect
     , fail, createFailed
     , getOutgoingPortValues
+    , getViewHtml, getModel
     , elmMajorVersionHack_4
     )
 
@@ -196,6 +197,15 @@ These functions may be useful if you are writing your own custom assertion funct
 @docs getOutgoingPortValues
 
 
+## Extracting values
+
+These functions extract the current view or model from a `ProgramTest` as values.
+They are intended for tooling authors building snapshot testing or other custom
+test workflows.
+
+@docs getViewHtml, getModel
+
+
 # Elm language workaround
 
 @docs elmMajorVersionHack_4
@@ -215,7 +225,11 @@ import MultiDict
 import ProgramTest.ComplexQuery as ComplexQuery exposing (ComplexQuery)
 import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
 import ProgramTest.Failure as Failure exposing (Failure(..))
+import ProgramTest.HtmlHighlighter as HtmlHighlighter
+import ProgramTest.HtmlRenderer as HtmlRenderer
 import ProgramTest.Program as Program exposing (Program)
+import ProgramTest.TestHtmlHacks as TestHtmlHacks
+import ProgramTest.TestHtmlParser exposing (FailureReport(..))
 import Result.Extra
 import SimulatedEffect exposing (SimulatedEffect, SimulatedSub, SimulatedTask)
 import String.Extra
@@ -1921,6 +1935,96 @@ expectModel assertion =
                     Err (ExpectFailed "expectModel" reason.description reason.reason)
     )
         >> done
+
+
+{-| Get the rendered HTML of the current view as a String.
+
+This is useful for tooling authors building snapshot testing or other custom
+test workflows where you need the rendered output as a value rather than
+making specific assertions about the view structure.
+
+    ProgramTest.createSandbox
+        { init = CounterApp.init
+        , update = CounterApp.update
+        , view = CounterApp.view
+        }
+        |> ProgramTest.start ()
+        |> ProgramTest.clickButton "+"
+        |> ProgramTest.getViewHtml
+    --> Ok "<div class=\"counter\">..."
+
+Returns `Err` with a description of the failure if the `ProgramTest` has
+already entered a failure state (e.g., a previous interaction failed).
+
+-}
+getViewHtml : ProgramTest model msg effect -> Result String String
+getViewHtml programTest =
+    case programTest of
+        Created created ->
+            case created.state of
+                Ok state ->
+                    let
+                        querySingle =
+                            Program.renderView created.program state.currentModel
+                    in
+                    case TestHtmlHacks.forceFailureReport [] querySingle of
+                        Ok (QueryFailure node _ _) ->
+                            let
+                                highlighted =
+                                    HtmlHighlighter.highlight (\_ _ _ -> True) node
+                            in
+                            Ok (HtmlRenderer.render identity 0 [ highlighted ] |> String.trimRight)
+
+                        Ok (EventFailure _ _) ->
+                            Err "getViewHtml: unexpected internal error (EventFailure)"
+
+                        Err err ->
+                            Err ("getViewHtml: could not parse view HTML: " ++ err)
+
+                Err failure ->
+                    Err (Failure.toString failure.reason)
+
+        FailedToCreate failure ->
+            Err (Failure.toString failure)
+
+
+{-| Get the current model from a `ProgramTest`.
+
+When possible, you should prefer making assertions about the rendered view
+(see [`expectView`](#expectView)) or external requests made by your program,
+as testing at the level that users interact with your program makes tests
+more resilient to implementation changes.
+
+However, this can be useful for tooling authors building snapshot testing
+or other custom test workflows:
+
+    ProgramTest.createSandbox
+        { init = App.init
+        , update = App.update
+        , view = App.view
+        }
+        |> ProgramTest.start ()
+        |> ProgramTest.clickButton "Submit"
+        |> ProgramTest.getModel
+    --> Ok { submitted = True, ... }
+
+Returns `Err` with a description of the failure if the `ProgramTest` has
+already entered a failure state.
+
+-}
+getModel : ProgramTest model msg effect -> Result String model
+getModel programTest =
+    case programTest of
+        Created created ->
+            case created.state of
+                Ok state ->
+                    Ok state.currentModel
+
+                Err failure ->
+                    Err (Failure.toString failure.reason)
+
+        FailedToCreate failure ->
+            Err (Failure.toString failure)
 
 
 {-| Simulate the outcome of the last effect produced by the program being tested
