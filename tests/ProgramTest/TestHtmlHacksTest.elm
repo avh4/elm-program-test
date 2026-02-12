@@ -144,9 +144,6 @@ all =
                         |> Expect.equal
                             (Ok
                                 [ FindStep
-                                    [ Tag "label"
-                                    , Containing [ TestHtmlParser.Text "Field 1" ]
-                                    ]
                                     (Element "label"
                                         []
                                         [ Html.Parser.Text "Field 1"

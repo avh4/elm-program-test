@@ -229,7 +229,7 @@ import ProgramTest.HtmlHighlighter as HtmlHighlighter
 import ProgramTest.HtmlRenderer as HtmlRenderer
 import ProgramTest.Program as Program exposing (Program)
 import ProgramTest.TestHtmlHacks as TestHtmlHacks
-import ProgramTest.TestHtmlParser exposing (FailureReport(..))
+import ProgramTest.TestHtmlParser exposing (FailureReport(..), Step(..))
 import Result.Extra
 import SimulatedEffect exposing (SimulatedEffect, SimulatedSub, SimulatedTask)
 import String.Extra
@@ -1937,7 +1937,11 @@ expectModel assertion =
         >> done
 
 
-{-| Get the rendered HTML of the current view as a String.
+{-| Get the rendered HTML of the current view (or a portion of it) as a String.
+
+The first argument is a list of
+[`Test.Html.Selector`](https://package.elm-lang.org/packages/elm-explorations/test/latest/Test-Html-Selector)s
+to narrow down to a specific element. Use `[]` to get the full view HTML.
 
 This is useful for tooling authors building snapshot testing or other custom
 test workflows where you need the rendered output as a value rather than
@@ -1950,15 +1954,18 @@ making specific assertions about the view structure.
         }
         |> ProgramTest.start ()
         |> ProgramTest.clickButton "+"
-        |> ProgramTest.getViewHtml
-    --> Ok "<div class=\"counter\">..."
+        |> ProgramTest.getViewHtml []
+        --> Ok "<div class=\"counter\">..."
+        -- Or narrow down to a specific element:
+        |> ProgramTest.getViewHtml [ Selector.id "main-content" ]
 
 Returns `Err` with a description of the failure if the `ProgramTest` has
-already entered a failure state (e.g., a previous interaction failed).
+already entered a failure state, or if the selectors match zero or more than
+one element.
 
 -}
-getViewHtml : ProgramTest model msg effect -> Result String String
-getViewHtml programTest =
+getViewHtml : List Selector -> ProgramTest model msg effect -> Result String String
+getViewHtml selectors programTest =
     case programTest of
         Created created ->
             case created.state of
@@ -1966,20 +1973,40 @@ getViewHtml programTest =
                     let
                         querySingle =
                             Program.renderView created.program state.currentModel
+
+                        targetQuery =
+                            if List.isEmpty selectors then
+                                querySingle
+
+                            else
+                                querySingle |> Query.find selectors
                     in
-                    case TestHtmlHacks.forceFailureReport [] querySingle of
-                        Ok (QueryFailure node _ _) ->
-                            let
-                                highlighted =
-                                    HtmlHighlighter.highlight (\_ _ _ -> True) node
-                            in
-                            Ok (HtmlRenderer.render identity 0 [ highlighted ] |> String.trimRight)
+                    case targetQuery |> Query.has [] |> Test.Runner.getFailureReason of
+                        Just reason ->
+                            Err ("getViewHtml: " ++ reason.description)
 
-                        Ok (EventFailure _ _) ->
-                            Err "getViewHtml: unexpected internal error (EventFailure)"
+                        Nothing ->
+                            case TestHtmlHacks.forceFailureReport [] targetQuery of
+                                Ok (QueryFailure rootNode steps _) ->
+                                    let
+                                        node =
+                                            case List.reverse steps of
+                                                (FindStep narrowedNode) :: _ ->
+                                                    narrowedNode
 
-                        Err err ->
-                            Err ("getViewHtml: could not parse view HTML: " ++ err)
+                                                [] ->
+                                                    rootNode
+
+                                        highlighted =
+                                            HtmlHighlighter.highlight (\_ _ _ -> True) node
+                                    in
+                                    Ok (HtmlRenderer.render identity 0 [ highlighted ] |> String.trimRight)
+
+                                Ok (EventFailure _ _) ->
+                                    Err "getViewHtml: unexpected internal error (EventFailure)"
+
+                                Err err ->
+                                    Err ("getViewHtml: could not parse view HTML: " ++ err)
 
                 Err failure ->
                     Err (Failure.toString failure.reason)

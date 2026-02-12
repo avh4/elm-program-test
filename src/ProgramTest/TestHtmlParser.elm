@@ -12,7 +12,7 @@ type FailureReport html
 
 
 type Step html
-    = FindStep (List Selector) html
+    = FindStep html
 
 
 type Selector
@@ -88,7 +88,7 @@ stepParser parseHtml =
     Parser.oneOf
         [ Parser.succeed FindStep
             |. Parser.keyword "▼ Query.find "
-            |= selectorsParser
+            |. Parser.chompUntil "\n"
             |. Parser.symbol "\n\n    1)  "
             |= parseHtml
         ]
