@@ -1682,7 +1682,7 @@ simulateHttpResponseHelper functionName method url pendingRequestIndex failIfMor
                             Err (NoMatchingHttpRequest pendingRequestIndex (List.length prev) functionName { method = method, url = url } (MultiDict.keys simulation.state.http))
 
                         ( prev, actualRequest :: rest ) ->
-                            if failIfMorePendingRequests && rest /= [] then
+                            if failIfMorePendingRequests && not (List.isEmpty rest) then
                                 Err (MultipleMatchingHttpRequest pendingRequestIndex (List.length prev + 1 + List.length rest) functionName { method = method, url = url } (MultiDict.keys simulation.state.http))
 
                             else
@@ -1883,7 +1883,7 @@ simulateIncomingPort portName value =
                                 Ok msg ->
                                     TestState.update msg program tc
                     in
-                    if matches == [] then
+                    if List.isEmpty matches then
                         Err (CustomFailure functionName "the program is not currently subscribed to the port")
 
                     else
