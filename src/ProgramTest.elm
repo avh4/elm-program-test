@@ -1768,7 +1768,7 @@ expectOutgoingPortValuesHelper functionName portName decoder checkValues =
                     Err (EffectSimulationNotConfigured functionName)
 
                 Just simulation ->
-                    case allOk <| List.map (Json.Decode.decodeValue decoder) <| EffectSimulation.outgoingPortValues portName simulation of
+                    case allOk decoder <| EffectSimulation.outgoingPortValues portName simulation of
                         Err errs ->
                             Err (CustomFailure (functionName ++ ": failed to decode port values") (List.map Json.Decode.errorToString errs |> String.join "\n"))
 
@@ -1790,13 +1790,13 @@ expectOutgoingPortValuesHelper functionName portName decoder checkValues =
                                         )
 
 
-allOk : List (Result x a) -> Result (List x) (List a)
-allOk results =
+allOk : Json.Decode.Decoder a -> List Json.Decode.Value -> Result (List Json.Decode.Error) (List a)
+allOk decoder results =
     let
         step next acc =
             case acc of
                 Ok a ->
-                    case next of
+                    case Json.Decode.decodeValue decoder next of
                         Ok n ->
                             Ok (n :: a)
 
@@ -1804,7 +1804,7 @@ allOk results =
                             Err [ n ]
 
                 Err x ->
-                    case next of
+                    case Json.Decode.decodeValue decoder next of
                         Ok _ ->
                             acc
 
