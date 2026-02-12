@@ -1794,18 +1794,22 @@ allOk : List (Result x a) -> Result (List x) (List a)
 allOk results =
     let
         step next acc =
-            case ( next, acc ) of
-                ( Ok n, Ok a ) ->
-                    Ok (n :: a)
+            case acc of
+                Ok a ->
+                    case next of
+                        Ok n ->
+                            Ok (n :: a)
 
-                ( Ok _, Err x ) ->
-                    Err x
+                        Err n ->
+                            Err [ n ]
 
-                ( Err n, Ok _ ) ->
-                    Err [ n ]
+                Err x ->
+                    case next of
+                        Ok _ ->
+                            acc
 
-                ( Err n, Err x ) ->
-                    Err (n :: x)
+                        Err n ->
+                            Err (n :: x)
     in
     List.foldr step (Ok []) results
         |> Result.mapError List.reverse
