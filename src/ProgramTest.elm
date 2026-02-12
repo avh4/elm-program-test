@@ -1807,8 +1807,7 @@ allOk results =
                 ( Err n, Err x ) ->
                     Err (n :: x)
     in
-    List.foldl step (Ok []) results
-        |> Result.map List.reverse
+    List.foldr step (Ok []) results
         |> Result.mapError List.reverse
 
 
