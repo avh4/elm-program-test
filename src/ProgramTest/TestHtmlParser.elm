@@ -76,20 +76,20 @@ stepsParser parseHtml =
     Parser.loop [] <|
         \acc ->
             Parser.oneOf
-                [ Parser.succeed (\stmt -> Parser.Loop (stmt :: acc))
-                    |= stepParser parseHtml
+                [ Parser.succeed (\selectors stmt -> Parser.Loop (FindStep selectors stmt :: acc))
+                    |= stepParser
+                    |= parseHtml
                 , Parser.succeed ()
                     |> Parser.map (\() -> Parser.Done (List.reverse acc))
                 ]
 
 
-stepParser : Parser html -> Parser (Step html)
-stepParser parseHtml =
-    Parser.succeed FindStep
+stepParser : Parser (List Selector)
+stepParser =
+    Parser.succeed identity
         |. Parser.keyword "▼ Query.find "
         |= selectorsParser
         |. Parser.symbol "\n\n    1)  "
-        |= parseHtml
 
 
 selectorsParser : Parser (List Selector)
