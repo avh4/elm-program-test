@@ -46,12 +46,11 @@ handleCheck fieldId =
 
 boolToString : Bool -> String
 boolToString b =
-    case b of
-        True ->
-            "True"
+    if b then
+        "True"
 
-        False ->
-            "False"
+    else
+        "False"
 
 
 testView : String -> Html String
