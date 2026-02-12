@@ -79,7 +79,7 @@ stepsParser parseHtml =
                 [ Parser.succeed (\stmt -> Parser.Loop (stmt :: acc))
                     |= stepParser parseHtml
                 , Parser.succeed ()
-                    |> Parser.map (\_ -> Parser.Done (List.reverse acc))
+                    |> Parser.map (\() -> Parser.Done (List.reverse acc))
                 ]
 
 
@@ -126,7 +126,7 @@ selectorParser =
                                 |. Parser.backtrackable (Parser.symbol " ")
                                 |= singleSelectorParser
                             , Parser.succeed ()
-                                |> Parser.map (\_ -> Parser.Done (done acc))
+                                |> Parser.map (\() -> Parser.Done (done acc))
                             ]
             )
 
@@ -175,7 +175,7 @@ selectorResultsParser =
                 [ Parser.succeed (\stmt -> Parser.Loop (stmt :: acc))
                     |= selectorResultParser
                 , Parser.succeed ()
-                    |> Parser.map (\_ -> Parser.Done (List.reverse acc))
+                    |> Parser.map (\() -> Parser.Done (List.reverse acc))
                 ]
     in
     Parser.loop [] help
