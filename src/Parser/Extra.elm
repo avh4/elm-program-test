@@ -66,4 +66,4 @@ problemToString prob =
 
 deadEndToRowColString : DeadEnd -> String
 deadEndToRowColString deadEnd =
-    "row " ++ String.fromInt deadEnd.row ++ ", " ++ "col " ++ String.fromInt deadEnd.col
+    "row " ++ String.fromInt deadEnd.row ++ ", col " ++ String.fromInt deadEnd.col

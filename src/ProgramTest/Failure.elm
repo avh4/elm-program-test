@@ -54,7 +54,7 @@ toString failure =
             "simulateLastEffect failed: " ++ message
 
         InvalidLocationUrl functionName invalidUrl ->
-            functionName ++ ": " ++ "Not a valid absolute URL:\n" ++ String.Extra.escape invalidUrl
+            functionName ++ ": Not a valid absolute URL:\n" ++ String.Extra.escape invalidUrl
 
         InvalidFlags functionName message ->
             functionName ++ ":\n" ++ message
