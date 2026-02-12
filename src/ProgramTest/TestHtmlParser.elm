@@ -85,13 +85,11 @@ stepsParser parseHtml =
 
 stepParser : Parser html -> Parser (Step html)
 stepParser parseHtml =
-    Parser.oneOf
-        [ Parser.succeed FindStep
-            |. Parser.keyword "▼ Query.find "
-            |= selectorsParser
-            |. Parser.symbol "\n\n    1)  "
-            |= parseHtml
-        ]
+    Parser.succeed FindStep
+        |. Parser.keyword "▼ Query.find "
+        |= selectorsParser
+        |. Parser.symbol "\n\n    1)  "
+        |= parseHtml
 
 
 selectorsParser : Parser (List Selector)
@@ -162,13 +160,11 @@ singleSelectorParser =
 
 assertionParser : Parser Assertion
 assertionParser =
-    Parser.oneOf
-        [ Parser.succeed Has
-            |. Parser.keyword "▼ Query.has "
-            |= selectorsParser
-            |. Parser.symbol "\n\n"
-            |= selectorResultsParser
-        ]
+    Parser.succeed Has
+        |. Parser.keyword "▼ Query.has "
+        |= selectorsParser
+        |. Parser.symbol "\n\n"
+        |= selectorResultsParser
 
 
 selectorResultsParser : Parser (List (Result String String))
