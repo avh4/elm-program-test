@@ -1,7 +1,7 @@
 module ProgramTestTests.SimulatedEffects.BasicTest exposing (all)
 
 import Expect
-import ProgramTest exposing (ProgramTest, SimulatedEffect, SimulatedTask)
+import ProgramTest exposing (SimulatedTask)
 import SimulatedEffect.Task as Task
 import Test exposing (..)
 import TestingProgram exposing (Msg(..))

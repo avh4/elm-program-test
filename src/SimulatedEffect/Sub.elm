@@ -15,7 +15,7 @@ to help you implement the function to provide when using [`ProgramTest.withSimul
 -}
 
 import Json.Decode
-import ProgramTest exposing (SimulatedEffect, SimulatedSub)
+import ProgramTest exposing (SimulatedSub)
 import SimulatedEffect
 
 

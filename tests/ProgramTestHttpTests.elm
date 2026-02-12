@@ -1,6 +1,6 @@
 module ProgramTestHttpTests exposing (all)
 
-import Expect exposing (Expectation)
+import Expect
 import Html
 import Html.Events exposing (onClick)
 import Json.Decode

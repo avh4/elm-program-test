@@ -1,6 +1,6 @@
 module PairingHeapTest exposing (all)
 
-import Expect exposing (Expectation)
+import Expect
 import PairingHeap
 import Test exposing (..)
 

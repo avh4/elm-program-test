@@ -1,14 +1,13 @@
 module ProgramTestTests.SimulatedEffects.TimeTest exposing (all)
 
 import Expect
-import ProgramTest exposing (ProgramTest, SimulatedEffect, SimulatedTask)
+import ProgramTest exposing (SimulatedTask)
 import SimulatedEffect.Cmd
 import SimulatedEffect.Process as Process
 import SimulatedEffect.Task as Task
 import SimulatedEffect.Time as Time
 import Test exposing (..)
 import TestingProgram exposing (Msg(..))
-import Time as RealTime
 
 
 startTasks : List (SimulatedTask x a) -> TestingProgram.ProgramTest

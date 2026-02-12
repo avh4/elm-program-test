@@ -1,10 +1,10 @@
 module ProgramTestTests.SimulatedEffects.PortsTest exposing (all)
 
-import Expect exposing (Expectation)
+import Expect
 import Html
 import Json.Decode as Decode
 import Json.Encode as Json
-import ProgramTest exposing (ProgramTest, SimulatedEffect, SimulatedTask)
+import ProgramTest
 import SimulatedEffect.Cmd
 import SimulatedEffect.Ports
 import SimulatedEffect.Sub

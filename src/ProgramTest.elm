@@ -203,7 +203,7 @@ These functions may be useful if you are writing your own custom assertion funct
 -}
 
 import Browser
-import Dict exposing (Dict)
+import Dict
 import Expect exposing (Expectation)
 import Html exposing (Html)
 import Html.Attributes exposing (attribute)
@@ -213,7 +213,7 @@ import Json.Encode
 import List.Extra
 import MultiDict
 import ProgramTest.ComplexQuery as ComplexQuery exposing (ComplexQuery)
-import ProgramTest.EffectSimulation as EffectSimulation exposing (EffectSimulation)
+import ProgramTest.EffectSimulation as EffectSimulation
 import ProgramTest.Failure as Failure exposing (Failure(..))
 import ProgramTest.Program as Program exposing (Program)
 import Result.Extra
@@ -276,12 +276,6 @@ toFailure programTest =
 
         FailedToCreate f ->
             Just f
-
-
-type alias TestLog model msg =
-    { view : model -> Html msg
-    , history : List model
-    }
 
 
 type alias ProgramOptions model msg effect =
@@ -798,11 +792,6 @@ runComplexQuery functionName complexQuery fn =
 simulateComplexQuery : String -> (ComplexQuery (Query.Single msg) -> ComplexQuery msg) -> ProgramTest model msg effect -> ProgramTest model msg effect
 simulateComplexQuery functionName complexQuery =
     runComplexQuery functionName complexQuery TestState.update
-
-
-assertComplexQuery : String -> (ComplexQuery (Query.Single msg) -> ComplexQuery ignored) -> ProgramTest model msg effect -> ProgramTest model msg effect
-assertComplexQuery functionName complexQuery =
-    runComplexQuery functionName complexQuery (\_ _ state -> Ok state)
 
 
 {-| Simulates a custom DOM event.

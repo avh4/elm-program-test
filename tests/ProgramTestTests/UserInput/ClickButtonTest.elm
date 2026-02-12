@@ -1,10 +1,10 @@
 module ProgramTestTests.UserInput.ClickButtonTest exposing (all)
 
-import Expect exposing (Expectation)
+import Expect
 import Html
 import Html.Attributes exposing (attribute, disabled, type_, value)
 import Html.Events exposing (onClick, onSubmit)
-import ProgramTest exposing (ProgramTest)
+import ProgramTest
 import Test exposing (..)
 import Test.Expect exposing (expectAnyFailure, expectFailure)
 import TestingProgram exposing (Msg(..))

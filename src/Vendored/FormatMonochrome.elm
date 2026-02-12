@@ -5,7 +5,7 @@
 
 module Vendored.FormatMonochrome exposing (formatEquality)
 
-import Vendored.Highlightable as Highlightable exposing (Highlightable(..))
+import Vendored.Highlightable as Highlightable exposing (Highlightable)
 
 
 formatEquality : List (Highlightable String) -> List (Highlightable String) -> ( String, String )

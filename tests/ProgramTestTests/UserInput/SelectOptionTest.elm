@@ -1,6 +1,6 @@
 module ProgramTestTests.UserInput.SelectOptionTest exposing (all)
 
-import Expect exposing (Expectation)
+import Expect
 import Html exposing (Html)
 import Html.Attributes exposing (for, id, value)
 import Html.Events exposing (on)
@@ -160,17 +160,3 @@ all =
                         , """  ✗ Event.expectEvent: I found a node, but it does not listen for "change" events like I expected it would."""
                         ]
         ]
-
-
-expectContains : String -> String -> Expectation
-expectContains expectedString actualString =
-    if String.contains expectedString actualString then
-        Expect.pass
-
-    else
-        Expect.fail
-            ("Expected string containing: "
-                ++ expectedString
-                ++ "\nBut got: "
-                ++ actualString
-            )
