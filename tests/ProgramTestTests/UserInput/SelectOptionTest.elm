@@ -14,13 +14,13 @@ start =
     ProgramTest.createSandbox
         { init = "<INIT>"
         , update = \msg model -> model ++ ";" ++ msg
-        , view = testView
+        , view = \_ -> testView
         }
         |> ProgramTest.start ()
 
 
-testView : String -> Html String
-testView model =
+testView : Html String
+testView =
     Html.div []
         [ Html.label [ for "pet-select" ] [ Html.text "Choose a pet" ]
         , Html.select

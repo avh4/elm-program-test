@@ -2325,7 +2325,7 @@ getOutgoingPortValues portName programTest =
                                 Created
                                     { created
                                         | state =
-                                            TestResult.fail (EffectSimulationNotConfigured "getPortValues") s
+                                            TestResult.fail (EffectSimulationNotConfigured "getPortValues")
                                     }
 
                         Just effects ->

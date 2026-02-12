@@ -13,8 +13,8 @@ type alias TestResult model msg effect =
         (TestState model msg effect)
 
 
-fail : Failure -> TestState model msg effect -> TestResult model msg effect
-fail failure state =
+fail : Failure -> TestResult model msg effect
+fail failure =
     Err
         { reason = failure
         }
@@ -26,7 +26,7 @@ andThen f testResult =
         Ok state ->
             case f state of
                 Err failure ->
-                    fail failure state
+                    fail failure
 
                 Ok newState ->
                     Ok newState
