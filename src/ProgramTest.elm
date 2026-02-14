@@ -1099,7 +1099,7 @@ clickLink linkText href =
                     Err
                         (CustomFailure functionDescription
                             (String.concat
-                                [ "Found an `<a href=\"...\">` tag has an onClick handler, "
+                                [ "Found an `<a href=\"...\">` tag with an onClick handler, "
                                 , "but the handler is overriding ctrl-click and meta-click.\n\n"
                                 , "A properly behaved single-page app should not override ctrl- and meta-clicks on `<a>` tags "
                                 , "because this prevents users from opening links in new tabs/windows.\n\n"

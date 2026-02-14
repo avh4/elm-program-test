@@ -116,7 +116,7 @@ all =
                     |> ProgramTest.clickLink "SPA" "#search"
                     |> ProgramTest.done
                     |> expectFailure
-                        [ """clickLink "SPA": Found an `<a href="...">` tag has an onClick handler, but the handler is overriding ctrl-click and meta-click."""
+                        [ """clickLink "SPA": Found an `<a href="...">` tag with an onClick handler, but the handler is overriding ctrl-click and meta-click."""
                         , ""
                         , "A properly behaved single-page app should not override ctrl- and meta-clicks on `<a>` tags because this prevents users from opening links in new tabs/windows."
                         , ""
