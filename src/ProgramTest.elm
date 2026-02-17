@@ -41,7 +41,7 @@ This module allows you to interact with your program by simulating
 user interactions and external events (like HTTP responses and ports),
 and making assertions about the HTML it renders and the external requests it makes.
 
-  - [Guide for upgrading from elm-program-test 2.x to 3.x](https://elm-program-test.netlify.com/upgrade-3.0.0.html)
+  - [Guide for upgrading from elm-program-test 2.x to 3.x](https://elm-program-test.netlify.app/upgrade-3.0.0.html)
 
 
 ## Documentation index
@@ -63,11 +63,11 @@ For a more detailed explanation of how to get started,
 see the elm-program-test guidebooks
 (the best one to start with is “Testing programs with interactive views”):
 
-  - [Testing programs with interactive views](https://elm-program-test.netlify.com//html.html) &mdash;
+  - [Testing programs with interactive views](https://elm-program-test.netlify.app//html.html) &mdash;
     shows an example of test-driving adding form validation to an Elm program
-  - [Testing programs with Cmds](https://elm-program-test.netlify.com/cmds.html) &mdash; shows testing a program
+  - [Testing programs with Cmds](https://elm-program-test.netlify.app/cmds.html) &mdash; shows testing a program
     that uses `Http.get` and `Http.post`
-  - [Testing programs with ports](https://elm-program-test.netlify.com/ports.html) &mdash; shows testing a program
+  - [Testing programs with ports](https://elm-program-test.netlify.app/ports.html) &mdash; shows testing a program
     that uses ports to interface with JavaScript
 
 
@@ -483,7 +483,7 @@ withJsonStringFlags decoder (ProgramDefinition options program) =
 when your app runs in production
 (this enables you to use [`simulateHttpResponse`](#simulateHttpResponse), [`advanceTime`](#advanceTime), etc.).
 For a detailed explanation and example of how to set up tests that use simulated effects,
-see the [“Testing programs with Cmds” guidebook](https://elm-program-test.netlify.com/cmds.html).
+see the [“Testing programs with Cmds” guidebook](https://elm-program-test.netlify.app/cmds.html).
 
 You only need to use this if you need to simulate [HTTP requests](#simulating-http-responses),
 [outgoing ports](#expectOutgoingPortValues),
@@ -506,7 +506,7 @@ when your app runs in production
 (this enables you to use [`simulateIncomingPort`](#simulateIncomingPort), etc.).
 You only need to use this if you need to simulate subscriptions in your test.
 For a detailed explanation and example of how to set up tests that use simulated subscriptions,
-see the [“Testing programs with ports” guidebook](https://elm-program-test.netlify.com/ports.html).
+see the [“Testing programs with ports” guidebook](https://elm-program-test.netlify.app/ports.html).
 
 The function you provide should be similar to your program's `subscriptions` function
 but return `SimulatedSub`s instead of `Sub`s.
@@ -1732,7 +1732,7 @@ For example:
             Json.Decode.string
             (Expect.equal [ "975774a26612", "920facb1bac0" ])
 
-For a more detailed explanation and example, see the [“Testing programs with ports” guidebook](https://elm-program-test.netlify.com/ports.html).
+For a more detailed explanation and example, see the [“Testing programs with ports” guidebook](https://elm-program-test.netlify.app/ports.html).
 
 NOTE: You must use [`withSimulatedEffects`](#withSimulatedEffects) before you call [`start`](#start) to be able to use this function.
 
@@ -1829,7 +1829,7 @@ For example, here we are simulating the program receiving a list of strings on t
                 [ "Garden-path sentences can confuse the reader." ]
             )
 
-For a more detailed explanation and example, see the [“Testing programs with ports” guidebook](https://elm-program-test.netlify.com/ports.html).
+For a more detailed explanation and example, see the [“Testing programs with ports” guidebook](https://elm-program-test.netlify.app/ports.html).
 
 NOTE: You must use [`withSimulatedSubscriptions`](#withSimulatedSubscriptions) before you call [`start`](#start) to be able to use this function.
 

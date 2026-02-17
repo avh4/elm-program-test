@@ -124,7 +124,7 @@ New features:
 ## 3.0.0
 
 There are many significant changes!
-See [Upgrading elm-program-test 2.x to 3.x](https://elm-program-test.netlify.com/upgrade-3.0.0.html) for more details about the following changes.
+See [Upgrading elm-program-test 2.x to 3.x](https://elm-program-test.netlify.app/upgrade-3.0.0.html) for more details about the following changes.
 
 API Changes:
 
@@ -140,9 +140,9 @@ New features:
   
 New documentation:
 
-  - new guidebook: [Testing programs with interactive views](https://elm-program-test.netlify.com/html.html)
-  - new guidebook: [Testing programs with Cmds](https://elm-program-test.netlify.com/cmds.html)
-  - new guidebook: [Testing programs with ports](https://elm-program-test.netlify.com/cmds.html)
+  - new guidebook: [Testing programs with interactive views](https://elm-program-test.netlify.app/html.html)
+  - new guidebook: [Testing programs with Cmds](https://elm-program-test.netlify.app/cmds.html)
+  - new guidebook: [Testing programs with ports](https://elm-program-test.netlify.app/cmds.html)
 
 
 ## 2.3.2

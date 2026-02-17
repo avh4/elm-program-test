@@ -15,7 +15,7 @@ for testing your Elm programs as complete units.
     ```elm-test install avh4/elm-program-test```
 
 
-## [Guidebooks](https://elm-program-test.netlify.com/#guidebooks)
+## [Guidebooks](https://elm-program-test.netlify.app/#guidebooks)
 
 Note: If you are just looking for a quick example of what using `elm-program-test` looks like,
 see the ["basic example"](#basic-example) below.
@@ -23,13 +23,13 @@ see the ["basic example"](#basic-example) below.
 For more detailed documentation, the following guides show examples of how to use
 `elm-program-test` to test different aspects of an Elm program:
 
-- [Testing programs with interactive views](https://elm-program-test.netlify.com/html.html) &mdash;
+- [Testing programs with interactive views](https://elm-program-test.netlify.app/html.html) &mdash;
   shows an example of test-driving adding form validation to an Elm program
-- [Testing programs with Cmds](https://elm-program-test.netlify.com/cmds.html) &mdash; shows testing a program
+- [Testing programs with Cmds](https://elm-program-test.netlify.app/cmds.html) &mdash; shows testing a program
   that uses `Http.get` and `Http.post`
-- [Testing programs with ports](https://elm-program-test.netlify.com/ports.html) &mdash; shows testing a program
+- [Testing programs with ports](https://elm-program-test.netlify.app/ports.html) &mdash; shows testing a program
   that uses ports to interface with JavaScript
-- [Upgrading from elm-program-test 2.x to 3.x](https://elm-program-test.netlify.com/upgrade-3.0.0.html)
+- [Upgrading from elm-program-test 2.x to 3.x](https://elm-program-test.netlify.app/upgrade-3.0.0.html)
 
 
 ## Basic example
