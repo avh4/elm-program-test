@@ -2,7 +2,7 @@
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
-    nodejs
+    nodejs-18_x
     nodePackages.pnpm
     nodePackages.npm-check-updates
   ];
