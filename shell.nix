@@ -1,8 +1,8 @@
-{ pkgs ? import <nixpkgs> { } }:
+{ sources ? import ./nix/sources.nix, pkgs ? import sources.nixpkgs { } }:
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
-    nodejs-18_x
+    nodejs_24
     nodePackages.pnpm
     nodePackages.npm-check-updates
   ];
