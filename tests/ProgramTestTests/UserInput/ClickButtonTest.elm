@@ -158,7 +158,7 @@ all =
                         [ "▼ Query.fromHtml"
                         , ""
                         , "    <body>"
-                        , "        <button disabled=true>"
+                        , "        <button disabled=\"\">"
                         , "            Click Me"
                         , "        </button>"
                         , "    </body>"

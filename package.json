@@ -1,12 +1,12 @@
 {
   "devDependencies": {
-    "@vue/babel-preset-app": "^5.0.8",
+    "@vue/babel-preset-app": "^5.0.9",
     "chokidar-cli": "^3.0.0",
-    "concurrently": "^7.6.0",
-    "elm-doc-preview": "^5.0.5",
-    "elm-test": "^0.19.1-revision10",
-    "elm-tooling": "^1.10.0",
-    "vuepress": "^1.9.7"
+    "concurrently": "^9.2.1",
+    "elm-doc-preview": "^6.0.1",
+    "elm-test": "^0.19.1-revision17",
+    "elm-tooling": "^1.17.0",
+    "vuepress": "^1.9.10"
   },
   "scripts": {
     "postinstall": "elm-tooling install",
