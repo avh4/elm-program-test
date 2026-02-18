@@ -82,8 +82,7 @@ hasHeader key value { headers } =
             String.toLower value
 
         matches ( k, v ) =
-            ( String.toLower k, String.toLower v )
-                == ( key_, value_ )
+            String.toLower k == key_ && String.toLower v == value_
     in
     if List.any matches headers then
         Expect.pass

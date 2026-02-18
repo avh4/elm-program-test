@@ -76,22 +76,20 @@ stepsParser parseHtml =
     Parser.loop [] <|
         \acc ->
             Parser.oneOf
-                [ Parser.succeed (\stmt -> Parser.Loop (stmt :: acc))
-                    |= stepParser parseHtml
+                [ Parser.succeed (\selectors stmt -> Parser.Loop (FindStep selectors stmt :: acc))
+                    |= stepParser
+                    |= parseHtml
                 , Parser.succeed ()
-                    |> Parser.map (\_ -> Parser.Done (List.reverse acc))
+                    |> Parser.map (\() -> Parser.Done (List.reverse acc))
                 ]
 
 
-stepParser : Parser html -> Parser (Step html)
-stepParser parseHtml =
-    Parser.oneOf
-        [ Parser.succeed FindStep
-            |. Parser.keyword "▼ Query.find "
-            |= selectorsParser
-            |. Parser.symbol "\n\n    1)  "
-            |= parseHtml
-        ]
+stepParser : Parser (List Selector)
+stepParser =
+    Parser.succeed identity
+        |. Parser.keyword "▼ Query.find "
+        |= selectorsParser
+        |. Parser.symbol "\n\n    1)  "
 
 
 selectorsParser : Parser (List Selector)
@@ -128,7 +126,7 @@ selectorParser =
                                 |. Parser.backtrackable (Parser.symbol " ")
                                 |= singleSelectorParser
                             , Parser.succeed ()
-                                |> Parser.map (\_ -> Parser.Done (done acc))
+                                |> Parser.map (\() -> Parser.Done (done acc))
                             ]
             )
 
@@ -162,13 +160,11 @@ singleSelectorParser =
 
 assertionParser : Parser Assertion
 assertionParser =
-    Parser.oneOf
-        [ Parser.succeed Has
-            |. Parser.keyword "▼ Query.has "
-            |= selectorsParser
-            |. Parser.symbol "\n\n"
-            |= selectorResultsParser
-        ]
+    Parser.succeed Has
+        |. Parser.keyword "▼ Query.has "
+        |= selectorsParser
+        |. Parser.symbol "\n\n"
+        |= selectorResultsParser
 
 
 selectorResultsParser : Parser (List (Result String String))
@@ -179,7 +175,7 @@ selectorResultsParser =
                 [ Parser.succeed (\stmt -> Parser.Loop (stmt :: acc))
                     |= selectorResultParser
                 , Parser.succeed ()
-                    |> Parser.map (\_ -> Parser.Done (List.reverse acc))
+                    |> Parser.map (\() -> Parser.Done (List.reverse acc))
                 ]
     in
     Parser.loop [] help

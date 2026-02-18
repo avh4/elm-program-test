@@ -23,14 +23,14 @@ formatEquality highlightedExpected highlightedActual =
 
         combinedExpected =
             String.join "\n"
-                [ String.join "" formattedExpected
-                , String.join "" expectedIndicators
+                [ String.concat formattedExpected
+                , String.concat expectedIndicators
                 ]
 
         combinedActual =
             String.join "\n"
-                [ String.join "" actualIndicators
-                , String.join "" formattedActual
+                [ String.concat actualIndicators
+                , String.concat formattedActual
                 ]
     in
     ( combinedExpected, combinedActual )

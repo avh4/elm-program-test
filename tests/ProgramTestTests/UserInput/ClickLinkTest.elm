@@ -146,9 +146,8 @@ onClickPreventDefaultForLinkWithHref msg =
 
 succeedIfFalse : a -> Bool -> Json.Decode.Decoder a
 succeedIfFalse msg preventDefault =
-    case preventDefault of
-        False ->
-            Json.Decode.succeed msg
+    if preventDefault then
+        Json.Decode.fail "succeedIfFalse: condition was True"
 
-        True ->
-            Json.Decode.fail "succeedIfFalse: condition was True"
+    else
+        Json.Decode.succeed msg

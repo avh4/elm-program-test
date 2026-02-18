@@ -75,7 +75,7 @@ format formatEquality description reason =
                         "\nThese keys are missing: "
                             ++ (missing |> String.join ", " |> (\d -> "[ " ++ d ++ " ]"))
             in
-            String.join ""
+            String.concat
                 [ verticalBar description expected actual
                 , "\n"
                 , extraStr
@@ -168,7 +168,7 @@ listDiffToString index description { expected, actual } originals =
             , "\n"
             , String.join ", " originals.originalActual
             ]
-                |> String.join ""
+                |> String.concat
 
         ( _ :: _, [] ) ->
             verticalBar (description ++ " was shorter than")
@@ -192,7 +192,7 @@ listDiffToString index description { expected, actual } originals =
 
             else
                 -- We found elements that differ; fail!
-                String.join ""
+                String.concat
                     [ verticalBar description
                         (String.join ", " originals.originalExpected)
                         (String.join ", " originals.originalActual)

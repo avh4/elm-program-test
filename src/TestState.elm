@@ -272,20 +272,19 @@ advanceTo program functionName end state =
 
                 Just ( t, task ) ->
                     if t <= end then
-                        Ok
-                            { state
-                                | effectSimulation =
-                                    Just
-                                        { simulation
-                                            | state =
-                                                { ss
-                                                    | nowMs = t
-                                                    , futureTasks = PairingHeap.deleteMin simulation.state.futureTasks
-                                                }
-                                        }
-                            }
-                            |> Result.map (withSimulation (EffectSimulation.queueTask (task ())))
-                            |> Result.andThen (drain program)
+                        { state
+                            | effectSimulation =
+                                Just
+                                    { simulation
+                                        | state =
+                                            { ss
+                                                | nowMs = t
+                                                , futureTasks = PairingHeap.deleteMin simulation.state.futureTasks
+                                            }
+                                    }
+                        }
+                            |> withSimulation (EffectSimulation.queueTask (task ()))
+                            |> drain program
                             |> Result.andThen (advanceTo program functionName end)
 
                     else

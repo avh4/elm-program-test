@@ -65,7 +65,7 @@ highlight predicate =
                     else
                         let
                             bestId =
-                                List.concatMap identity
+                                List.concat
                                     [ List.filter (Tuple.first >> (==) "id") attrs
                                     , List.filter (Tuple.first >> (==) "name") attrs
                                     , List.filter (Tuple.first >> (==) "class") attrs

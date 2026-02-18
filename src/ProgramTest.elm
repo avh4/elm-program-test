@@ -1682,7 +1682,7 @@ simulateHttpResponseHelper functionName method url pendingRequestIndex failIfMor
                             Err (NoMatchingHttpRequest pendingRequestIndex (List.length prev) functionName { method = method, url = url } (MultiDict.keys simulation.state.http))
 
                         ( prev, actualRequest :: rest ) ->
-                            if failIfMorePendingRequests && rest /= [] then
+                            if failIfMorePendingRequests && not (List.isEmpty rest) then
                                 Err (MultipleMatchingHttpRequest pendingRequestIndex (List.length prev + 1 + List.length rest) functionName { method = method, url = url } (MultiDict.keys simulation.state.http))
 
                             else
@@ -1768,7 +1768,7 @@ expectOutgoingPortValuesHelper functionName portName decoder checkValues =
                     Err (EffectSimulationNotConfigured functionName)
 
                 Just simulation ->
-                    case allOk <| List.map (Json.Decode.decodeValue decoder) <| EffectSimulation.outgoingPortValues portName simulation of
+                    case allOk decoder <| EffectSimulation.outgoingPortValues portName simulation of
                         Err errs ->
                             Err (CustomFailure (functionName ++ ": failed to decode port values") (List.map Json.Decode.errorToString errs |> String.join "\n"))
 
@@ -1790,25 +1790,28 @@ expectOutgoingPortValuesHelper functionName portName decoder checkValues =
                                         )
 
 
-allOk : List (Result x a) -> Result (List x) (List a)
-allOk results =
+allOk : Json.Decode.Decoder a -> List Json.Decode.Value -> Result (List Json.Decode.Error) (List a)
+allOk decoder results =
     let
         step next acc =
-            case ( next, acc ) of
-                ( Ok n, Ok a ) ->
-                    Ok (n :: a)
+            case acc of
+                Ok a ->
+                    case Json.Decode.decodeValue decoder next of
+                        Ok n ->
+                            Ok (n :: a)
 
-                ( Ok _, Err x ) ->
-                    Err x
+                        Err n ->
+                            Err [ n ]
 
-                ( Err n, Ok _ ) ->
-                    Err [ n ]
+                Err x ->
+                    case Json.Decode.decodeValue decoder next of
+                        Ok _ ->
+                            acc
 
-                ( Err n, Err x ) ->
-                    Err (n :: x)
+                        Err n ->
+                            Err (n :: x)
     in
-    List.foldl step (Ok []) results
-        |> Result.map List.reverse
+    List.foldr step (Ok []) results
         |> Result.mapError List.reverse
 
 
@@ -1883,7 +1886,7 @@ simulateIncomingPort portName value =
                                 Ok msg ->
                                     TestState.update msg program tc
                     in
-                    if matches == [] then
+                    if List.isEmpty matches then
                         Err (CustomFailure functionName "the program is not currently subscribed to the port")
 
                     else

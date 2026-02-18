@@ -21,7 +21,7 @@ stringHelp revChunks =
                 , map (\_ -> "\u{000D}") (token "r")
                 ]
         , token "\""
-            |> map (\_ -> Done (String.join "" (List.reverse revChunks)))
+            |> map (\_ -> Done (String.concat (List.reverse revChunks)))
         , chompWhile isUninteresting
             |> getChompedString
             |> map (\chunk -> Loop (chunk :: revChunks))
