@@ -1,3 +1,9 @@
+## 4.0.1
+
+- Require elm-explorations/test >= 2.2.0 for consistent HTML rendering
+- Update links to elm-program-test guidebooks website
+
+
 ## 4.0.0
 
 - Upgrade to elm-explorations/test 2.0.0
