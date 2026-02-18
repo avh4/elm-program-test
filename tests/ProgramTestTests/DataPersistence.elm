@@ -3,7 +3,7 @@ module ProgramTestTests.DataPersistence exposing (all)
 import Expect
 import Html
 import Json.Encode as Encode
-import ProgramTest exposing (ProgramTest, SimulatedEffect, SimulatedTask)
+import ProgramTest
 import SimulatedEffect.Ports as Ports
 import Test exposing (..)
 import Test.Expect exposing (expectFailure, expectFailureContaining)

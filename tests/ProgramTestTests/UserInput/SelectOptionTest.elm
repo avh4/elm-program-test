@@ -1,6 +1,6 @@
 module ProgramTestTests.UserInput.SelectOptionTest exposing (all)
 
-import Expect exposing (Expectation)
+import Expect
 import Html exposing (Html)
 import Html.Attributes exposing (for, id, value)
 import Html.Events exposing (on)
@@ -14,13 +14,13 @@ start =
     ProgramTest.createSandbox
         { init = "<INIT>"
         , update = \msg model -> model ++ ";" ++ msg
-        , view = testView
+        , view = \_ -> testView
         }
         |> ProgramTest.start ()
 
 
-testView : String -> Html String
-testView model =
+testView : Html String
+testView =
     Html.div []
         [ Html.label [ for "pet-select" ] [ Html.text "Choose a pet" ]
         , Html.select
@@ -160,17 +160,3 @@ all =
                         , """  ✗ Event.expectEvent: I found a node, but it does not listen for "change" events like I expected it would."""
                         ]
         ]
-
-
-expectContains : String -> String -> Expectation
-expectContains expectedString actualString =
-    if String.contains expectedString actualString then
-        Expect.pass
-
-    else
-        Expect.fail
-            ("Expected string containing: "
-                ++ expectedString
-                ++ "\nBut got: "
-                ++ actualString
-            )

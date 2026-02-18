@@ -97,25 +97,6 @@ parseFailureReportWithoutHtml string =
         |> Result.mapError Parser.Extra.deadEndsToString
 
 
-partitionSections_ : List String -> List (List String) -> List String -> List (List String)
-partitionSections_ accLines accSections remaining =
-    case remaining of
-        [] ->
-            case List.reverse (List.reverse accLines :: accSections) of
-                [] :: rest ->
-                    rest
-
-                all ->
-                    all
-
-        next :: rest ->
-            if String.startsWith "▼ " next then
-                partitionSections_ [ next ] (List.reverse accLines :: accSections) rest
-
-            else
-                partitionSections_ (next :: accLines) accSections rest
-
-
 parseSimulateFailure : String -> String
 parseSimulateFailure string =
     let

@@ -1,16 +1,8 @@
 module TestHelper exposing (testAssertion1, testAssertion2, testAssertion3)
 
 import Expect exposing (Expectation)
-import Html
-import Html.Events exposing (onClick)
-import Json.Decode
 import ProgramTest exposing (ProgramTest)
-import SimulatedEffect.Cmd
-import SimulatedEffect.Http as Http
-import SimulatedEffect.Task as Task
 import Test exposing (..)
-import Test.Expect exposing (expectFailure, expectSuccess)
-import Test.Http
 
 
 

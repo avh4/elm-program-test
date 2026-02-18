@@ -5,7 +5,7 @@ module Url.Extra exposing (resolve, toUrlRequest)
 -}
 
 import Browser
-import Url exposing (Protocol(..), Url)
+import Url exposing (Url)
 
 
 {-| This resolves a URL string (either an absolute or relative URL) against a base URL (given as a `Location`).

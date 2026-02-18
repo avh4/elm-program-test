@@ -22,7 +22,7 @@ These are ways to easily make `Http.Response` values for use with [`ProgramTest.
 
 -}
 
-import Dict exposing (Dict)
+import Dict
 import Expect exposing (Expectation)
 import Http
 import Json.Decode
